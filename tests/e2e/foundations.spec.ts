@@ -19,13 +19,19 @@ test.describe("styleguide", () => {
     await expect(track.getByRole("listitem")).toHaveCount(5);
     await expect(track.locator('[aria-current="step"]')).toContainText("Build");
     await expect(page.getByText("12 days left").first()).toBeVisible();
+    // Steps: the current stage is a ring that is partly closed.
+    const ring = page.locator("[data-stage-ring]").first();
+    const offset = Number(await ring.getAttribute("stroke-dashoffset"));
+    const full = Number(await ring.getAttribute("stroke-dasharray"));
+    expect(offset).toBeGreaterThan(0);
+    expect(offset).toBeLessThan(full);
 
     // Chart: the SVG line is drawn, and the same data exists as a table.
     await expect(page.locator("[data-chart] svg path.recharts-line-curve")).toBeVisible();
     await expect(page.getByRole("table", { name: "Weekly load" }).getByRole("row")).toHaveCount(13);
   });
 
-  test("uses the design tokens: fonts, soft corners, light canvas, one lime accent", async ({
+  test("uses the design tokens: fonts, soft corners, light canvas, one sage accent", async ({
     page,
   }) => {
     await page.goto("/styleguide");
@@ -39,8 +45,8 @@ test.describe("styleguide", () => {
 
     expect(await style("h1", "font-family")).toContain("Satoshi");
     expect(await style("body", "font-family")).toContain("Switzer");
-    expect(await style("body", "background-color")).toBe("rgb(247, 247, 248)");
-    expect(await style("body", "color")).toBe("rgb(20, 20, 20)");
+    expect(await style("body", "background-color")).toBe("rgb(241, 239, 234)");
+    expect(await style("body", "color")).toBe("rgb(28, 25, 22)");
     // Sentence case everywhere except the tiny mono labels.
     expect(await style("h1", "text-transform")).toBe("none");
     expect(await style(".type-label", "text-transform")).toBe("uppercase");
@@ -57,7 +63,7 @@ test.describe("styleguide", () => {
     const box = await button.boundingBox();
     expect(box?.height).toBeGreaterThanOrEqual(44);
     await expect(button).toHaveCSS("border-radius", "12px");
-    await expect(button).toHaveCSS("background-color", "rgb(179, 255, 59)");
+    await expect(button).toHaveCSS("background-color", "rgb(142, 154, 128)");
     await expect(button).toHaveCSS("text-transform", "none");
   });
 
@@ -99,7 +105,7 @@ test.describe("styleguide", () => {
     const icons = page.locator("[data-icon-group] svg[data-icon]");
     await expect(icons).toHaveCount(36);
     await expect(icons.first()).toHaveCSS("fill", "none");
-    await expect(icons.first()).toHaveCSS("stroke", "rgb(20, 20, 20)");
+    await expect(icons.first()).toHaveCSS("stroke", "rgb(28, 25, 22)");
   });
 });
 
@@ -180,7 +186,7 @@ test.describe("PWA", () => {
     }
 
     await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveCount(1);
-    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#f7f7f8");
+    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#f1efea");
 
     const state = await page.evaluate(async () => {
       const registration = await navigator.serviceWorker.ready;

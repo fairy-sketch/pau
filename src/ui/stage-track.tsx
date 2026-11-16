@@ -11,47 +11,123 @@ export interface StageTrackItem {
   statusLabel: string;
 }
 
-const bar: Record<StageStatus, string> = {
-  done: "bg-ink opacity-30",
-  current: "bg-ink",
-  upcoming: "bg-hairline",
-};
+const R = 12;
+const C = 2 * Math.PI * R;
+const Y = 16;
+const WIDTH = 320;
 
 /**
- * Progress towards the goal as a row of thin segments. Only the current stage
- * is named on screen; the full list is there for screen readers.
+ * The path as five named stops ("Steps", decisions R34 to R36). Flat, no glow.
+ * Finished stages are filled and ticked, upcoming ones are hollow, and the
+ * current one is a ring that closes as the stage progresses, with the accent
+ * dot in its centre. The drawing is decorative; the list of names underneath
+ * carries the meaning for screen readers.
  */
 export function StageTrack({
   stages,
   label,
   position,
   note,
+  progress = 0,
 }: {
   stages: StageTrackItem[];
   /** Accessible name, e.g. "Stages towards your goal". */
   label: string;
-  /** e.g. "Stage 2 of 5". */
+  /** e.g. "· stage 2 of 5". */
   position: string;
   /** e.g. "12 days left". */
   note?: string;
+  /** How far through the current stage, from 0 to 1. */
+  progress?: number;
 }) {
-  const current = stages.find((s) => s.status === "current");
+  const n = stages.length;
+  const step = WIDTH / n;
+  const x = (k: number) => step / 2 + step * k;
+  const currentIndex = stages.findIndex((s) => s.status === "current");
+  const current = stages[currentIndex];
+  const reached = currentIndex === -1 ? n - 1 : currentIndex;
+  const done = Math.min(1, Math.max(0, progress));
+
   return (
-    <div>
-      <ol aria-label={label} className="flex gap-1.5">
+    <div data-stage-track>
+      <svg
+        viewBox={`0 0 ${WIDTH} ${Y * 2}`}
+        className="block w-full overflow-visible"
+        aria-hidden="true"
+      >
+        <path
+          d={`M${x(0)} ${Y}H${x(n - 1)}`}
+          className="stroke-track"
+          strokeWidth="3"
+          strokeLinecap="round"
+          fill="none"
+        />
+        {reached > 0 ? (
+          <path
+            d={`M${x(0)} ${Y}H${x(reached)}`}
+            className="stroke-ink"
+            strokeWidth="3"
+            strokeLinecap="round"
+            fill="none"
+          />
+        ) : null}
+        {stages.map((stage, k) => (
+          <g key={stage.id} transform={`translate(${x(k)} ${Y})`}>
+            {stage.status === "done" ? (
+              <>
+                <circle r={R} className="fill-ink" />
+                <path
+                  d="M-5 0.5 L-1.5 4 L5.5 -3.5"
+                  className="stroke-surface"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+              </>
+            ) : stage.status === "current" ? (
+              <>
+                <circle r={R} className="fill-surface stroke-track" strokeWidth="4" />
+                <circle
+                  r={R}
+                  className="stroke-ink"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  fill="none"
+                  strokeDasharray={C}
+                  strokeDashoffset={C * (1 - done)}
+                  transform="rotate(-90)"
+                  data-stage-ring
+                />
+                <circle r="5" className="fill-accent stroke-ink" strokeWidth="2" />
+              </>
+            ) : (
+              <circle r={R} className="fill-canvas stroke-track" strokeWidth="2" />
+            )}
+          </g>
+        ))}
+      </svg>
+      <ol
+        aria-label={label}
+        className="mt-2 grid text-center"
+        style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}
+      >
         {stages.map((stage) => (
           <li
             key={stage.id}
             aria-current={stage.status === "current" ? "step" : undefined}
-            className={cx("rounded-pill relative h-1 flex-1", bar[stage.status])}
+            className={cx(
+              "type-label",
+              stage.status === "current" ? "text-ink font-bold" : "text-secondary",
+            )}
+            style={{ fontSize: "0.59375rem", letterSpacing: "0.03em" }}
           >
-            <span className="sr-only">
-              {stage.label} {stage.statusLabel}
-            </span>
+            {stage.label}
+            <span className="sr-only"> {stage.statusLabel}</span>
           </li>
         ))}
       </ol>
-      <div className="mt-2.5 flex items-baseline justify-between gap-3" aria-hidden="true">
+      <div className="mt-3.5 flex items-baseline justify-between gap-3">
         <span>
           <span className="font-semibold">{current?.label}</span>{" "}
           <span className="text-small text-secondary">{position}</span>

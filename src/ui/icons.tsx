@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 /**
  * The PATH icon set: our own icons, drawn for this app (decisions R37 to R39).
  * One round line on a 24 px grid, no fills except small dots. Icons take the
- * colour of the text around them and are never lime.
+ * colour of the text around them and are never the accent colour.
  */
 const paths = {
   path: (

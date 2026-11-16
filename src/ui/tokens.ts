@@ -4,13 +4,14 @@
  * fails if the two drift apart.
  */
 export const colorTokens = [
-  { id: "canvas", name: "canvas", cssVar: "--color-canvas", hex: "#f7f7f8" },
+  { id: "canvas", name: "canvas", cssVar: "--color-canvas", hex: "#f1efea" },
   { id: "surface", name: "surface", cssVar: "--color-surface", hex: "#ffffff" },
-  { id: "soft", name: "soft", cssVar: "--color-soft", hex: "#edf0f5" },
-  { id: "hairline", name: "hairline", cssVar: "--color-hairline", hex: "#e1e5ec" },
-  { id: "ink", name: "ink", cssVar: "--color-ink", hex: "#141414" },
-  { id: "secondary", name: "secondary", cssVar: "--color-secondary", hex: "#5f6672" },
-  { id: "accent", name: "accent", cssVar: "--color-accent-base", hex: "#b3ff3b" },
+  { id: "soft", name: "soft", cssVar: "--color-soft", hex: "#e6e3dc" },
+  { id: "hairline", name: "hairline", cssVar: "--color-hairline", hex: "#dfdcd4" },
+  { id: "track", name: "track", cssVar: "--color-track", hex: "#d2cec4" },
+  { id: "ink", name: "ink", cssVar: "--color-ink", hex: "#1c1916" },
+  { id: "secondary", name: "secondary", cssVar: "--color-secondary", hex: "#5e6259" },
+  { id: "accent", name: "accent", cssVar: "--color-accent-base", hex: "#8e9a80" },
 ] as const;
 
 export type ColorTokenId = (typeof colorTokens)[number]["id"];

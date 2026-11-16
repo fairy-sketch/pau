@@ -33,13 +33,14 @@
     },
     "colour": {
       "usage": {
-        "canvas": "Screen background.",
+        "canvas": "Screen background: warm stone.",
         "surface": "Cards, sheets and inputs.",
         "soft": "Quiet fills: active tab, pills, notes.",
         "hairline": "The one divider. 1 px.",
         "ink": "Text.",
         "secondary": "Secondary text.",
-        "accent": "The only accent. The primary action, with dark text. Nothing else."
+        "accent": "The only accent: sage. The primary action, with dark text. Nothing else.",
+        "track": "The unfinished part of the stage line."
       }
     },
     "type": {
@@ -123,7 +124,7 @@
       "week": "W{number}",
       "columnPeriod": "Week",
       "columnValue": "Load",
-      "note": "One thin line on hairline rules. A lime dot marks the current week."
+      "note": "One thin line on hairline rules. A sage dot marks the current week."
     },
     "cover": {
       "goalLabel": "Your goal",
@@ -135,7 +136,7 @@
       "action": "Book"
     },
     "icons": {
-      "intro": "Our own set. One round line on a 24 px grid, always in the colour of the text beside it, never lime."
+      "intro": "Our own set. One round line on a 24 px grid, always in the colour of the text beside it, never the accent."
     },
     "photos": {
       "intro": "Twelve photos are the only imagery in the app. One photo per screen at most, always muted, and never with text on a busy area: text sits below the picture or on a soft fade.",

@@ -3,9 +3,9 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import sharp from "sharp";
 
-const INK = "#141414";
+const INK = "#1c1916";
 const PAPER = "#ffffff";
-const ACCENT = "#b3ff3b";
+const ACCENT = "#8e9a80";
 
 /** Two leaning lanes on black. `scale` shrinks the mark for the maskable safe zone. */
 function mark(scale = 1) {

@@ -10,15 +10,16 @@
 @font-face { font-family: "Switzer"; src: url("fonts/Switzer-Variable.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
 @font-face { font-family: "JetBrains Mono"; src: url("fonts/JetBrainsMono-Variable.woff2") format("woff2"); font-weight: 100 800; font-style: normal; font-display: swap; }
 :root {
-  /* Layout: one calm phone-width column on off-white; one focal element per screen; one lime accent for the primary action; progress is near-black. */
-  --bg: #f7f7f8;
+  /* Layout: one calm phone-width column on off-white; one focal element per screen; warm stone ground, white cards, one sage accent for the primary action; progress is warm black. */
+  --bg: #f1efea;
   --surface: #ffffff;
-  --soft: #edf0f5;
-  --text: #141414;
-  --text-2: #5f6672;
-  --hairline: #e1e5ec;
-  --accent: #b3ff3b;
-  --on-accent: #141414;
+  --soft: #e6e3dc;
+  --text: #1c1916;
+  --text-2: #5e6259;
+  --hairline: #dfdcd4;
+  --track: #d2cec4;
+  --accent: #8e9a80;
+  --on-accent: #1c1916;
   --heading: "Satoshi", "Helvetica Neue", Arial, sans-serif;
   --body: "Switzer", "Helvetica Neue", Arial, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
@@ -148,11 +149,11 @@ th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06e
 svg text { font-family: var(--mono); font-size: 10px; fill: var(--text-2); }
 /* The path line ("Steps"): five clear stops, flat, no glow. Finished stages are ticked; the current one is a ring that closes as you log. */
 .steps svg { display: block; width: 100%; height: auto; overflow: visible; }
-.s-track { fill: none; stroke: #cfd5df; stroke-width: 3; stroke-linecap: round; }
+.s-track { fill: none; stroke: var(--track); stroke-width: 3; stroke-linecap: round; }
 .s-conn { fill: none; stroke: var(--text); stroke-width: 3; stroke-linecap: round; }
-.s-st { fill: var(--bg); stroke: #cfd5df; stroke-width: 2; }
+.s-st { fill: var(--bg); stroke: var(--track); stroke-width: 2; }
 .s-st.done { fill: var(--text); stroke: var(--text); }
-.s-st.cur { fill: var(--surface); stroke: #cfd5df; stroke-width: 4; }
+.s-st.cur { fill: var(--surface); stroke: var(--track); stroke-width: 4; }
 .s-arc { fill: none; stroke: var(--text); stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset .9s cubic-bezier(.2,.8,.2,1); }
 .s-core { fill: var(--accent); stroke: var(--text); stroke-width: 2; }
 .s-core.beat { animation: s-beat .6s cubic-bezier(.34,1.56,.64,1); transform-box: fill-box; transform-origin: center; }
@@ -164,7 +165,7 @@ svg text { font-family: var(--mono); font-size: 10px; fill: var(--text-2); }
 /* Photography: the only imagery. Muted, one photo per screen, text below the picture or on the faded part. */
 .ph { display: block; width: 100%; height: 100%; object-fit: cover; filter: saturate(.6) contrast(.96); }
 .hero { position: relative; height: 208px; overflow: hidden; }
-.hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(247,247,248,0) 35%, var(--bg) 90%); }
+.hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(241,239,234,0) 35%, var(--bg) 90%); }
 .ccard { background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-card); box-shadow: var(--shadow); overflow: hidden; }
 .ccard .pic { aspect-ratio: 2 / 1; background: var(--soft); }
 .ccard .between > span:last-child { white-space: nowrap; flex: none; }
@@ -177,7 +178,7 @@ svg text { font-family: var(--mono); font-size: 10px; fill: var(--text-2); }
 .hold::before { content: ""; position: absolute; inset: 0; background: var(--accent); transform: scaleX(0); transform-origin: left; transition: transform .25s ease; }
 .hold { display: flex; align-items: center; justify-content: center; gap: 8px; }
 .hold span, .hold svg { position: relative; }
-.hold.holding { transform: scale(.98); box-shadow: 0 0 0 4px rgba(179,255,59,.3), 0 0 32px rgba(179,255,59,.95); transition: box-shadow .65s ease-in, transform .15s ease; }
+.hold.holding { transform: scale(.98); box-shadow: 0 0 0 4px rgba(142,154,128,.35), 0 0 28px rgba(142,154,128,.9); transition: box-shadow .65s ease-in, transform .15s ease; }
 .hold.holding::before { transform: scaleX(1); transition: transform .65s linear; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>

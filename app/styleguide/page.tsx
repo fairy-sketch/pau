@@ -59,6 +59,7 @@ export default async function StyleguidePage() {
       label={t("stageTrack.label")}
       position={t("stageTrack.position", { current: CURRENT_STAGE + 1, total: stages.length })}
       note={t("stageTrack.daysLeft", { count: 12 })}
+      progress={5 / 12}
     />
   );
 
