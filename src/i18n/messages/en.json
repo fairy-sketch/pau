@@ -27,7 +27,8 @@
       "components": "Components",
       "stageTrack": "Stage track",
       "chart": "Chart",
-      "cover": "Path sample"
+      "cover": "Path sample",
+      "icons": "Icons"
     },
     "colour": {
       "usage": {
@@ -131,6 +132,9 @@
       "nextTitle": "Book Thursday track, {time}",
       "nextMeta": "{count} spots left · Uses Regular season pass",
       "action": "Book"
+    },
+    "icons": {
+      "intro": "Our own set. One round line on a 24 px grid, always in the colour of the text beside it, never lime."
     }
   }
 }

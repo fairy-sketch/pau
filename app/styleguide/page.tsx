@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getFormatter, getTranslations } from "next-intl/server";
 import { APP_NAME } from "@/src/config/app";
 import { Button } from "@/src/ui/button";
+import { Icon, iconGroups } from "@/src/ui/icons";
 import {
   Card,
   DataList,
@@ -224,6 +225,24 @@ export default async function StyleguidePage() {
               />
             </div>
           </div>
+        </section>
+
+        <section aria-labelledby="sg-icons" className="space-y-6">
+          <Heading id="sg-icons">{t("sections.icons")}</Heading>
+          <p className="text-secondary max-w-prose">{t("icons.intro")}</p>
+          {iconGroups.map((group) => (
+            <ul key={group.id} className="grid grid-cols-4 gap-2 sm:grid-cols-6" data-icon-group>
+              {group.names.map((name) => (
+                <li
+                  key={name}
+                  className="rounded-control border-hairline bg-surface flex flex-col items-center gap-2 border px-1 py-3"
+                >
+                  <Icon name={name} size={28} />
+                  <span className="type-label text-secondary text-[0.5625rem]">{name}</span>
+                </li>
+              ))}
+            </ul>
+          ))}
         </section>
 
         <section aria-labelledby="sg-stage" className="space-y-6">

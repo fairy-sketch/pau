@@ -93,6 +93,13 @@ test.describe("styleguide", () => {
     const nav = page.getByRole("navigation", { name: "Sections" });
     await expect(nav.getByRole("link")).toHaveCount(5);
     await expect(nav.locator('[aria-current="page"]')).toHaveText("Path");
+    await expect(nav.locator("svg[data-icon]")).toHaveCount(5);
+
+    // Our own icon set: all 36 are shown, drawn as lines in the text colour.
+    const icons = page.locator("[data-icon-group] svg[data-icon]");
+    await expect(icons).toHaveCount(36);
+    await expect(icons.first()).toHaveCSS("fill", "none");
+    await expect(icons.first()).toHaveCSS("stroke", "rgb(20, 20, 20)");
   });
 });
 
