@@ -147,9 +147,9 @@
       "emptyBody": "Sessions you book show up here.",
       "cardTitle": "Yoga flow",
       "cardMeta": "Studio Two · Noor",
-      "peopleLabel": "Community: a low banner, as on the Coach screen",
-      "peopleTitle": "Your coach",
-      "peopleBody": "Ask anything. It only acts after you confirm."
+      "peopleLabel": "Community: a low banner, as on the club feed",
+      "peopleTitle": "This week at the club",
+      "peopleBody": "The Coach chat itself has no photo."
     }
   }
 }

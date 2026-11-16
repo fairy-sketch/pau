@@ -46,7 +46,7 @@ export function HeroPhoto({
   children,
 }: {
   image: AppImage;
-  /** "hero" for the Path and onboarding, "banner" for a lower strip such as the Coach screen. */
+  /** "hero" for the Path and onboarding, "banner" for a lower strip such as the club feed. */
   size?: "hero" | "banner";
   children: ReactNode;
 }) {

@@ -264,7 +264,7 @@ export default async function StyleguidePage() {
           <div className="space-y-3">
             <Label>{t("photos.peopleLabel")}</Label>
             <div className="rounded-card border-hairline overflow-hidden border pb-5">
-              <HeroPhoto image={communityImages.coach} size="banner">
+              <HeroPhoto image={communityImages.feed[0]} size="banner">
                 <div className="px-5">
                   <Heading as="p">{t("photos.peopleTitle")}</Heading>
                   <p className="text-small text-secondary mt-1">{t("photos.peopleBody")}</p>

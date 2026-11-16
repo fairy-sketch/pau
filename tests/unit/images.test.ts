@@ -64,7 +64,6 @@ describe("photography config", () => {
       heroImages.default,
       ...Object.values(heroImages.bySport),
       ...onboardingImages,
-      communityImages.coach,
       ...communityImages.feed,
       communityImages.emptyState,
       communityImages.restDay,
@@ -127,7 +126,6 @@ describe("photography config", () => {
     expect(heroForSport("running").src).toContain("/hero-");
     expect(heroForSport("cycling").src).toContain("hero-cyclist");
     expect(heroForSport(undefined).src).toContain("/hero-");
-    expect(communityImages.coach.src).toContain("/people-");
     for (const img of communityImages.feed) expect(img.src).toContain("/people-");
     expect(communityImages.emptyState.src).toContain("/moment-");
     for (const img of Object.values(textureImages)) expect(img.src).toContain("/texture-");

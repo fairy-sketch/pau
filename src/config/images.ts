@@ -9,7 +9,7 @@
  * File names say what a photo is for:
  *   hero-*     onboarding and the Path hero behind the goal
  *   class-*    class and session cards, by sport
- *   people-*   community (Coach screen, club feed, onboarding)
+ *   people-*   community (club feed, club page, onboarding). Not the Coach chat.
  *   moment-*   in-between moments (empty states, onboarding)
  *   texture-*  subtle backgrounds, dividers, empty states, and the fallback
  *
@@ -219,12 +219,11 @@ export const onboardingImages: AppImage[] = [
   images.momentAlpineRidge,
 ];
 
-/** Community and in-between moments. */
+/** Community and in-between moments. The Coach chat has no photo (decision R68). */
 export const communityImages = {
-  /** Top of the Coach screen. */
-  coach: images.peopleCoachStretch,
   /** Club feed and club page. */
   feed: [
+    images.peopleCoachStretch,
     images.peopleStretchClass,
     images.peopleHighfivePlank,
     images.peopleVolleyballBeach,
