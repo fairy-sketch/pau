@@ -19,11 +19,15 @@ the default shown, in the milestone noted. Nothing here is hardcoded.
 
 ## Raised while building
 
-| #   | Question                                                                                                                                     | Raised in   | Status |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ------ |
-| 12  | Is Docker installed on Ramon's machine? The answer in the M0 go-ahead was left as a template (`[yes / no]`).                                 | M0          | Open   |
-| 13  | Should a GitHub Actions workflow run `pnpm test` on every push? (Needs a choice on running Supabase in CI from M1.)                          | M0          | Open   |
-| 14  | Logo and app icon: the current mark is a placeholder.                                                                                        | M0          | Open   |
-| 15  | What moves the Path line within a stage: sessions logged (demo: 12 per stage), training load, or the stage dates?                            | Stage line  | Open   |
-| 16  | There is no class photo for running or athletics (PAU's main sport), pilates or cycling. Supply `class-*` photos, or keep the borrowed ones? | Photography | Open   |
-| 17  | Where do the twelve photos come from, and are they licensed for use in the app (e.g. Unsplash or Pexels licence, or bought)?                 | Photography | Open   |
+| #   | Question                                                                                                                                                                                                                    | Raised in   | Status |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ------ |
+| 12  | Is Docker installed on Ramon's machine? The answer in the M0 go-ahead was left as a template (`[yes / no]`).                                                                                                                | M0          | Open   |
+| 13  | Should a GitHub Actions workflow run `pnpm test` on every push? (Needs a choice on running Supabase in CI from M1.)                                                                                                         | M0          | Open   |
+| 14  | Logo and app icon: the current mark is a placeholder.                                                                                                                                                                       | M0          | Open   |
+| 15  | What moves the Path line within a stage: sessions logged (demo: 12 per stage), training load, or the stage dates?                                                                                                           | Stage line  | Open   |
+| 16  | There is no class photo for running or athletics (PAU's main sport), pilates or cycling. Supply `class-*` photos, or keep the borrowed ones?                                                                                | Photography | Open   |
+| 17  | Where do the twelve photos come from, and are they licensed for use in the app (e.g. Unsplash or Pexels licence, or bought)?                                                                                                | Photography | Open   |
+| 18  | Where are I2-1 to I2-4 built? In the demo they can only be simulated (no real LLM calls, push, email or QR-bill PDF in a static page). The real versions belong to M2 to M9 of the app, which needs Docker and a go for M1. | Iteration 2 | Open   |
+| 19  | May a coach add walk-ins beyond a session's capacity? The demo allows it and shows "+1 walk-in".                                                                                                                            | I2-0 (B4)   | Open   |
+| 20  | Guardrail reason and privacy: the coach sees that a pain flag is open, but its location and level only if the athlete shares pain flags with the club. Is that the balance you want?                                        | I2-0 (B1)   | Open   |
+| 21  | The demo link is public. Are the photos licensed for that (see 17)?                                                                                                                                                         | I2-0        | Open   |

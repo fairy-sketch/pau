@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const PORT = 3100;
+const PROTOTYPE = /prototype\.spec\.ts$/;
 
 /**
  * End-to-end tests run against a production build, because the service worker
@@ -20,17 +21,32 @@ export default defineConfig({
   projects: [
     {
       name: "mobile",
+      testIgnore: PROTOTYPE,
       use: {
         ...devices["iPhone 14"],
         ...(process.env.PW_WEBKIT ? {} : { browserName: "chromium" as const }),
       },
     },
-    { name: "desktop", use: { ...devices["Desktop Chrome"] } },
+    { name: "desktop", testIgnore: PROTOTYPE, use: { ...devices["Desktop Chrome"] } },
+    {
+      // The clickable demo is a static page opened from disk: same phone profile, Swiss time.
+      name: "prototype",
+      testMatch: PROTOTYPE,
+      use: {
+        ...devices["iPhone 14"],
+        browserName: "chromium" as const,
+        timezoneId: "Europe/Zurich",
+        locale: "en-CH",
+      },
+    },
   ],
-  webServer: {
-    command: `pnpm build && pnpm start --port ${PORT}`,
-    url: `http://localhost:${PORT}/styleguide`,
-    reuseExistingServer: !process.env.CI,
-    timeout: 240_000,
-  },
+  // The demo tests need no server: `pnpm test:proto` skips the build.
+  webServer: process.env.PW_SKIP_SERVER
+    ? undefined
+    : {
+        command: `pnpm build && pnpm start --port ${PORT}`,
+        url: `http://localhost:${PORT}/styleguide`,
+        reuseExistingServer: !process.env.CI,
+        timeout: 240_000,
+      },
 });
