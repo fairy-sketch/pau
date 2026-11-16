@@ -148,12 +148,12 @@ th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06e
 @media (min-width: 700px) { .tiles { grid-template-columns: repeat(4, 1fr); } }
 svg text { font-family: var(--mono); font-size: 10px; fill: var(--text-2); }
 /* The path line ("Blocks", on trial): one block per session, grouped by stage. The next block to fill is sage. */
-.groups { display: flex; flex-wrap: wrap; gap: 14px 16px; }
-.grp { display: flex; flex-direction: column; gap: 6px; }
-.grp .eyebrow { font-size: 9.5px; letter-spacing: .03em; white-space: nowrap; }
+.groups { display: flex; gap: 12px; width: 100%; }
+.grp { flex: var(--cols) 1 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.grp .eyebrow { font-size: 9px; letter-spacing: .02em; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .grp.now .eyebrow { color: var(--text); font-weight: 700; }
-.blocks { display: grid; grid-template-columns: repeat(6, 12px); grid-auto-rows: 12px; gap: 4px; }
-.blk { border-radius: 3.5px; border: 1.5px solid var(--track); transition: background .3s ease, border-color .3s ease; }
+.blocks { display: grid; grid-template-columns: repeat(var(--cols), 1fr); gap: 4px; }
+.blk { aspect-ratio: 1; border-radius: 4px; border: 1.5px solid var(--track); transition: background .3s ease, border-color .3s ease; }
 .blk.done { background: var(--text); border-color: var(--text); }
 .blk.next { background: var(--accent); border-color: var(--text); }
 .blk.pop { animation: blk-pop .55s cubic-bezier(.34,1.56,.64,1); }
@@ -515,11 +515,16 @@ const isoWeek = (d) => { const t = new Date(Date.UTC(d.getFullYear(), d.getMonth
 const loadPts = (st) => st.wl.map((w) => ({ l: "W" + isoWeek(w.start), v: w.load }));
 
 const PER = 12;
-/* The stage as blocks: one per session, grouped by stage. `S.lineFrom` holds the state before a log, so the new block can fill on screen. */
+/* The stage as blocks: one per session, grouped by stage, laid out as ONE row that fills the width.
+   Works for any plan: pick the fewest rows per group that keep the whole plan within about 16 columns. */
+function blockCols(sizes) {
+  for (let rows = 1; rows <= 8; rows++) { const cols = sizes.map((n) => Math.ceil(n / rows)); if (cols.reduce((a, b) => a + b, 0) <= 16) return cols; }
+  return sizes.map((n) => Math.ceil(n / 8));
+}
 function pathLine() {
-  const at = S.lineFrom ?? { stage: S.stage, inSt: S.stageSessions }, n = S.stages.length, doneCount = at.stage * PER + at.inSt;
-  return `<div id="blocks" style="margin-top:28px" role="img" aria-label="Stage ${at.stage + 1} of ${n}: ${S.stages[at.stage]}. ${at.inSt} of ${PER} sessions done."><div class="groups">${S.stages.map((name, k) => `<div class="grp ${k === at.stage ? "now" : ""}"><span class="eyebrow">${name}</span><div class="blocks">${[...Array(PER)].map((_, j) => { const i = k * PER + j; return `<i class="blk ${i < doneCount ? "done" : i === doneCount ? "next" : ""}" data-i="${i}"></i>`; }).join("")}</div></div>`).join("")}</div>
-    <div class="between" style="margin-top:16px"><span class="strong">${S.stages[at.stage]} <span class="sub">· ${at.inSt} of ${PER} sessions</span></span><span class="eyebrow">${doneCount} / ${n * PER}</span></div></div>`;
+  const at = S.lineFrom ?? { stage: S.stage, inSt: S.stageSessions }, n = S.stages.length, doneCount = at.stage * PER + at.inSt, cols = blockCols(S.stages.map(() => PER));
+  return `<div id="blocks" style="margin-top:28px" role="img" aria-label="Stage ${at.stage + 1} of ${n}: ${S.stages[at.stage]}. ${at.inSt} of ${PER} sessions done."><div class="groups">${S.stages.map((name, k) => `<div class="grp ${k === at.stage ? "now" : ""}" style="--cols:${cols[k]}"><span class="eyebrow">${name}</span><div class="blocks">${[...Array(PER)].map((_, j) => { const i = k * PER + j; return `<i class="blk ${i < doneCount ? "done" : i === doneCount ? "next" : ""}" data-i="${i}"></i>`; }).join("")}</div></div>`).join("")}</div>
+    <div class="between" style="margin-top:18px"><span class="strong">${S.stages[at.stage]} <span class="sub">· ${at.inSt} of ${PER} sessions</span></span><span class="eyebrow">${doneCount} / ${n * PER}</span></div></div>`;
 }
 /* After a log: the sage block turns solid with a pop, and the next one becomes sage. */
 function flowLine() {
