@@ -1,0 +1,158 @@
+@import "tailwindcss";
+@import "@fontsource-variable/archivo/wdth.css";
+@import "@fontsource-variable/archivo/wdth-italic.css";
+@import "@fontsource-variable/jetbrains-mono/wght.css";
+
+/*
+ * Design tokens (brief section 10).
+ * Raw values live here and nowhere else. src/ui/tokens.ts mirrors the colour
+ * values for the styleguide, and tests/unit/tokens.test.ts keeps the two in sync.
+ */
+@theme {
+  /* Colour: drop Tailwind's palette so only our tokens exist. */
+  --color-*: initial;
+  --color-ink: #000000;
+  --color-paper: #ffffff;
+  --color-grey-700: #2e2e2e;
+  --color-grey-600: #5c5c5c;
+  --color-grey-400: #a3a3a3;
+  --color-grey-300: #d9d9d9;
+  --color-accent-signal: #e40513;
+  --color-accent-electric: #0000ff;
+
+  /* Shape: square corners. A pill exists only for small tags. */
+  --radius-*: initial;
+  --radius-none: 0;
+  --radius-pill: 9999px;
+
+  /* Type */
+  --font-display: "Archivo Variable", "Arial Black", "Helvetica Neue", sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, "SFMono-Regular", "Courier New", monospace;
+  --font-sans: var(--font-mono);
+
+  --text-label: 0.6875rem;
+  --text-label--line-height: 1.25;
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.55;
+  --text-data-lg: 1.75rem;
+  --text-data-lg--line-height: 1;
+  --text-display-sm: clamp(1.75rem, 8vw, 2.75rem);
+  --text-display-md: clamp(2.25rem, 10vw, 4.5rem);
+  --text-display-lg: clamp(2.75rem, 13vw, 8rem);
+
+  --tracking-label: 0.05em;
+
+  /* Layout */
+  --spacing-touch: 2.75rem; /* 44 px minimum touch target */
+
+  /* Motion: quick and mechanical, never bouncy. */
+  --duration-quick: 120ms;
+  --ease-mechanical: cubic-bezier(0.3, 0, 0, 1);
+  --animate-ticker: ticker 32s linear infinite;
+
+  @keyframes ticker {
+    to {
+      transform: translateX(-50%);
+    }
+  }
+}
+
+/*
+ * Semantic tokens. Components use these (bg, fg, muted, rule, accent) and
+ * never the raw colours, so a surface can be inverted and a club can later
+ * set its own accent by overriding --org-accent.
+ */
+:root,
+[data-surface="paper"] {
+  --surface-bg: var(--color-paper);
+  --surface-fg: var(--color-ink);
+  --surface-muted: var(--color-grey-600);
+  --surface-rule: var(--color-grey-300);
+}
+
+[data-surface="ink"] {
+  --surface-bg: var(--color-ink);
+  --surface-fg: var(--color-paper);
+  --surface-muted: var(--color-grey-400);
+  --surface-rule: var(--color-grey-700);
+}
+
+:root {
+  --org-accent: var(--color-accent-signal);
+}
+
+@theme inline {
+  --color-bg: var(--surface-bg);
+  --color-fg: var(--surface-fg);
+  --color-muted: var(--surface-muted);
+  --color-rule: var(--surface-rule);
+  --color-accent: var(--org-accent);
+  --color-on-accent: var(--color-paper);
+}
+
+@layer base {
+  html {
+    font-family: var(--font-mono);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body,
+  [data-surface] {
+    background-color: var(--surface-bg);
+    color: var(--surface-fg);
+  }
+
+  body {
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* Big headlines: heavy, extended, italic, uppercase. */
+@utility type-display {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-stretch: 125%;
+  font-style: italic;
+  text-transform: uppercase;
+  line-height: 0.9;
+  letter-spacing: -0.01em;
+  /* A single long word must never push the page sideways on a phone. */
+  overflow-wrap: anywhere;
+}
+
+/* Small uppercase labels: section labels, tab labels, status chips. */
+@utility type-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+  line-height: var(--text-label--line-height);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+}
+
+/* Data: times, spots, credits, CHF. */
+@utility type-data {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}

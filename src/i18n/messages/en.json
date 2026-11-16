@@ -1,0 +1,132 @@
+{
+  "app": {
+    "tagline": "Your path.",
+    "description": "See where you are heading, where you are now, and what to do next."
+  },
+  "common": {
+    "demo": "Demo",
+    "skipToContent": "Skip to content"
+  },
+  "home": {
+    "kicker": "[00] Foundations",
+    "body": "The Path home arrives in the next milestone. This build proves the foundations underneath it.",
+    "styleguideLink": "[→] Open styleguide"
+  },
+  "offline": {
+    "title": "Offline",
+    "body": "You are offline. Pages you have opened before still work. Reconnect to load this one.",
+    "home": "[←] Back to start"
+  },
+  "styleguide": {
+    "title": "Styleguide",
+    "intro": "Tokens, type and core components. Every screen in the app is built from these.",
+    "sections": {
+      "colour": "[01] Colour",
+      "type": "[02] Type",
+      "shape": "[03] Shape and motion",
+      "components": "[04] Components",
+      "stageTrack": "[05] Stage track",
+      "chart": "[06] Chart",
+      "cover": "[07] Path cover"
+    },
+    "colour": {
+      "usage": {
+        "ink": "Base. Text, rules and inverted surfaces.",
+        "paper": "Base. Default surface.",
+        "grey600": "Muted text on paper.",
+        "grey400": "Muted text on ink.",
+        "grey300": "Hairlines on paper.",
+        "grey700": "Hairlines on ink.",
+        "accentSignal": "State: alert, pain flag, the one primary action. Fills carry white text.",
+        "accentElectric": "State: booked, live. Fills carry white text. Never used as text on ink."
+      }
+    },
+    "type": {
+      "displayLabel": "Display: Archivo, extra-black, expanded, italic",
+      "displaySample": "Sub‑40 10K",
+      "monoLabel": "UI and body: JetBrains Mono",
+      "monoSample": "Everything in the app supports or guides you on your path: your goal, your stages, your log and your coach.",
+      "labelLabel": "Label: uppercase, 0.05em tracking",
+      "labelSample": "My week [4]",
+      "dataLabel": "Data: monospace, tabular figures",
+      "dataSpots": "[{count}] spots"
+    },
+    "shape": {
+      "radius": "Corners are square. Radius is 0 everywhere; a full pill is reserved for small tags.",
+      "dividers": "Lists are separated by thin dotted rules, not rounded cards.",
+      "motion": "Motion is quick and mechanical ({duration} ms) and switches off when reduced motion is requested.",
+      "targets": "Touch targets are at least 44 px."
+    },
+    "components": {
+      "buttons": "Buttons",
+      "book": "[+] Book",
+      "joinWaitlist": "[+] Join waitlist",
+      "cancel": "[×] Cancel",
+      "chips": "Status chips",
+      "chipBooked": "Booked",
+      "chipLive": "Live",
+      "chipFull": "Full",
+      "chipAlert": "Pain flag",
+      "chipSpots": "[{count}] spots",
+      "list": "Session list",
+      "ticker": "Ticker",
+      "tickerLabel": "Next up",
+      "tickerPause": "[II] Pause",
+      "tickerPlay": "[▶] Play",
+      "tickerItems": {
+        "next": "Next: Track Thu {time}",
+        "spots": "6 spots left",
+        "stage": "Stage: Build, 12 days left",
+        "pb": "New PB 400 m 61.8"
+      }
+    },
+    "sessions": {
+      "track": {
+        "title": "Track session",
+        "meta": "Sportanlage Fronwald · Coach Sara"
+      },
+      "gym": {
+        "title": "Gym session",
+        "meta": "Balboa Underground · Coach Jonas"
+      },
+      "community": {
+        "title": "Saturday community session",
+        "meta": "Sportanlage Fronwald · Open to everyone"
+      }
+    },
+    "stageTrack": {
+      "label": "Stages towards your goal",
+      "stage": "[{index}] {name}",
+      "names": {
+        "foundation": "Foundation",
+        "build": "Build",
+        "sharpen": "Sharpen",
+        "test": "Test",
+        "recover": "Recover"
+      },
+      "status": {
+        "done": "Done",
+        "current": "Current stage",
+        "upcoming": "Upcoming"
+      },
+      "daysLeft": "{count, plural, one {# day left} other {# days left}}"
+    },
+    "chart": {
+      "title": "Weekly load",
+      "unit": "Duration × RPE",
+      "week": "W{number}",
+      "columnPeriod": "Week",
+      "columnValue": "Load",
+      "note": "Black line, thin rules, monospace axes. One accent marks the current week."
+    },
+    "cover": {
+      "goalLine": "{goal} — {date}",
+      "goal": "Sub‑40 10K",
+      "why": "Because I want to race the Zurich 10K with my club.",
+      "nextLabel": "Next step",
+      "nextTitle": "Book Thursday track {time}",
+      "nextMeta": "[{count}] spots · Uses Regular season pass",
+      "action": "[+] Book"
+    }
+  }
+}
