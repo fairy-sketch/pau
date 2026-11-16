@@ -12,8 +12,8 @@ export interface StageTrackItem {
 }
 
 const bar: Record<StageStatus, string> = {
-  done: "bg-accent opacity-35",
-  current: "bg-accent",
+  done: "bg-ink opacity-30",
+  current: "bg-ink",
   upcoming: "bg-hairline",
 };
 

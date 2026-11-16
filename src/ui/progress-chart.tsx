@@ -19,12 +19,21 @@ const tick = {
 function HighlightDot(props: { cx?: number; cy?: number; payload?: ProgressPoint }) {
   const { cx, cy, payload } = props;
   if (cx == null || cy == null || !payload?.highlight) return null;
-  return <circle cx={cx} cy={cy} r={5} fill="var(--org-accent)" />;
+  return (
+    <circle
+      cx={cx}
+      cy={cy}
+      r={5}
+      fill="var(--org-accent)"
+      stroke="var(--color-ink)"
+      strokeWidth={1.75}
+    />
+  );
 }
 
 /**
  * Quiet progress line: one thin near-black line on hairline rules, mono axis
- * labels, and a single accent dot on the point that matters. No animation.
+ * labels, and a single lime dot, ringed in near-black, on the point that matters. No animation.
  * The same data is offered as a table for screen readers.
  */
 export function ProgressChart({

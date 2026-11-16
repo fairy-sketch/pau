@@ -4,13 +4,13 @@
  * fails if the two drift apart.
  */
 export const colorTokens = [
-  { id: "canvas", name: "canvas", cssVar: "--color-canvas", hex: "#f5f5f3" },
+  { id: "canvas", name: "canvas", cssVar: "--color-canvas", hex: "#f7f7f8" },
   { id: "surface", name: "surface", cssVar: "--color-surface", hex: "#ffffff" },
-  { id: "soft", name: "soft", cssVar: "--color-soft", hex: "#ebebe7" },
-  { id: "hairline", name: "hairline", cssVar: "--color-hairline", hex: "#e3e3df" },
-  { id: "ink", name: "ink", cssVar: "--color-ink", hex: "#111111" },
-  { id: "secondary", name: "secondary", cssVar: "--color-secondary", hex: "#666660" },
-  { id: "accent", name: "accent", cssVar: "--color-accent-base", hex: "#c2410c" },
+  { id: "soft", name: "soft", cssVar: "--color-soft", hex: "#edf0f5" },
+  { id: "hairline", name: "hairline", cssVar: "--color-hairline", hex: "#e1e5ec" },
+  { id: "ink", name: "ink", cssVar: "--color-ink", hex: "#141414" },
+  { id: "secondary", name: "secondary", cssVar: "--color-secondary", hex: "#5f6672" },
+  { id: "accent", name: "accent", cssVar: "--color-accent-base", hex: "#b3ff3b" },
 ] as const;
 
 export type ColorTokenId = (typeof colorTokens)[number]["id"];
@@ -23,7 +23,7 @@ export const contrastPairs: ReadonlyArray<{ fg: ColorTokenId; bg: ColorTokenId }
   { fg: "secondary", bg: "canvas" },
   { fg: "secondary", bg: "surface" },
   { fg: "secondary", bg: "soft" },
-  { fg: "surface", bg: "accent" },
+  { fg: "ink", bg: "accent" },
   { fg: "surface", bg: "ink" },
 ];
 

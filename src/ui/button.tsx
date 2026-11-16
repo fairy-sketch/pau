@@ -3,7 +3,7 @@ import type { ComponentProps } from "react";
 import { cx } from "./cx";
 
 /**
- * primary: the one accent-coloured action on a screen.
+ * primary: the one lime action on a screen (dark text on lime).
  * secondary: everything else that is a button.
  * ghost: quiet actions such as "Close".
  */

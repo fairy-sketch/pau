@@ -25,7 +25,7 @@ test.describe("styleguide", () => {
     await expect(page.getByRole("table", { name: "Weekly load" }).getByRole("row")).toHaveCount(13);
   });
 
-  test("uses the design tokens: fonts, soft corners, off-white canvas, one accent", async ({
+  test("uses the design tokens: fonts, soft corners, light canvas, one lime accent", async ({
     page,
   }) => {
     await page.goto("/styleguide");
@@ -39,8 +39,8 @@ test.describe("styleguide", () => {
 
     expect(await style("h1", "font-family")).toContain("Satoshi");
     expect(await style("body", "font-family")).toContain("Switzer");
-    expect(await style("body", "background-color")).toBe("rgb(245, 245, 243)");
-    expect(await style("body", "color")).toBe("rgb(17, 17, 17)");
+    expect(await style("body", "background-color")).toBe("rgb(247, 247, 248)");
+    expect(await style("body", "color")).toBe("rgb(20, 20, 20)");
     // Sentence case everywhere except the tiny mono labels.
     expect(await style("h1", "text-transform")).toBe("none");
     expect(await style(".type-label", "text-transform")).toBe("uppercase");
@@ -57,7 +57,7 @@ test.describe("styleguide", () => {
     const box = await button.boundingBox();
     expect(box?.height).toBeGreaterThanOrEqual(44);
     await expect(button).toHaveCSS("border-radius", "12px");
-    await expect(button).toHaveCSS("background-color", "rgb(194, 65, 12)");
+    await expect(button).toHaveCSS("background-color", "rgb(179, 255, 59)");
     await expect(button).toHaveCSS("text-transform", "none");
   });
 
@@ -122,7 +122,7 @@ test.describe("PWA", () => {
     }
 
     await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveCount(1);
-    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#f5f5f3");
+    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#f7f7f8");
 
     const state = await page.evaluate(async () => {
       const registration = await navigator.serviceWorker.ready;

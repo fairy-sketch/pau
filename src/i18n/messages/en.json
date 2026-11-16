@@ -37,7 +37,7 @@
         "hairline": "The one divider. 1 px.",
         "ink": "Text.",
         "secondary": "Secondary text.",
-        "accent": "The only accent. Primary action and progress, nothing else."
+        "accent": "The only accent. The primary action, with dark text. Nothing else."
       }
     },
     "type": {
@@ -121,7 +121,7 @@
       "week": "W{number}",
       "columnPeriod": "Week",
       "columnValue": "Load",
-      "note": "One thin line on hairline rules. The accent marks the current week."
+      "note": "One thin line on hairline rules. A lime dot marks the current week."
     },
     "cover": {
       "goalLabel": "Your goal",

@@ -23,8 +23,9 @@
 
 /*
  * Design tokens, revision 2 (docs/decisions.md, "Design revision"): calm and
- * minimal. Off-white canvas, near-black text, grey secondary text, and ONE
- * accent used only for the primary action and for progress.
+ * minimal. Near-white canvas, near-black text, cool grey secondary text, and
+ * ONE accent (lime) used only for the primary action. Progress is near-black:
+ * lime is too faint for thin lines on a light ground (decisions R17 to R20).
  *
  * Raw values live here and nowhere else. src/ui/tokens.ts mirrors the colours
  * for the styleguide, and tests/unit/tokens.test.ts keeps the two in sync.
@@ -32,14 +33,14 @@
 @theme {
   /* Colour: drop Tailwind's palette so only our tokens exist. */
   --color-*: initial;
-  --color-canvas: #f5f5f3;
+  --color-canvas: #f7f7f8;
   --color-surface: #ffffff;
-  --color-soft: #ebebe7;
-  --color-ink: #111111;
-  --color-secondary: #666660;
-  --color-hairline: #e3e3df;
-  --color-accent-base: #c2410c;
-  --color-on-accent: #ffffff;
+  --color-soft: #edf0f5;
+  --color-ink: #141414;
+  --color-secondary: #5f6672;
+  --color-hairline: #e1e5ec;
+  --color-accent-base: #b3ff3b;
+  --color-on-accent: #141414;
 
   /* Shape: soft corners on controls and cards. */
   --radius-*: initial;
