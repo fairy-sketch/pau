@@ -141,7 +141,7 @@ test.describe("photography", () => {
 
   test("hero fades into the page and the goal sits below the picture", async ({ page }) => {
     await page.goto("/styleguide");
-    const hero = page.locator("[data-hero]").first();
+    const hero = page.locator('[data-hero="hero"]').first();
     await hero.scrollIntoViewIfNeeded();
     const fade = await hero.locator("div").evaluate((el) => getComputedStyle(el).backgroundImage);
     expect(fade).toContain("linear-gradient");

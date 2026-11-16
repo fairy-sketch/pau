@@ -2,11 +2,15 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  defaultSportImage,
+  type AppImage,
+  communityImages,
+  fallbackSportImage,
   heroForSport,
+  heroImages,
   imageForSport,
   images,
   onboardingImages,
+  sportImageAlternates,
   sportImages,
   textureImages,
 } from "@/src/config/images";
@@ -35,7 +39,7 @@ describe("photography config", () => {
       .map((i) => i.src.replace("/images/", ""))
       .sort();
     expect(configured).toEqual([...onDisk].sort());
-    expect(onDisk).toHaveLength(12);
+    expect(onDisk).toHaveLength(41);
   });
 
   it("records the real pixel size of each file", () => {
@@ -46,39 +50,88 @@ describe("photography config", () => {
     }
   });
 
-  it("follows the naming rule: hero-, class- and texture- files only", () => {
-    for (const file of onDisk) expect(file).toMatch(/^(hero|class|texture)-[a-z-]+\.jpg$/);
+  it("follows the naming rule: hero-, class-, people-, moment- and texture- files only", () => {
+    for (const file of onDisk) {
+      expect(file).toMatch(/^(hero|class|people|moment|texture)-[a-z-]+\.jpg$/);
+    }
   });
 
-  it("matches class cards to the sport", () => {
-    expect(imageForSport("yoga").src).toContain("class-yoga");
-    expect(imageForSport("Gym").src).toContain("class-gym");
-    expect(imageForSport("swimming").src).toContain("class-swimmer");
-    expect(imageForSport("climbing").src).toContain("class-climber");
-    expect(imageForSport("tennis").src).toContain("class-tennis");
-    expect(imageForSport("football").src).toContain("class-football");
-    expect(imageForSport("pilates").src).toContain("pilates");
+  it("gives every photo a job, so none sits unused", () => {
+    const used = new Set<AppImage>([
+      ...Object.values(sportImages),
+      ...Object.values(sportImageAlternates).flat(),
+      fallbackSportImage,
+      heroImages.default,
+      ...Object.values(heroImages.bySport),
+      ...onboardingImages,
+      communityImages.coach,
+      ...communityImages.feed,
+      communityImages.emptyState,
+      communityImages.restDay,
+      ...Object.values(textureImages),
+    ]);
+    const unused = Object.entries(images)
+      .filter(([, img]) => !used.has(img))
+      .map(([name]) => name);
+    expect(unused).toEqual([]);
   });
 
-  it("understands other names for a sport, and falls back for unknown ones", () => {
-    expect(imageForSport("HIIT")).toBe(sportImages.gym);
+  it("matches class cards to the sport, for all twenty sports Ramon listed", () => {
+    const expected: Record<string, string> = {
+      running: "track-runner",
+      gym: "class-gym",
+      yoga: "class-yoga",
+      pilates: "pilates",
+      swimming: "class-swimmer",
+      climbing: "class-climber",
+      tennis: "class-tennis",
+      padel: "class-padel",
+      football: "class-football",
+      basketball: "class-basketball",
+      volleyball: "class-volleyball",
+      boxing: "class-boxing",
+      rowing: "class-rowing",
+      dance: "class-dance",
+      CrossFit: "class-crossfit",
+      calisthenics: "class-calisthenics",
+      skiing: "class-skiing",
+      "martial arts": "class-martial-arts",
+      "ice hockey": "class-hockey",
+      trail: "class-trail",
+    };
+    for (const [sport, part] of Object.entries(expected)) {
+      expect(imageForSport(sport).src, sport).toContain(part);
+    }
+  });
+
+  it("understands other names for a sport", () => {
+    expect(imageForSport("HIIT")).toBe(sportImages.crossfit);
     expect(imageForSport("bouldering")).toBe(sportImages.climbing);
     expect(imageForSport(" Track ")).toBe(sportImages.running);
-    expect(imageForSport("underwater rugby")).toBe(defaultSportImage);
+    expect(imageForSport("Ice_Hockey")).toBe(sportImages["ice-hockey"]);
+    expect(imageForSport("trail running")).toBe(sportImages.trail);
+  });
+
+  it("falls back to a texture for a sport without a photo", () => {
+    expect(imageForSport("underwater rugby")).toBe(fallbackSportImage);
+    expect(fallbackSportImage.src).toContain("/texture-");
   });
 
   it("lets a club swap a sport's photo without touching code", () => {
-    const own = { ...images.textureChalk, src: "/images/club-own.jpg" };
-    expect(imageForSport("yoga", { yoga: own })).toBe(own);
-    expect(imageForSport("gym", { yoga: own })).toBe(sportImages.gym);
+    const own = sportImageAlternates.skiing![0]!;
+    expect(imageForSport("skiing", { skiing: own })).toBe(own);
+    expect(imageForSport("gym", { skiing: own })).toBe(sportImages.gym);
   });
 
-  it("uses hero files for the Path and onboarding, and texture files for textures", () => {
+  it("keeps each kind of photo in its role", () => {
     expect(heroForSport("running").src).toContain("/hero-");
     expect(heroForSport("cycling").src).toContain("hero-cyclist");
     expect(heroForSport(undefined).src).toContain("/hero-");
-    for (const img of onboardingImages) expect(img.src).toContain("/hero-");
+    expect(communityImages.coach.src).toContain("/people-");
+    for (const img of communityImages.feed) expect(img.src).toContain("/people-");
+    expect(communityImages.emptyState.src).toContain("/moment-");
     for (const img of Object.values(textureImages)) expect(img.src).toContain("/texture-");
+    for (const img of onboardingImages) expect(img.src).toMatch(/\/(hero|people|moment)-/);
   });
 
   it("keeps photos out of the code: only the config file names image files", () => {

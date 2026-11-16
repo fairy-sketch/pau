@@ -224,7 +224,7 @@ const ORGS = {
     policy: { opensDays: 6, cancelMin: 240, lateCancel: "forfeit", waitlist: true, maxDay: 2, maxWeek: 7 },
     offerings: [
       { id: "strength", sport: "gym", name: "Strength", days: [1, 2, 3, 4, 5], time: [7, 0], dur: 50, cap: 14, loc: "Studio One", coach: "Lena", intensity: "high" },
-      { id: "hiit", sport: "gym", name: "HIIT", days: [1, 2, 3, 4, 5, 0], time: [12, 15], dur: 45, cap: 16, loc: "Studio One", coach: "Marco", intensity: "high" },
+      { id: "hiit", sport: "crossfit", name: "HIIT", days: [1, 2, 3, 4, 5, 0], time: [12, 15], dur: 45, cap: 16, loc: "Studio One", coach: "Marco", intensity: "high" },
       { id: "mobility", sport: "pilates", name: "Mobility", days: [1, 3, 5], time: [17, 30], dur: 45, cap: 12, loc: "Studio Two", coach: "Aylin", intensity: "low" },
       { id: "yoga", sport: "yoga", name: "Yoga flow", days: [2, 4, 0, 6], time: [18, 45], dur: 60, cap: 20, loc: "Studio Two", coach: "Noor", intensity: "low" },
       { id: "ride", sport: "cycling", name: "Ride", days: [1, 2, 3, 4], time: [19, 0], dur: 45, cap: 18, loc: "Studio One", coach: "Tim", intensity: "high" },
@@ -473,11 +473,13 @@ function confirmProposal(id, yes) {
 
 /* ---------- photography: sport -> photo, in one place (mirrors src/config/images.ts in the app) ---------- */
 const SPORT_IMAGE = {
-  yoga: ["class-yoga-window", "60% 50%"], gym: ["class-gym-barbell", "55% 55%"], swimming: ["class-swimmer-underwater", "75% 65%"],
-  climbing: ["class-climber-indoor", "80% 45%"], tennis: ["class-tennis-courts-empty", "45% 60%"], football: ["class-football-pitch-aerial", "50% 50%"],
-  pilates: ["hero-pilates-studio", "50% 70%"], running: ["texture-track-lanes", "50% 50%"], cycling: ["hero-cyclist-mountain-path", "50% 60%"],
+  running: ["hero-track-runner-silhouette", "30% 40%"], gym: ["class-gym-barbell", "55% 55%"], yoga: ["class-yoga-window", "60% 50%"], pilates: ["hero-pilates-studio", "50% 70%"],
+  swimming: ["class-swimmer-underwater", "75% 65%"], climbing: ["class-climber-indoor", "80% 45%"], tennis: ["class-tennis-courts-empty", "45% 60%"], padel: ["class-padel-court", "50% 60%"],
+  football: ["class-football-pitch-aerial", "50% 50%"], boxing: ["class-boxing-silhouette", "35% 45%"], crossfit: ["class-crossfit-ropes", "50% 60%"], cycling: ["hero-cyclist-mountain-path", "50% 60%"],
 };
-const HERO_IMAGE = ["hero-track-runner-silhouette", "30% 40%"], TEXTURE_IMAGE = ["texture-chalk-hands", "50% 60%"];
+const FALLBACK_IMAGE = ["texture-chalk-hands", "50% 60%"]; // sports without a photo
+const HERO_IMAGE = ["hero-track-runner-silhouette", "30% 40%"], COACH_IMAGE = ["people-coach-stretch", "50% 45%"], TEXTURE_IMAGE = ["texture-foam-roller", "45% 55%"];
+const sportPhoto = (sport) => SPORT_IMAGE[sport] || FALLBACK_IMAGE;
 const photo = ([file, focus]) => `<img class="ph" src="images/${file}.jpg" alt="" style="object-position:${focus}">`;
 const texture = (inner) => `<div class="tex"><img src="images/${TEXTURE_IMAGE[0]}.jpg" alt="">${inner}</div>`;
 
@@ -547,7 +549,7 @@ function vPath() {
     <div class="stack"><div class="between"><span class="eyebrow">Weekly load</span><span class="sub" style="font-size:12px">${Math.round(st.ratio * 100)}% of your average</span></div>${lineChart(loadPts(st), st.wl.length - 1)}</div></section>`;
 }
 function vCoachChat() {
-  return `<div class="chatwrap"><div class="chatlog"><p class="sub" style="text-align:center;font-size:12px">Scripted demo coach. It only acts after you confirm.</p>${S.chat.map((m) => `<div class="msg ${m.who}">${esc(m.text)}</div>${m.proposal ? `<div class="card stack"><div><div class="eyebrow">Needs your OK</div><p class="h2" style="margin-top:4px">${esc(m.proposal.title)}</p></div><ul class="sub stack" style="gap:4px">${m.proposal.lines.filter(Boolean).map((l) => `<li>${esc(l)}</li>`).join("")}</ul>${m.proposal.status === "proposed" ? `<div class="btns"><button class="btn acc" style="flex:1" data-a="prop-yes" data-v="${m.proposal.id}">Confirm</button><button class="btn" data-a="prop-no" data-v="${m.proposal.id}">Not now</button></div>` : `<span class="pill" style="align-self:flex-start">${m.proposal.status === "executed" ? I(P.tick, 14) + "Confirmed" : "Declined"}</span>`}</div>` : ""}`).join("")}</div>
+  return `<div class="chatwrap"><div class="hero" style="height:140px;flex:none">${photo(COACH_IMAGE)}</div><div class="chatlog" style="position:relative;margin-top:-28px"><p class="sub" style="text-align:center;font-size:12px">Scripted demo coach. It only acts after you confirm.</p>${S.chat.map((m) => `<div class="msg ${m.who}">${esc(m.text)}</div>${m.proposal ? `<div class="card stack"><div><div class="eyebrow">Needs your OK</div><p class="h2" style="margin-top:4px">${esc(m.proposal.title)}</p></div><ul class="sub stack" style="gap:4px">${m.proposal.lines.filter(Boolean).map((l) => `<li>${esc(l)}</li>`).join("")}</ul>${m.proposal.status === "proposed" ? `<div class="btns"><button class="btn acc" style="flex:1" data-a="prop-yes" data-v="${m.proposal.id}">Confirm</button><button class="btn" data-a="prop-no" data-v="${m.proposal.id}">Not now</button></div>` : `<span class="pill" style="align-self:flex-start">${m.proposal.status === "executed" ? I(P.tick, 14) + "Confirmed" : "Declined"}</span>`}</div>` : ""}`).join("")}</div>
   <div class="quick">${["Book my usual", "What's on this week?", "I need an easy week", "How am I doing?", "Cancel my next session", "My knee hurts"].map((q) => `<button data-a="ask" data-v="${esc(q)}">${esc(q)}</button>`).join("")}</div>
   <form class="chatform" data-f="chat"><input id="chat-input" aria-label="Message your coach" placeholder="Talk to your coach" autocomplete="off"><button type="submit" aria-label="Send">${I(P.up, 20)}</button></form></div>`;
 }
@@ -576,7 +578,7 @@ function vWeek() {
   let card = "";
   if (feat) { const o = offOf(feat), c = check(feat), b = myBooking(feat.id), w = myWait(feat.id), plan = feat.org === "pau" && S.plan.items.some((i) => i.date === ymd(feat.start) && i.off === feat.off);
     const btn = b || w ? `<button class="btn full" data-a="sheet" data-v="${feat.id}">Manage booking</button>` : c.ok ? `<button class="btn acc full" data-a="book" data-v="${feat.id}">${spots(feat) ? "Book" : "Join waitlist"}</button>` : feat.start <= now() ? "" : `<p class="note">${c.msg}</p>`;
-    card = `<article class="ccard" id="classcard"><div class="pic">${photo(SPORT_IMAGE[o.sport])}</div><div class="body"><button class="between" style="align-items:flex-start;width:100%" data-a="sheet" data-v="${feat.id}" aria-label="${o.name}, details"><span><span class="eyebrow">${fDay(feat.start)} · ${fTime(feat.start)}</span><span class="h2" style="display:block;margin-top:4px">${o.name}</span><span class="sub" style="display:block">${o.loc} · ${o.coach}${plan ? " · in your plan" : ""}</span></span><span>${status(feat)}</span></button>${c.ok && !b && !w ? `<p class="sub" style="margin-top:-8px">${c.note}</p>` : ""}${btn}</div></article>`; }
+    card = `<article class="ccard" id="classcard"><div class="pic">${photo(sportPhoto(o.sport))}</div><div class="body"><button class="between" style="align-items:flex-start;width:100%" data-a="sheet" data-v="${feat.id}" aria-label="${o.name}, details"><span><span class="eyebrow">${fDay(feat.start)} · ${fTime(feat.start)}</span><span class="h2" style="display:block;margin-top:4px">${o.name}</span><span class="sub" style="display:block">${o.loc} · ${o.coach}${plan ? " · in your plan" : ""}</span></span><span>${status(feat)}</span></button>${c.ok && !b && !w ? `<p class="sub" style="margin-top:-8px">${c.note}</p>` : ""}${btn}</div></article>`; }
   return `<section class="pad stack-l"><div><div class="eyebrow">${ORGS[S.org].kind}</div><h1 class="h1">${esc(ORGS[S.org].name)}</h1></div>
     <div class="stack"><div class="days">${days.map((d) => `<button data-a="day" data-v="${ymd(d)}" aria-pressed="${ymd(d) === S.day}" aria-label="${fDay(d)}"><span class="eyebrow" style="color:inherit">${WD[d.getDay()]}</span><span class="n">${d.getDate()}</span></button>`).join("")}</div>
       ${card}${rest.length ? `<div class="card rows flat">${rest.map((s) => row(s)).join("")}</div>` : ""}${list.length ? "" : `<p class="sub">No sessions on this day.</p>`}

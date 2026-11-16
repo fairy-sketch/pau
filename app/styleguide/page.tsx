@@ -13,7 +13,7 @@ import {
   Label,
   StatusPill,
 } from "@/src/ui/primitives";
-import { heroForSport, imageForSport, textureImages } from "@/src/config/images";
+import { communityImages, heroForSport, imageForSport, textureImages } from "@/src/config/images";
 import { ClassCard, HeroPhoto, TextureEmpty } from "@/src/ui/photo";
 import { ProgressChart, type ProgressPoint } from "@/src/ui/progress-chart";
 import { StageTrack, type StageTrackItem } from "@/src/ui/stage-track";
@@ -257,6 +257,17 @@ export default async function StyleguidePage() {
                   <Display as="p" className="mt-2">
                     {t("cover.goal")}
                   </Display>
+                </div>
+              </HeroPhoto>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <Label>{t("photos.peopleLabel")}</Label>
+            <div className="rounded-card border-hairline overflow-hidden border pb-5">
+              <HeroPhoto image={communityImages.coach} size="banner">
+                <div className="px-5">
+                  <Heading as="p">{t("photos.peopleTitle")}</Heading>
+                  <p className="text-small text-secondary mt-1">{t("photos.peopleBody")}</p>
                 </div>
               </HeroPhoto>
             </div>

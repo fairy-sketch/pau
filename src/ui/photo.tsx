@@ -40,10 +40,22 @@ export function Photo({
  * Photo at the top of a screen that fades into the canvas. Text goes BELOW
  * the photo, on the fully faded part, never on the picture itself.
  */
-export function HeroPhoto({ image, children }: { image: AppImage; children: ReactNode }) {
+export function HeroPhoto({
+  image,
+  size = "hero",
+  children,
+}: {
+  image: AppImage;
+  /** "hero" for the Path and onboarding, "banner" for a lower strip such as the Coach screen. */
+  size?: "hero" | "banner";
+  children: ReactNode;
+}) {
   return (
     <div>
-      <div className="relative h-52 overflow-hidden" data-hero>
+      <div
+        className={cx("relative overflow-hidden", size === "hero" ? "h-52" : "h-36")}
+        data-hero={size}
+      >
         <Photo image={image} preload />
         <div className="to-canvas absolute inset-0 bg-linear-to-b from-transparent from-35% to-90%" />
       </div>
@@ -74,7 +86,7 @@ export function ClassCard({
       className="rounded-card border-hairline bg-surface shadow-card overflow-hidden border"
       data-class-card
     >
-      <div className="relative aspect-[16/9]">
+      <div className="relative aspect-[2/1]">
         <Photo image={image} />
       </div>
       <div className="space-y-4 p-5">
