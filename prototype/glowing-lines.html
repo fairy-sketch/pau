@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PATH line sketches</title>
+<style>
+@font-face { font-family: "Satoshi"; src: url("fonts/Satoshi-Variable.woff2") format("woff2"); font-weight: 300 900; font-display: swap; }
+@font-face { font-family: "Switzer"; src: url("fonts/Switzer-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "JetBrains Mono"; src: url("fonts/JetBrainsMono-Variable.woff2") format("woff2"); font-weight: 100 800; font-display: swap; }
+:root {
+  /* Layout: a grid of cards, each drawing the stage progress as a path whose travelled part glows lime. */
+  --bg: #f7f7f8; --surface: #ffffff; --soft: #edf0f5; --hairline: #e1e5ec;
+  --text: #141414; --text-2: #5f6672; --accent: #b3ff3b;
+  --heading: "Satoshi", "Helvetica Neue", Arial, sans-serif;
+  --body: "Switzer", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  color-scheme: light;
+}
+/* The panel the path sits on. Dark makes the glow read; light keeps the calm look. */
+body[data-panel="dark"] { --panel: #141414; --ahead: #3a3a3a; --under: transparent; --node: #141414; --node-line: #5a5a5a; --panel-text: #ffffff; --panel-2: #a3a8b3; --glow: .95; }
+body[data-panel="light"] { --panel: #f7f7f8; --ahead: #d5dae3; --under: #141414; --node: #ffffff; --node-line: #b9c0cc; --panel-text: #141414; --panel-2: #5f6672; --glow: .8; }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 400 15px/1.5 var(--body); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
+:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+h1, h2, p { margin: 0; }
+.page { max-width: 1180px; margin: 0 auto; padding: 32px 24px 64px; }
+.eyebrow { font: 500 11px/1.3 var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--text-2); }
+h1 { font: 900 clamp(32px, 7vw, 44px)/1.05 var(--heading); letter-spacing: -.03em; margin: 8px 0 12px; text-wrap: balance; }
+.intro { color: var(--text-2); max-width: 62ch; }
+.seg { display: inline-flex; margin-top: 20px; background: var(--soft); border-radius: 999px; padding: 4px; }
+.seg button { height: 36px; padding: 0 16px; border-radius: 999px; font-size: 13px; font-weight: 500; color: var(--text-2); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(17,17,17,.1); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; margin-top: 28px; }
+.card { background: var(--surface); border: 1px solid var(--hairline); border-radius: 20px; box-shadow: 0 1px 2px rgba(17,17,17,.04), 0 6px 20px rgba(17,17,17,.05); padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+.card h2 { font: 700 20px/1.2 var(--heading); letter-spacing: -.01em; margin-top: 4px; }
+.panel { background: var(--panel); border-radius: 16px; padding: 16px 16px 14px; transition: background .3s ease; }
+.panel svg { display: block; width: 100%; height: auto; overflow: visible; }
+.pmeta { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-top: 8px; color: var(--panel-text); }
+.pmeta b { font-weight: 600; }
+.pmeta .eyebrow, .pmeta .s { color: var(--panel-2); }
+.s { font-size: 13px; }
+.sub { color: var(--text-2); font-size: 13px; }
+.row { display: flex; gap: 8px; }
+.feed { flex: 1; height: 48px; border-radius: 12px; background: var(--accent); font-weight: 600; transition: transform .12s ease; }
+.feed:active { transform: scale(.96); }
+.reset { height: 48px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--hairline); color: var(--text-2); font-size: 13px; font-weight: 500; }
+
+/* path layers */
+.ahead { fill: none; stroke: var(--ahead); stroke-width: 3; stroke-linecap: round; stroke-dasharray: .6 2.2; }
+.under { fill: none; stroke: var(--under); stroke-width: 8; stroke-linecap: round; transition: stroke-dasharray .9s cubic-bezier(.2,.8,.2,1); }
+.halo { fill: none; stroke: var(--accent); stroke-width: 16; stroke-linecap: round; opacity: var(--glow); filter: blur(9px); transition: stroke-dasharray .9s cubic-bezier(.2,.8,.2,1); animation: breathe 2.8s ease-in-out infinite; }
+.done { fill: none; stroke: var(--accent); stroke-width: 4.5; stroke-linecap: round; transition: stroke-dasharray .9s cubic-bezier(.2,.8,.2,1); }
+.spark { fill: none; stroke: #ffffff; stroke-width: 4.5; stroke-linecap: round; stroke-dasharray: 2.5 400; animation: run 2.6s cubic-bezier(.5,0,.5,1) infinite; }
+@keyframes run { from { stroke-dashoffset: 3px; opacity: 0; } 12% { opacity: .9; } 88% { opacity: .9; } to { stroke-dashoffset: calc(var(--p) * -1px + 2.5px); opacity: 0; } }
+@keyframes breathe { 50% { opacity: calc(var(--glow) * .55); } }
+.node { fill: var(--node); stroke: var(--node-line); stroke-width: 2; transition: fill .3s ease, stroke .3s ease; }
+.node.lit { fill: var(--accent); stroke: var(--text); }
+.node.pop { animation: pop .6s cubic-bezier(.34,1.56,.64,1); transform-box: fill-box; transform-origin: center; }
+@keyframes pop { 40% { transform: scale(2); } }
+.you { fill: var(--accent); stroke: var(--text); stroke-width: 2.5; }
+.youhalo { fill: var(--accent); opacity: .5; filter: blur(6px); transform-box: fill-box; transform-origin: center; animation: pulse 1.8s ease-out infinite; }
+@keyframes pulse { from { transform: scale(.6); opacity: .7; } to { transform: scale(2.2); opacity: 0; } }
+.mover { transition: transform .9s cubic-bezier(.2,.8,.2,1); }
+.goal { fill: var(--panel-text); font: 700 11px var(--heading); }
+.lab { fill: var(--panel-2); font: 500 8px var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+.guide { stroke: var(--ahead); stroke-width: 1.5; fill: none; opacity: .7; }
+@media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation: none !important; transition: none !important; } .spark { display: none; } }
+.seg2 { fill: none; stroke-linecap: round; }
+.bead { fill: var(--ahead); transition: fill .25s ease; }
+.bead.on { fill: var(--accent); stroke: var(--under); stroke-width: 1; paint-order: stroke; }
+.bead.next { animation: hint 1.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.bead.pop { animation: pop .5s cubic-bezier(.34,1.56,.64,1); transform-box: fill-box; transform-origin: center; }
+@keyframes hint { 50% { fill: var(--accent); transform: scale(1.7); } }
+.beadglow { fill: var(--accent); filter: blur(5px); opacity: var(--glow); }
+.tick { stroke: var(--node-line); stroke-width: 1.5; }
+</style>
+</head>
+<body data-panel="dark">
+<div class="page">
+  <div class="eyebrow">PATH · sketches, round 3</div>
+  <h1>Six glowing lines</h1>
+  <p class="intro">All six keep the simple left-to-right line. They differ in how the line is alive and what happens when you log a session. Start to goal runs across five stages; the demo starts in Build.</p>
+  <div class="seg" role="group" aria-label="Panel">
+    <button data-panel="dark" aria-pressed="true">Dark panel</button>
+    <button data-panel="light" aria-pressed="false">Light panel</button>
+  </div>
+  <div class="grid" id="grid"></div>
+</div>
+<script>
+"use strict";
+const PER = 12, STAGES = ["Foundation", "Build", "Sharpen", "Test", "Recover"], TOTAL = PER * STAGES.length, START = PER + 5;
+const X0 = 16, X1 = 304, Y = 46, W = X1 - X0, NS = "http://www.w3.org/2000/svg";
+const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const xAt = (n) => X0 + (W * Math.min(n, TOTAL)) / TOTAL;
+const SK = [
+  { id: "neon", name: "Neon", line: "One thin glowing line. A spark runs from the start to where you are, over and over." },
+  { id: "segments", name: "Segments", line: "Closest to the bar you have now: five pieces. Finished stages glow, the current one fills up." },
+  { id: "pulse", name: "Heartbeat", line: "A heartbeat travels along the line you have covered. It beats faster right after you log." },
+  { id: "wave", name: "Wave", line: "The travelled part moves like a wave, calm at the start and stronger towards where you are." },
+  { id: "comet", name: "Comet", line: "The glow is brightest at your position and fades behind you, like a comet's tail." },
+  { id: "beads", name: "Beads", line: "One bead per session. The next bead blinks until you log, then it lights up with a pop." },
+];
+const state = Object.fromEntries(SK.map((s) => [s.id, START])), kick = {};
+const layers = (d) => `<path class="halo" d="${d}"/><path class="under" d="${d}"/><path class="done" d="${d}"/>`;
+const nodes = (r) => STAGES.map((_, k) => `<circle class="node" data-k="${k}" cx="${xAt((k + 1) * PER)}" cy="${Y}" r="${k === STAGES.length - 1 ? r + 2 : r}"/>`).join("");
+const you = `<g class="mover" data-you><circle class="youhalo" r="9"/><circle class="you" r="6"/></g>`;
+const ahead = `<path class="ahead" d="M${X0} ${Y}H${X1}"/>`;
+
+const BUILD = {
+  neon: () => `${ahead}<g data-live>${layers("")}</g><path class="spark" pathLength="100" d="M${X0} ${Y}H${X1}"/>${nodes(4.5)}${you}`,
+  segments: () => STAGES.map((_, k) => { const a = xAt(k * PER) + 4, b = xAt((k + 1) * PER) - 4; return `<path class="seg2" stroke="var(--ahead)" stroke-width="6" d="M${a} ${Y}H${b}"/><g data-seg="${k}">${layers("")}</g>`; }).join(""),
+  pulse: () => `${ahead}<g data-live>${layers("")}</g>${nodes(4)}${you}`,
+  wave: () => `${ahead}<g data-live>${layers("")}</g>${nodes(4)}${you}`,
+  comet: () => `<defs><linearGradient id="tail" gradientUnits="userSpaceOnUse" x1="${X0}" y1="0" x2="${X1}" y2="0"><stop offset="0" stop-color="#b3ff3b" stop-opacity=".12"/><stop offset="1" stop-color="#b3ff3b"/></linearGradient></defs>${ahead}${STAGES.map((_, k) => `<line class="tick" x1="${xAt((k + 1) * PER)}" x2="${xAt((k + 1) * PER)}" y1="${Y - 7}" y2="${Y + 7}"/>`).join("")}<path data-under class="under" d=""/><path data-tail d="" fill="none" stroke="url(#tail)" stroke-width="5" stroke-linecap="round"/><g class="mover" data-you><circle class="youhalo" r="16"/><circle class="youhalo" r="10" style="animation-delay:.6s"/><circle class="you" r="7"/></g>`,
+  beads: () => { let o = `<g data-glow></g>`; for (let i = 1; i <= TOTAL; i++) { const big = i % PER === 0; o += `<circle class="bead" data-i="${i}" cx="${X0 + (W * (i - 0.5)) / TOTAL}" cy="${Y}" r="${big ? 3.4 : 1.7}"/>`; } return o; },
+};
+function setLayers(g, d) { g.querySelectorAll("path").forEach((p) => p.setAttribute("d", d)); }
+function shape(id, x, end, t) {
+  if (id === "wave") { const grow = (x - X0) / Math.max(1, end - X0), taper = Math.min(1, (x - X0) / 14, (end - x) / 10); return Math.sin(x * 0.16 - t * 3.2) * (1.5 + 5 * grow) * Math.max(0, taper); }
+  const speed = kick.pulse && t - kick.pulse < 2.5 ? 150 : 70, span = end - X0 + 60, c = X0 - 30 + ((t * speed) % span), u = (x - c) / 5;
+  if (Math.abs(u) > 3) return 0;
+  return (-14 * Math.exp(-((u + 0.6) ** 2) * 3) + 9 * Math.exp(-((u - 0.5) ** 2) * 4) - 3 * Math.exp(-((u - 1.8) ** 2) * 2)) * Math.min(1, (x - X0) / 10, (end - x) / 8);
+}
+function liveD(id, n, t) { const end = xAt(n); let d = ""; for (let x = X0; x <= end; x += 2) d += (x === X0 ? "M" : "L") + x.toFixed(1) + " " + (Y + shape(id, x, end, t)).toFixed(1); return d + `L${end.toFixed(1)} ${Y}`; }
+
+function paint(id, animate) {
+  const el = document.getElementById(id), n = state[id], svg = el.querySelector("svg"), end = xAt(n);
+  if (id === "neon") { setLayers(svg.querySelector("[data-live]"), `M${X0} ${Y}H${end}`); svg.querySelector(".spark").style.setProperty("--p", (100 * n) / TOTAL); }
+  if (id === "pulse" || id === "wave") setLayers(svg.querySelector("[data-live]"), liveD(id, n, still ? 0.4 : performance.now() / 1000));
+  if (id === "segments") STAGES.forEach((_, k) => { const a = xAt(k * PER) + 4, b = xAt((k + 1) * PER) - 4, f = Math.max(0, Math.min(1, (n - k * PER) / PER)); setLayers(svg.querySelector(`[data-seg="${k}"]`), f > 0 ? `M${a} ${Y}H${a + (b - a) * f}` : ""); });
+  if (id === "comet") { svg.querySelector("#tail").setAttribute("x2", end); svg.querySelector("[data-tail]").setAttribute("d", `M${X0} ${Y}H${end}`); svg.querySelector("[data-under]").setAttribute("d", `M${X0} ${Y}H${end}`); }
+  if (id === "beads") { let glow = ""; svg.querySelectorAll(".bead").forEach((b) => { const i = Number(b.dataset.i), on = i <= n, was = b.classList.contains("on"); b.classList.toggle("on", on); b.classList.toggle("next", i === n + 1); if (on) glow += `<circle class="beadglow" cx="${b.getAttribute("cx")}" cy="${Y}" r="${Number(b.getAttribute("r")) + 2}"/>`; if (on && !was && animate) { b.classList.remove("pop"); void b.getBoundingClientRect(); b.classList.add("pop"); } }); svg.querySelector("[data-glow]").innerHTML = glow; }
+  const y = svg.querySelector("[data-you]"); if (y) y.style.transform = `translate(${end}px, ${Y}px)`;
+  svg.querySelectorAll(".node").forEach((node) => { const lit = n >= (Number(node.dataset.k) + 1) * PER, was = node.classList.contains("lit"); node.classList.toggle("lit", lit); if (lit && !was && animate) { node.classList.remove("pop"); void node.getBoundingClientRect(); node.classList.add("pop"); } });
+  const st = Math.min(STAGES.length - 1, Math.floor(n / PER)), done = n >= TOTAL;
+  el.querySelector("[data-stage]").textContent = done ? "Goal reached" : STAGES[st];
+  el.querySelector("[data-pos]").textContent = done ? "" : `· stage ${st + 1} of ${STAGES.length}`;
+  el.querySelector("[data-left]").textContent = done ? "Done" : `${PER - (n - st * PER)} sessions to next`;
+}
+SK.forEach((s, i) => {
+  const el = document.createElement("section"); el.className = "card"; el.id = s.id;
+  el.innerHTML = `<div><div class="eyebrow">Line ${i + 1}</div><h2>${s.name}</h2></div><div class="panel"><svg viewBox="0 0 320 92" role="img" aria-label="${s.name}: progress line">${BUILD[s.id]()}</svg><div class="pmeta"><span><b data-stage></b> <span class="s" data-pos></span></span><span class="eyebrow" data-left></span></div></div><p class="sub">${s.line}</p><div class="row"><button class="feed" data-feed>Log a session</button><button class="reset" data-reset>Reset</button></div>`;
+  document.getElementById("grid").appendChild(el);
+  el.querySelectorAll("[data-live] path, [data-seg] path").forEach((p) => { p.style.strokeDasharray = "none"; p.style.transition = "none"; });
+  el.querySelector("[data-feed]").addEventListener("click", () => { state[s.id] = state[s.id] >= TOTAL ? START : state[s.id] + 1; kick[s.id] = performance.now() / 1000; paint(s.id, true); });
+  el.querySelector("[data-reset]").addEventListener("click", () => { state[s.id] = START; paint(s.id, false); });
+  paint(s.id, false);
+});
+if (!still) (function loop() { for (const id of ["pulse", "wave"]) setLayers(document.querySelector(`#${id} [data-live]`), liveD(id, state[id], performance.now() / 1000)); requestAnimationFrame(loop); })();
+document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => {
+  document.body.dataset.panel = b.dataset.panel;
+  document.querySelectorAll(".seg button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+}));
+</script>
+</body>
+</html>
