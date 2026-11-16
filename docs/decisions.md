@@ -117,3 +117,16 @@ adjusts R18, R19 and R10.
 | R26 | Hold is used **only** for logging. Booking, cancelling and paying stay a plain tap.                                                                                               | The brief promises booking in one or two taps; hold there would be friction.                   |
 | R27 | A plain tap shows "Keep holding to log" and changes nothing. Keyboard, screen-reader and reduced-motion users log with a normal press, with no hold and no animation.             | A hold-only control would lock some people out (WCAG 2.5).                                     |
 | R28 | The line never moves backwards and nothing decays on rest days.                                                                                                                   | The brief bans streaks and guilt mechanics.                                                    |
+
+### Revised after trying it (16 Nov 2026): Comet, no dark panel
+
+Ramon tried Neon on the dark panel and found the black box too dominant. He chose **line 5, "Comet"**, on the
+normal light background. R22 and R23 are withdrawn; R24 to R28 stand.
+
+| #   | Decision                                                                                                                                                                          | Reason                                                                            |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| R29 | The stage progress is a **comet on a line**, directly on the canvas with no panel: a lime head with a pulsing halo at your position and a tail that fades back towards the start. | Ramon's choice. Restores R10 (no dark blocks).                                    |
+| R30 | On the light ground the lime tail and head carry a near-black edge, and the glow is a soft lime haze around the head.                                                             | Lime alone is about 1.2:1 on near-white; the dark edge is what makes it readable. |
+| R31 | The line is the single place where lime appears outside the primary action (narrows R18).                                                                                         | Gives the Path one energetic element; everything else stays black and white.      |
+| R32 | The hold-to-log button is light at rest (white with a near-black outline) and fills with lime while held.                                                                         | A black button would bring back the heavy block Ramon just removed.               |
+| R33 | Stage boundaries are small ticks on the line; a passed tick turns near-black. The goal is a ring at the far end.                                                                  | Keeps the line quiet; the comet is the only thing that glows.                     |
