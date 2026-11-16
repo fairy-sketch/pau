@@ -183,3 +183,13 @@ This supersedes R17 to R21 (lime) and, for colour, R35.
 | R54 | Cards, sheets, inputs and the navigation are white on the stone ground. Progress, toggles and selected chips stay warm black.                                                                   | The white surfaces are what lifts off the ground now that it is tinted.                               |
 | R55 | The photo fade, shadows and the app icon follow the new ground and ink. The hold-to-log button fills with sage.                                                                                 | Keeps every piece on the same palette.                                                                |
 | R56 | The **Steps** stage line is now built into the app (`StageTrack`), not only the demo. It uses `track` for the unfinished line, `ink` for progress and `accent` for the centre dot.              | Ramon chose Steps and has kept it through two further rounds of sketches. Reverting is one component. |
+
+### Stage element under review again (16 Nov 2026)
+
+Ramon felt Steps "could have a way better design" and set a new requirement: the element must adapt to **any
+kind of training plan**. Five designs were sketched against five plan shapes ("PATH plan progress sketches").
+
+| #   | Decision                                                                                                                                                                    | Reason                                                                                       |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| R57 | Requirement: the stage element must work for any number of stages, uneven stage lengths, plans counted in sessions or weeks, and plans with no stages or end date.          | Ramon's direction. Steps needs a label under every stop and breaks beyond about five stages. |
+| R58 | **Blocks** (one block per session or week, grouped by stage, the next one in sage) is **on trial in the clickable demo only**. The app still has Steps until Ramon decides. | Ramon asked to see Blocks in the app before choosing.                                        |

@@ -147,21 +147,17 @@ th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06e
 .tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 @media (min-width: 700px) { .tiles { grid-template-columns: repeat(4, 1fr); } }
 svg text { font-family: var(--mono); font-size: 10px; fill: var(--text-2); }
-/* The path line ("Steps"): five clear stops, flat, no glow. Finished stages are ticked; the current one is a ring that closes as you log. */
-.steps svg { display: block; width: 100%; height: auto; overflow: visible; }
-.s-track { fill: none; stroke: var(--track); stroke-width: 3; stroke-linecap: round; }
-.s-conn { fill: none; stroke: var(--text); stroke-width: 3; stroke-linecap: round; }
-.s-st { fill: var(--bg); stroke: var(--track); stroke-width: 2; }
-.s-st.done { fill: var(--text); stroke: var(--text); }
-.s-st.cur { fill: var(--surface); stroke: var(--track); stroke-width: 4; }
-.s-arc { fill: none; stroke: var(--text); stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset .9s cubic-bezier(.2,.8,.2,1); }
-.s-core { fill: var(--accent); stroke: var(--text); stroke-width: 2; }
-.s-core.beat { animation: s-beat .6s cubic-bezier(.34,1.56,.64,1); transform-box: fill-box; transform-origin: center; }
-.s-bump { animation: s-beat .6s cubic-bezier(.34,1.56,.64,1); transform-box: fill-box; transform-origin: center; }
-@keyframes s-beat { 40% { scale: 1.45; } }
-.s-labels { display: grid; grid-template-columns: repeat(5, 1fr); margin-top: 8px; text-align: center; }
-.s-labels span { font: 500 9.5px/1.3 var(--mono); letter-spacing: .03em; text-transform: uppercase; color: var(--text-2); }
-.s-labels span.now { color: var(--text); font-weight: 700; }
+/* The path line ("Blocks", on trial): one block per session, grouped by stage. The next block to fill is sage. */
+.groups { display: flex; flex-wrap: wrap; gap: 14px 16px; }
+.grp { display: flex; flex-direction: column; gap: 6px; }
+.grp .eyebrow { font-size: 9.5px; letter-spacing: .03em; white-space: nowrap; }
+.grp.now .eyebrow { color: var(--text); font-weight: 700; }
+.blocks { display: grid; grid-template-columns: repeat(6, 12px); grid-auto-rows: 12px; gap: 4px; }
+.blk { border-radius: 3.5px; border: 1.5px solid var(--track); transition: background .3s ease, border-color .3s ease; }
+.blk.done { background: var(--text); border-color: var(--text); }
+.blk.next { background: var(--accent); border-color: var(--text); }
+.blk.pop { animation: blk-pop .55s cubic-bezier(.34,1.56,.64,1); }
+@keyframes blk-pop { 40% { scale: 1.7; } }
 /* Photography: the only imagery. Muted, one photo per screen, text below the picture or on the faded part. */
 .ph { display: block; width: 100%; height: 100%; object-fit: cover; filter: saturate(.6) contrast(.96); }
 .hero { position: relative; height: 208px; overflow: hidden; }
@@ -518,24 +514,20 @@ function lineChart(points, hi) {
 const isoWeek = (d) => { const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7)); return Math.ceil(((t - Date.UTC(t.getUTCFullYear(), 0, 1)) / 864e5 + 1) / 7); };
 const loadPts = (st) => st.wl.map((w) => ({ l: "W" + isoWeek(w.start), v: w.load }));
 
-const PER = 12, SR = 12, SC = 2 * Math.PI * SR, SY = 16, sx = (k) => 32 + 64 * k;
-/* The stage as five steps. `S.lineFrom` holds the state before a log, so the ring can close on screen. */
+const PER = 12;
+/* The stage as blocks: one per session, grouped by stage. `S.lineFrom` holds the state before a log, so the new block can fill on screen. */
 function pathLine() {
-  const at = S.lineFrom ?? { stage: S.stage, inSt: S.stageSessions }, n = S.stages.length, left = PER - at.inSt;
-  return `<div class="steps" id="steps" style="margin-top:28px"><svg viewBox="0 0 320 32" role="img" aria-label="Stage ${at.stage + 1} of ${n}: ${S.stages[at.stage]}. ${at.inSt} of ${PER} sessions done.">
-    <path class="s-track" d="M${sx(0)} ${SY}H${sx(n - 1)}"/><path class="s-conn" d="M${sx(0)} ${SY}H${sx(at.stage)}"/>
-    ${S.stages.map((_, k) => { const done = k < at.stage, cur = k === at.stage; return `<g transform="translate(${sx(k)} ${SY})"><g class="${S.justDone === k ? "s-bump" : ""}"><circle class="s-st ${done ? "done" : cur ? "cur" : ""}" r="${SR}"/>${cur ? `<circle class="s-arc" id="s-arc" r="${SR}" stroke-dasharray="${SC}" stroke-dashoffset="${SC * (1 - at.inSt / PER)}" transform="rotate(-90)"/><circle class="s-core" id="s-core" r="5"/>` : ""}${done ? `<path d="M-5 0.5 L-1.5 4 L5.5 -3.5" fill="none" stroke="var(--surface)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>` : ""}</g></g>`; }).join("")}</svg>
-    <div class="s-labels" aria-hidden="true">${S.stages.map((name, k) => `<span class="${k === at.stage ? "now" : ""}">${name}</span>`).join("")}</div>
-    <div class="between" style="margin-top:14px"><span class="strong">${S.stages[at.stage]} <span class="sub">· ${at.inSt} of ${PER} sessions</span></span><span class="eyebrow">${left} to next stage</span></div></div>`;
+  const at = S.lineFrom ?? { stage: S.stage, inSt: S.stageSessions }, n = S.stages.length, doneCount = at.stage * PER + at.inSt;
+  return `<div id="blocks" style="margin-top:28px" role="img" aria-label="Stage ${at.stage + 1} of ${n}: ${S.stages[at.stage]}. ${at.inSt} of ${PER} sessions done."><div class="groups">${S.stages.map((name, k) => `<div class="grp ${k === at.stage ? "now" : ""}"><span class="eyebrow">${name}</span><div class="blocks">${[...Array(PER)].map((_, j) => { const i = k * PER + j; return `<i class="blk ${i < doneCount ? "done" : i === doneCount ? "next" : ""}" data-i="${i}"></i>`; }).join("")}</div></div>`).join("")}</div>
+    <div class="between" style="margin-top:16px"><span class="strong">${S.stages[at.stage]} <span class="sub">· ${at.inSt} of ${PER} sessions</span></span><span class="eyebrow">${doneCount} / ${n * PER}</span></div></div>`;
 }
-/* After a log: close the ring a little further; when a stage is finished, tick it off and move on. */
+/* After a log: the sage block turns solid with a pop, and the next one becomes sage. */
 function flowLine() {
-  if (S.lineFrom == null) { S.justDone = null; return; }
-  const from = S.lineFrom, arc = document.getElementById("s-arc"), core = document.getElementById("s-core"); S.lineFrom = null;
-  if (!arc) return;
-  const same = from.stage === S.stage, target = same ? S.stageSessions / PER : 1;
-  requestAnimationFrame(() => requestAnimationFrame(() => { arc.style.strokeDashoffset = SC * (1 - target); core.classList.add("beat"); }));
-  setTimeout(() => { if (S.role !== "athlete" || S.tab.athlete !== "path") return; if (!same) S.justDone = from.stage; render(); }, same ? 950 : 850);
+  if (S.lineFrom == null) return;
+  const from = S.lineFrom, el = document.getElementById("blocks"); S.lineFrom = null; if (!el) return;
+  const i = from.stage * PER + from.inSt, cur = el.querySelector(`[data-i="${i}"]`), nxt = el.querySelector(`[data-i="${i + 1}"]`);
+  setTimeout(() => { if (!cur || !cur.isConnected) return; cur.classList.remove("next"); cur.classList.add("done", "pop"); if (nxt) nxt.classList.add("next"); }, 250);
+  setTimeout(() => { if (S.role === "athlete" && S.tab.athlete === "path") render(); }, 1100);
 }
 function vPath() {
   const n = nextStep(), st = stats(), wk = monday(TODAY);
