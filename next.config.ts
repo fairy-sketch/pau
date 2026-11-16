@@ -7,6 +7,12 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   serverExternalPackages: ["esbuild"],
+  images: {
+    // Only the app's own photos (src/config/images.ts) may be optimised.
+    localPatterns: [{ pathname: "/images/**" }],
+    formats: ["image/avif", "image/webp"],
+    qualities: [75],
+  },
   turbopack: {
     rules: {
       "*.css": {

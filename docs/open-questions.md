@@ -19,9 +19,11 @@ the default shown, in the milestone noted. Nothing here is hardcoded.
 
 ## Raised while building
 
-| #   | Question                                                                                                            | Raised in  | Status |
-| --- | ------------------------------------------------------------------------------------------------------------------- | ---------- | ------ |
-| 12  | Is Docker installed on Ramon's machine? The answer in the M0 go-ahead was left as a template (`[yes / no]`).        | M0         | Open   |
-| 13  | Should a GitHub Actions workflow run `pnpm test` on every push? (Needs a choice on running Supabase in CI from M1.) | M0         | Open   |
-| 14  | Logo and app icon: the current mark is a placeholder.                                                               | M0         | Open   |
-| 15  | What moves the Path line within a stage: sessions logged (demo: 12 per stage), training load, or the stage dates?   | Stage line | Open   |
+| #   | Question                                                                                                                                     | Raised in   | Status |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ------ |
+| 12  | Is Docker installed on Ramon's machine? The answer in the M0 go-ahead was left as a template (`[yes / no]`).                                 | M0          | Open   |
+| 13  | Should a GitHub Actions workflow run `pnpm test` on every push? (Needs a choice on running Supabase in CI from M1.)                          | M0          | Open   |
+| 14  | Logo and app icon: the current mark is a placeholder.                                                                                        | M0          | Open   |
+| 15  | What moves the Path line within a stage: sessions logged (demo: 12 per stage), training load, or the stage dates?                            | Stage line  | Open   |
+| 16  | There is no class photo for running or athletics (PAU's main sport), pilates or cycling. Supply `class-*` photos, or keep the borrowed ones? | Photography | Open   |
+| 17  | Where do the twelve photos come from, and are they licensed for use in the app (e.g. Unsplash or Pexels licence, or bought)?                 | Photography | Open   |

@@ -167,3 +167,16 @@
   font-variant-numeric: tabular-nums;
   font-weight: 500;
 }
+
+/*
+ * Photography (decisions R41 to R47). Photos are always muted and never get a
+ * coloured overlay. A texture is faded far enough that text on it stays readable.
+ */
+@utility photo-muted {
+  filter: saturate(0.6) contrast(0.96);
+}
+
+@utility photo-texture {
+  filter: saturate(0.35) contrast(0.9);
+  opacity: 0.16;
+}

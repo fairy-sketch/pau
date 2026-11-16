@@ -103,6 +103,57 @@ test.describe("styleguide", () => {
   });
 });
 
+test.describe("photography", () => {
+  test("class card: responsive next/image, muted, with all text below the photo", async ({
+    page,
+  }) => {
+    await page.goto("/styleguide");
+    const card = page.locator("[data-class-card]").first();
+    await card.scrollIntoViewIfNeeded();
+    const img = card.locator("img");
+
+    await expect(img).toHaveAttribute(
+      "src",
+      /\/_next\/image\?url=%2Fimages%2Fclass-yoga-window\.jpg/,
+    );
+    await expect(img).toHaveAttribute("srcset", /\b\d+w\b/);
+    await expect(img).toHaveAttribute("sizes", /100vw/);
+    await expect(img).toHaveAttribute("alt", "");
+    expect(await img.evaluate((el) => getComputedStyle(el).filter)).toContain("saturate(0.6)");
+    await expect
+      .poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0))
+      .toBe(true);
+
+    // The served file is sized for the screen, not the 2000 px original.
+    const served = await img.evaluate((el: HTMLImageElement) => el.naturalWidth);
+    expect(served).toBeLessThan(2000);
+
+    const photo = await img.boundingBox();
+    const title = await card.getByText("Yoga flow").boundingBox();
+    expect(title!.y).toBeGreaterThanOrEqual(photo!.y + photo!.height);
+  });
+
+  test("hero fades into the page and the goal sits below the picture", async ({ page }) => {
+    await page.goto("/styleguide");
+    const hero = page.locator("[data-hero]").first();
+    await hero.scrollIntoViewIfNeeded();
+    const fade = await hero.locator("div").evaluate((el) => getComputedStyle(el).backgroundImage);
+    expect(fade).toContain("linear-gradient");
+    const box = await hero.boundingBox();
+    const goal = await hero.locator("xpath=following-sibling::div").locator("p").boundingBox();
+    // The headline starts in the lowest part of the fade, where the photo is already gone.
+    expect(goal!.y).toBeGreaterThan(box!.y + box!.height * 0.85);
+  });
+
+  test("texture stays faint behind an empty state", async ({ page }) => {
+    await page.goto("/styleguide");
+    const img = page.locator("[data-texture] img");
+    expect(Number(await img.evaluate((el) => getComputedStyle(el).opacity))).toBeLessThanOrEqual(
+      0.2,
+    );
+  });
+});
+
 test.describe("PWA", () => {
   test("is installable: manifest, icons and an active service worker", async ({
     page,

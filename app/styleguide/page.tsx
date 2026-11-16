@@ -13,6 +13,8 @@ import {
   Label,
   StatusPill,
 } from "@/src/ui/primitives";
+import { heroForSport, imageForSport, textureImages } from "@/src/config/images";
+import { ClassCard, HeroPhoto, TextureEmpty } from "@/src/ui/photo";
 import { ProgressChart, type ProgressPoint } from "@/src/ui/progress-chart";
 import { StageTrack, type StageTrackItem } from "@/src/ui/stage-track";
 import { TabBar } from "@/src/ui/tab-bar";
@@ -224,6 +226,46 @@ export default async function StyleguidePage() {
                 ]}
               />
             </div>
+          </div>
+        </section>
+
+        <section aria-labelledby="sg-photos" className="space-y-8">
+          <Heading id="sg-photos">{t("sections.photos")}</Heading>
+          <p className="text-secondary max-w-prose">{t("photos.intro")}</p>
+          <div className="space-y-3">
+            <Label>{t("photos.cardLabel")}</Label>
+            <ClassCard
+              image={imageForSport("yoga")}
+              lead={time(COMMUNITY_START)}
+              title={t("photos.cardTitle")}
+              meta={t("photos.cardMeta")}
+              trailing={t("components.spots", { count: 6 })}
+              action={
+                <Button variant="primary" className="w-full">
+                  {t("components.book")}
+                </Button>
+              }
+            />
+          </div>
+          <div className="space-y-3">
+            <Label>{t("photos.heroLabel")}</Label>
+            <div className="rounded-card border-hairline overflow-hidden border pb-5">
+              <HeroPhoto image={heroForSport("running")}>
+                <div className="px-5">
+                  <Label>{t("cover.goalLabel")}</Label>
+                  <Display as="p" className="mt-2">
+                    {t("cover.goal")}
+                  </Display>
+                </div>
+              </HeroPhoto>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <Label>{t("photos.textureLabel")}</Label>
+            <TextureEmpty image={textureImages.default}>
+              <Heading as="p">{t("photos.emptyTitle")}</Heading>
+              <p className="text-small text-secondary mt-1">{t("photos.emptyBody")}</p>
+            </TextureEmpty>
           </div>
         </section>
 

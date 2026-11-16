@@ -28,7 +28,8 @@
       "stageTrack": "Stage track",
       "chart": "Chart",
       "cover": "Path sample",
-      "icons": "Icons"
+      "icons": "Icons",
+      "photos": "Photography"
     },
     "colour": {
       "usage": {
@@ -135,6 +136,16 @@
     },
     "icons": {
       "intro": "Our own set. One round line on a 24 px grid, always in the colour of the text beside it, never lime."
+    },
+    "photos": {
+      "intro": "Twelve photos are the only imagery in the app. One photo per screen at most, always muted, and never with text on a busy area: text sits below the picture or on a soft fade.",
+      "cardLabel": "Class card: photo on top, text below",
+      "heroLabel": "Hero: fades into the page, goal sits underneath",
+      "textureLabel": "Texture: a quiet background for empty states",
+      "emptyTitle": "Nothing booked yet",
+      "emptyBody": "Sessions you book show up here.",
+      "cardTitle": "Yoga flow",
+      "cardMeta": "Studio Two · Noor"
     }
   }
 }

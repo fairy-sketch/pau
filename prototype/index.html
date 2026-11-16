@@ -161,6 +161,17 @@ svg text { font-family: var(--mono); font-size: 10px; fill: var(--text-2); }
 .s-labels { display: grid; grid-template-columns: repeat(5, 1fr); margin-top: 8px; text-align: center; }
 .s-labels span { font: 500 9.5px/1.3 var(--mono); letter-spacing: .03em; text-transform: uppercase; color: var(--text-2); }
 .s-labels span.now { color: var(--text); font-weight: 700; }
+/* Photography: the only imagery. Muted, one photo per screen, text below the picture or on the faded part. */
+.ph { display: block; width: 100%; height: 100%; object-fit: cover; filter: saturate(.6) contrast(.96); }
+.hero { position: relative; height: 208px; overflow: hidden; }
+.hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(247,247,248,0) 35%, var(--bg) 90%); }
+.ccard { background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-card); box-shadow: var(--shadow); overflow: hidden; }
+.ccard .pic { aspect-ratio: 2 / 1; background: var(--soft); }
+.ccard .between > span:last-child { white-space: nowrap; flex: none; }
+.ccard .body { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+.tex { position: relative; overflow: hidden; border: 1px solid var(--hairline); border-radius: var(--r-card); padding: 28px 24px; text-align: center; }
+.tex img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: saturate(.35) contrast(.9); opacity: .16; }
+.tex > :not(img) { position: relative; }
 /* Hold to log: the button charges with lime while held, then releases into the line. */
 .hold { position: relative; overflow: hidden; width: 100%; min-height: 56px; border-radius: var(--r-control); background: var(--surface); border: 1.5px solid var(--text); color: var(--text); font-weight: 600; text-align: center; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: box-shadow .3s ease, transform .15s ease; }
 .hold::before { content: ""; position: absolute; inset: 0; background: var(--accent); transform: scaleX(0); transform-origin: left; transition: transform .25s ease; }
@@ -199,9 +210,9 @@ const ORGS = {
     name: "PAU Trackrunning", kind: "Athletics club",
     policy: { opensDays: 60, cancelMin: 120, lateCancel: "none", waitlist: true },
     offerings: [
-      { id: "track", name: "Track session", days: [1, 4], time: [18, 30], dur: 90, cap: 30, loc: "Sportanlage Fronwald", coach: "Coach Sara", intensity: "high" },
-      { id: "gym", name: "Gym session", days: [2, 5], time: [18, 0], dur: 60, cap: 15, loc: "Balboa Underground", coach: "Coach Jonas", intensity: "medium" },
-      { id: "community", name: "Saturday community session", days: [6], time: [10, 0], dur: 75, cap: 40, loc: "Sportanlage Fronwald", coach: "Open to everyone", intensity: "low", free: true },
+      { id: "track", sport: "running", name: "Track session", days: [1, 4], time: [18, 30], dur: 90, cap: 30, loc: "Sportanlage Fronwald", coach: "Coach Sara", intensity: "high" },
+      { id: "gym", sport: "gym", name: "Gym session", days: [2, 5], time: [18, 0], dur: 60, cap: 15, loc: "Balboa Underground", coach: "Coach Jonas", intensity: "medium" },
+      { id: "community", sport: "running", name: "Saturday community session", days: [6], time: [10, 0], dur: 75, cap: 40, loc: "Sportanlage Fronwald", coach: "Open to everyone", intensity: "low", free: true },
     ],
     products: [
       { name: "Performance season pass", price: 600, rule: "Unlimited group sessions, valid for the season." },
@@ -215,11 +226,11 @@ const ORGS = {
     name: "Studio Demo", kind: "Boutique studio",
     policy: { opensDays: 6, cancelMin: 240, lateCancel: "forfeit", waitlist: true, maxDay: 2, maxWeek: 7 },
     offerings: [
-      { id: "strength", name: "Strength", days: [1, 2, 3, 4, 5], time: [7, 0], dur: 50, cap: 14, loc: "Studio One", coach: "Lena", intensity: "high" },
-      { id: "hiit", name: "HIIT", days: [1, 2, 3, 4, 5, 0], time: [12, 15], dur: 45, cap: 16, loc: "Studio One", coach: "Marco", intensity: "high" },
-      { id: "mobility", name: "Mobility", days: [1, 3, 5], time: [17, 30], dur: 45, cap: 12, loc: "Studio Two", coach: "Aylin", intensity: "low" },
-      { id: "yoga", name: "Yoga flow", days: [2, 4, 0, 6], time: [18, 45], dur: 60, cap: 20, loc: "Studio Two", coach: "Noor", intensity: "low" },
-      { id: "ride", name: "Ride", days: [1, 2, 3, 4], time: [19, 0], dur: 45, cap: 18, loc: "Studio One", coach: "Tim", intensity: "high" },
+      { id: "strength", sport: "gym", name: "Strength", days: [1, 2, 3, 4, 5], time: [7, 0], dur: 50, cap: 14, loc: "Studio One", coach: "Lena", intensity: "high" },
+      { id: "hiit", sport: "gym", name: "HIIT", days: [1, 2, 3, 4, 5, 0], time: [12, 15], dur: 45, cap: 16, loc: "Studio One", coach: "Marco", intensity: "high" },
+      { id: "mobility", sport: "pilates", name: "Mobility", days: [1, 3, 5], time: [17, 30], dur: 45, cap: 12, loc: "Studio Two", coach: "Aylin", intensity: "low" },
+      { id: "yoga", sport: "yoga", name: "Yoga flow", days: [2, 4, 0, 6], time: [18, 45], dur: 60, cap: 20, loc: "Studio Two", coach: "Noor", intensity: "low" },
+      { id: "ride", sport: "cycling", name: "Ride", days: [1, 2, 3, 4], time: [19, 0], dur: 45, cap: 18, loc: "Studio One", coach: "Tim", intensity: "high" },
     ],
     products: [
       { name: "Drop-in", price: 33, rule: "1 class." },
@@ -463,6 +474,16 @@ function confirmProposal(id, yes) {
   say("Done.\n" + out.join("\n"));
 }
 
+/* ---------- photography: sport -> photo, in one place (mirrors src/config/images.ts in the app) ---------- */
+const SPORT_IMAGE = {
+  yoga: ["class-yoga-window", "60% 50%"], gym: ["class-gym-barbell", "55% 55%"], swimming: ["class-swimmer-underwater", "75% 65%"],
+  climbing: ["class-climber-indoor", "80% 45%"], tennis: ["class-tennis-courts-empty", "45% 60%"], football: ["class-football-pitch-aerial", "50% 50%"],
+  pilates: ["hero-pilates-studio", "50% 70%"], running: ["texture-track-lanes", "50% 50%"], cycling: ["hero-cyclist-mountain-path", "50% 60%"],
+};
+const HERO_IMAGE = ["hero-track-runner-silhouette", "30% 40%"], TEXTURE_IMAGE = ["texture-chalk-hands", "50% 60%"];
+const photo = ([file, focus]) => `<img class="ph" src="images/${file}.jpg" alt="" style="object-position:${focus}">`;
+const texture = (inner) => `<div class="tex"><img src="images/${TEXTURE_IMAGE[0]}.jpg" alt="">${inner}</div>`;
+
 /* ---------- views ---------- */
 const I = (d, s = 22) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 /* PATH icon set (same drawings as src/ui/icons.tsx in the app). */
@@ -518,7 +539,7 @@ function flowLine() {
 function vPath() {
   const n = nextStep(), st = stats(), wk = monday(TODAY);
   const week = [...Array(7)].map((_, i) => { const d = addDays(wk, i), done = S.entries.some((e) => ymd(e.at) === ymd(d)), bk = S.bookings.some((b) => active(b) && ymd(S.sessions[b.sid].start) === ymd(d)), today = ymd(d) === ymd(TODAY); return `<div class="d"><span class="eyebrow" style="${today ? "color:var(--text);font-weight:700" : ""}">${WD[d.getDay()][0]}</span><span class="dot ${done ? "done" : bk ? "booked" : ""}" title="${done ? "Done" : bk ? "Booked" : "Open"}"></span></div>`; }).join("");
-  return `<section class="pad stack-l">
+  return `<div class="hero">${photo(HERO_IMAGE)}</div><section class="pad stack-l" style="position:relative;margin-top:-48px">
     <div><div class="eyebrow">Your goal</div><h1 class="goal">${S.goal.title}</h1><p class="sub" style="font-size:15px">By ${S.goal.date.getDate()} ${MOL[S.goal.date.getMonth()]} ${S.goal.date.getFullYear()}. ${esc(S.goal.why)}</p>
       ${pathLine()}</div>
     <div class="card stack"><div><div class="eyebrow">Next step</div><p class="h2" style="font-size:22px;margin-top:6px">${esc(n.title)}</p><p class="sub" style="margin-top:4px">${n.meta}</p></div>
@@ -553,9 +574,14 @@ function vWeek() {
   const mine = S.bookings.map((b) => ({ b, s: S.sessions[b.sid] })).filter((r) => r.b.status === "confirmed" && r.s.org === S.org && r.s.start > now()).sort((a, c) => a.s.start - c.s.start);
   const waits = S.waitlist.map((w) => ({ w, s: S.sessions[w.sid] })).filter((r) => r.s.org === S.org);
   const row = (s, lead) => { const o = offOf(s), plan = s.org === "pau" && S.plan.items.some((i) => i.date === ymd(s.start) && i.off === s.off); return `<button class="row" data-a="sheet" data-v="${s.id}"><span class="lead time">${lead || fTime(s.start)}</span><span class="mid"><span class="strong">${o.name}</span><span class="sub">${lead ? fTime(s.start) + " · " : ""}${o.loc}${plan && !lead ? " · in your plan" : ""}</span></span><span class="end">${status(s)}</span></button>`; };
+  const feat = list.find((s) => s.start > now()) || list[0], rest = list.filter((s) => s !== feat);
+  let card = "";
+  if (feat) { const o = offOf(feat), c = check(feat), b = myBooking(feat.id), w = myWait(feat.id), plan = feat.org === "pau" && S.plan.items.some((i) => i.date === ymd(feat.start) && i.off === feat.off);
+    const btn = b || w ? `<button class="btn full" data-a="sheet" data-v="${feat.id}">Manage booking</button>` : c.ok ? `<button class="btn acc full" data-a="book" data-v="${feat.id}">${spots(feat) ? "Book" : "Join waitlist"}</button>` : feat.start <= now() ? "" : `<p class="note">${c.msg}</p>`;
+    card = `<article class="ccard" id="classcard"><div class="pic">${photo(SPORT_IMAGE[o.sport])}</div><div class="body"><button class="between" style="align-items:flex-start;width:100%" data-a="sheet" data-v="${feat.id}" aria-label="${o.name}, details"><span><span class="eyebrow">${fDay(feat.start)} · ${fTime(feat.start)}</span><span class="h2" style="display:block;margin-top:4px">${o.name}</span><span class="sub" style="display:block">${o.loc} · ${o.coach}${plan ? " · in your plan" : ""}</span></span><span>${status(feat)}</span></button>${c.ok && !b && !w ? `<p class="sub" style="margin-top:-8px">${c.note}</p>` : ""}${btn}</div></article>`; }
   return `<section class="pad stack-l"><div><div class="eyebrow">${ORGS[S.org].kind}</div><h1 class="h1">${esc(ORGS[S.org].name)}</h1></div>
     <div class="stack"><div class="days">${days.map((d) => `<button data-a="day" data-v="${ymd(d)}" aria-pressed="${ymd(d) === S.day}" aria-label="${fDay(d)}"><span class="eyebrow" style="color:inherit">${WD[d.getDay()]}</span><span class="n">${d.getDate()}</span></button>`).join("")}</div>
-      <div class="card rows">${list.length ? list.map((s) => row(s)).join("") : `<div class="row sub">No sessions on this day.</div>`}</div>
+      ${card}${rest.length ? `<div class="card rows flat">${rest.map((s) => row(s)).join("")}</div>` : ""}${list.length ? "" : `<p class="sub">No sessions on this day.</p>`}
       <details><summary>Club rules</summary><p class="sub">${policyText(ORGS[S.org])}</p></details></div>
     <div class="stack"><div class="eyebrow">Your bookings</div>${mine.length || waits.length ? `<div class="card rows flat">${mine.map((r) => row(r.s, WD[r.s.start.getDay()] + " " + r.s.start.getDate())).join("")}${waits.map((r) => row(r.s, WD[r.s.start.getDay()] + " " + r.s.start.getDate())).join("")}</div>` : `<p class="sub">Nothing booked at this club yet.</p>`}</div></section>`;
 }
@@ -594,13 +620,13 @@ function vCoach() {
   }
   if (t === "today") return `<section class="pad stack-l"><div><div class="eyebrow">Coach · ${ORGS[S.org].name}</div><h1 class="h1">Your sessions</h1></div><div class="card rows">${sessList(S.org).filter((s) => s.start > addDays(now(), -1)).slice(0, 8).map((s) => `<button class="row" data-a="roster" data-v="${s.id}"><span class="lead time" style="width:64px">${WD[s.start.getDay()]} ${s.start.getDate()}</span><span class="mid"><span class="strong">${offOf(s).name}</span><span class="sub">${fTime(s.start)} · ${offOf(s).loc}</span></span><span class="end mono">${booked(s)} / ${s.cap}${s.waitOthers ? `<span class="sub" style="display:block">${s.waitOthers + (myWait(s.id) ? 1 : 0)} waiting</span>` : ""}</span></button>`).join("")}</div></section>`;
   if (t === "athletes") {
-    if (!shares("path.read") && !shares("log.read")) return `<section class="pad stack"><h1 class="h1">Your athletes</h1><p>No athlete shares their path or log with ${ORGS[S.org].name}. Coaches only see what an athlete chooses to share.</p><p class="note">Try it: switch to Athlete, open Me, and change what this club sees.</p></section>`;
+    if (!shares("path.read") && !shares("log.read")) return `<section class="pad stack"><h1 class="h1">Your athletes</h1>${texture(`<p class="h2">Nobody is sharing yet</p><p class="sub" style="margin-top:6px">Coaches only see what an athlete chooses to share with ${ORGS[S.org].name}.</p>`)}<p class="note">Try it: switch to Athlete, open Me, and change what this club sees.</p></section>`;
     return `<section class="pad stack-l"><div><div class="eyebrow">Shared with ${ORGS[S.org].name}</div><h1 class="h1">${S.me.name}</h1>${shares("path.read") ? `<p class="sub" style="margin-top:4px">${S.goal.title} · ${S.stages[S.stage]}, ${S.stageDaysLeft} days left</p>` : `<p class="sub" style="margin-top:4px">Path not shared.</p>`}</div>
       ${shares("log.read") ? `<div class="stack"><div class="eyebrow">Training log</div><div class="card rows flat">${S.entries.slice(0, 5).map((e) => `<div class="row" style="align-items:flex-start"><span class="mid"><span class="strong">${esc(e.title)}</span><span class="sub">${fDay(e.at)} · ${e.dur} min · RPE ${e.rpe}${e.pain && shares("alerts.pain") ? " · pain " + e.painLevel : ""}</span>${e.comments.map((c) => `<span class="note" style="margin-top:8px"><span class="strong" style="color:var(--text)">${esc(c.by)}</span> ${esc(c.text)}</span>`).join("")}${shares("log.comment") ? `<form data-f="comment" data-id="${e.id}" style="display:flex;gap:8px;margin-top:8px"><input class="inp" style="min-height:40px" id="c-${e.id}" aria-label="Comment on ${esc(e.title)}" placeholder="Add a comment"><button class="btn sm" style="min-height:40px" type="submit">Send</button></form>` : ""}</span></div>`).join("")}</div></div>` : `<p class="sub">Training log not shared.</p>`}</section>`;
   }
   if (t === "review") return `<section class="pad stack-l"><h1 class="h1">Review queue</h1>${!shares("plan.write") ? `<p>${S.me.name} has not allowed coaches at this club to review plans.</p>` : S.draft.status !== "pending_review" ? `<p class="sub">Nothing is waiting. You ${S.draft.status} "${S.draft.title}".</p>` : `<div class="card stack"><div><div class="eyebrow">${S.me.name} · waiting for you</div><p class="h2" style="font-size:22px;margin-top:6px">${S.draft.title}</p></div><p class="sub">${S.draft.rationale}</p><ul class="stack" style="gap:6px">${S.draft.changes.map((c) => `<li>${c}</li>`).join("")}</ul><div class="btns"><button class="btn acc" style="flex:1" data-a="draft" data-v="approved">Approve</button><button class="btn" data-a="draft" data-v="rejected">Reject</button></div><p class="sub">A drafted plan never reaches the athlete until a coach approves it.</p></div>`}</section>`;
   const al = S.alerts.filter((a) => a.info || shares("alerts.pain"));
-  return `<section class="pad stack-l"><h1 class="h1">Alerts</h1>${al.length ? `<div class="card rows flat">${al.map((a) => `<div class="row"><span class="mid"><span class="strong">${esc(a.kind)}</span><span class="sub">${S.me.name} · ${fDay(a.at)}</span></span>${a.status === "open" ? `<button class="btn sm" data-a="ack" data-v="${a.id}">Got it</button>` : `<span class="sub">Seen</span>`}</div>`).join("")}</div>` : `<p class="sub">No alerts. Pain alerts appear only for athletes who share them.</p>`}</section>`;
+  return `<section class="pad stack-l"><h1 class="h1">Alerts</h1>${al.length ? `<div class="card rows flat">${al.map((a) => `<div class="row"><span class="mid"><span class="strong">${esc(a.kind)}</span><span class="sub">${S.me.name} · ${fDay(a.at)}</span></span>${a.status === "open" ? `<button class="btn sm" data-a="ack" data-v="${a.id}">Got it</button>` : `<span class="sub">Seen</span>`}</div>`).join("")}</div>` : texture(`<p class="h2">No alerts</p><p class="sub" style="margin-top:6px">Pain alerts appear only for athletes who share them.</p>`)}</section>`;
 }
 /* admin */
 function vAdmin() {
