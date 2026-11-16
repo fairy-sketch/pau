@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PATH living progress sketches</title>
+<style>
+@font-face { font-family: "Satoshi"; src: url("fonts/Satoshi-Variable.woff2") format("woff2"); font-weight: 300 900; font-display: swap; }
+@font-face { font-family: "Switzer"; src: url("fonts/Switzer-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "JetBrains Mono"; src: url("fonts/JetBrainsMono-Variable.woff2") format("woff2"); font-weight: 100 800; font-display: swap; }
+:root {
+  /* Layout: a grid of phone-width cards, each one living version of the stage progress with a button that feeds it. */
+  --bg: #f7f7f8; --surface: #ffffff; --soft: #edf0f5; --hairline: #e1e5ec;
+  --text: #141414; --text-2: #5f6672; --accent: #b3ff3b;
+  --heading: "Satoshi", "Helvetica Neue", Arial, sans-serif;
+  --body: "Switzer", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --spring: cubic-bezier(.34, 1.56, .64, 1);
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 400 15px/1.5 var(--body); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
+:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+h1, h2, p { margin: 0; }
+.page { max-width: 1180px; margin: 0 auto; padding: 32px 24px 64px; }
+.eyebrow { font: 500 11px/1.3 var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--text-2); }
+h1 { font: 900 clamp(32px, 7vw, 44px)/1.05 var(--heading); letter-spacing: -.03em; margin: 8px 0 12px; text-wrap: balance; }
+.intro { color: var(--text-2); max-width: 62ch; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px; margin-top: 32px; }
+.card { background: var(--surface); border: 1px solid var(--hairline); border-radius: 20px; box-shadow: 0 1px 2px rgba(17,17,17,.04), 0 6px 20px rgba(17,17,17,.05); padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+.card h2 { font: 700 20px/1.2 var(--heading); letter-spacing: -.01em; margin-top: 4px; }
+.stage { height: 200px; display: grid; place-items: center; position: relative; overflow: hidden; border-radius: 14px; background: var(--bg); }
+.meta { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.meta b { font-weight: 600; }
+.sub { color: var(--text-2); font-size: 13px; }
+.row { display: flex; gap: 8px; }
+.feed { flex: 1; height: 48px; border-radius: 12px; background: var(--accent); font-weight: 600; transition: transform .12s ease; }
+.feed:active { transform: scale(.96); }
+.reset { height: 48px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--hairline); color: var(--text-2); font-size: 13px; font-weight: 500; }
+.plus { position: absolute; font: 700 18px var(--heading); pointer-events: none; animation: plus .9s ease-out forwards; }
+@keyframes plus { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-44px); } }
+
+/* 1 Liquid */
+.caps { display: flex; gap: 8px; width: 88%; height: 96px; align-items: stretch; }
+.cap { flex: 1; border-radius: 18px; background: var(--soft); position: relative; overflow: hidden; }
+.cap.done, .cap.cur { background: var(--text); }
+.cap.done::after { content: ""; position: absolute; inset: 5px; border-radius: 13px; background: var(--accent); }
+.cap.cur { flex: 2.4; }
+.cap.cur.gulp { animation: gulp .5s var(--spring); }
+@keyframes gulp { 30% { transform: scale(1.06, .92); } 60% { transform: scale(.97, 1.05); } }
+.liquid { position: absolute; left: 5px; right: 5px; bottom: 5px; border-radius: 0 0 13px 13px; background: var(--accent); transition: height .7s var(--spring); }
+.wave { position: absolute; left: 0; bottom: 100%; width: 200%; height: 10px; margin-bottom: -1px; animation: wave 2.4s linear infinite; }
+.wave.b { animation-duration: 3.6s; opacity: .55; }
+@keyframes wave { to { transform: translateX(-50%); } }
+.bubble { position: absolute; bottom: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--text); opacity: .25; animation: rise 2.8s ease-in infinite; }
+@keyframes rise { from { transform: translateY(0) scale(1); opacity: .3; } to { transform: translateY(-70px) scale(.4); opacity: 0; } }
+
+/* 2 Pulse ring */
+.ring { width: 150px; height: 150px; animation: breathe 3.2s ease-in-out infinite; }
+@keyframes breathe { 50% { transform: scale(1.035); } }
+.ring .arc { transition: stroke-dashoffset .8s var(--spring); }
+.ring .ripple { transform-origin: 80px 80px; opacity: 0; }
+.ring.hit .ripple { animation: ripple .7s ease-out; }
+@keyframes ripple { from { opacity: .5; transform: scale(.8); } to { opacity: 0; transform: scale(1.25); } }
+.ringnum { position: absolute; text-align: center; }
+.ringnum b { display: block; font: 800 34px/1 var(--heading); letter-spacing: -.03em; }
+
+/* 3 Buddy */
+.ground { position: absolute; bottom: 30px; width: 90px; height: 12px; border-radius: 50%; background: var(--text); opacity: .1; animation: shadow 2.2s ease-in-out infinite; }
+@keyframes shadow { 50% { transform: scale(.86); opacity: .07; } }
+.buddywrap { transition: transform .6s var(--spring); transform-origin: 50% 100%; margin-top: 10px; }
+.buddy { width: 110px; height: 100px; background: var(--accent); border: 3px solid var(--text); border-radius: 58% 42% 48% 52% / 60% 58% 42% 40%; position: relative; animation: bob 2.2s ease-in-out infinite, morph 6s ease-in-out infinite; }
+@keyframes bob { 50% { transform: translateY(-8px); } }
+@keyframes morph { 33% { border-radius: 46% 54% 56% 44% / 54% 62% 38% 46%; } 66% { border-radius: 54% 46% 42% 58% / 62% 52% 48% 38%; } }
+.buddy.jump { animation: jump .6s var(--spring), morph 6s ease-in-out infinite; }
+@keyframes jump { 25% { transform: translateY(6px) scale(1.12, .84); } 55% { transform: translateY(-34px) scale(.92, 1.1); } 100% { transform: translateY(0); } }
+.eye { position: absolute; top: 34px; width: 12px; height: 14px; border-radius: 50%; background: var(--text); animation: blink 4.2s infinite; }
+.eye.l { left: 30px; } .eye.r { right: 30px; }
+@keyframes blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
+.mouth { position: absolute; left: 50%; top: 58px; width: 22px; height: 11px; margin-left: -11px; border: 3px solid var(--text); border-top: 0; border-radius: 0 0 22px 22px; transition: all .15s ease; }
+.buddy.jump .mouth { height: 18px; width: 18px; margin-left: -9px; border-top: 3px solid var(--text); border-radius: 50%; background: var(--text); }
+.pellet { position: absolute; top: -14px; width: 12px; height: 12px; border-radius: 50%; background: var(--text); animation: drop .35s ease-in forwards; }
+@keyframes drop { to { transform: translateY(96px); opacity: 0; } }
+
+/* 4 Orbit */
+.orbit { position: relative; width: 170px; height: 170px; }
+.core { position: absolute; inset: 53px; border-radius: 50%; background: var(--text); color: #fff; display: grid; place-items: center; font: 700 15px var(--heading); transition: transform .5s var(--spring); }
+.core.hit { transform: scale(1.15); }
+.lane { position: absolute; inset: 0; border-radius: 50%; animation: spin linear infinite; }
+.lane.guide { border: 1px dashed var(--hairline); animation: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.sat { position: absolute; left: 50%; top: -7px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--accent); border: 2.5px solid var(--text); animation: pop .5s var(--spring); }
+@keyframes pop { from { transform: scale(0) translateY(-40px); } }
+
+/* 5 Bars */
+.bars { display: flex; align-items: flex-end; gap: 10px; height: 130px; width: 84%; }
+.bar { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; }
+.bar i { display: block; width: 100%; border-radius: 10px; background: var(--text); transform-origin: 50% 100%; transition: height .6s var(--spring); animation: eq 1.6s ease-in-out infinite; }
+.bar.rest i { background: var(--soft); animation: none; }
+.bar.today i { background: var(--accent); border: 3px solid var(--text); }
+@keyframes eq { 50% { transform: scaleY(.93); } }
+.bar.kick i { animation: kick .5s var(--spring); }
+@keyframes kick { 40% { transform: scaleY(1.12) scaleX(.92); } }
+
+@media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="eyebrow">PATH · sketches</div>
+  <h1>A stage that feels alive</h1>
+  <p class="intro">Five ways to replace the flat stage bar on the Path. Each one moves gently on its own and reacts when you log a session. Press the lime button to feed it. None of them shrink or punish you for a rest day.</p>
+  <div class="grid" id="grid"></div>
+</div>
+<script>
+"use strict";
+const TARGET = 12, START = 5;
+const SKETCHES = [
+  { id: "liquid", name: "Liquid", line: "The current stage is a tank that fills. The surface never stops moving, and every session makes it gulp and rise." },
+  { id: "ring", name: "Pulse", line: "A ring that breathes. Each session snaps a new piece into place and sends out a ripple." },
+  { id: "buddy", name: "Buddy", line: "A small companion that bobs, blinks and watches your finger. Feed it a session and it jumps and grows." },
+  { id: "orbit", name: "Orbit", line: "Every session becomes a dot circling your stage. The more you train, the busier the sky." },
+  { id: "bars", name: "Beat", line: "Your week as a row of bars that pulse like music. Today's bar is lime and kicks up when you log." },
+];
+const state = Object.fromEntries(SKETCHES.map((s) => [s.id, START]));
+const grid = document.getElementById("grid");
+const wavePath = (fill) => `<svg class="wave" viewBox="0 0 200 10" preserveAspectRatio="none" aria-hidden="true"><path d="M0 5 Q 12.5 0 25 5 T 50 5 T 75 5 T 100 5 T 125 5 T 150 5 T 175 5 T 200 5 V10 H0Z" fill="${fill}"/></svg>`;
+
+const DRAW = {
+  liquid(n) {
+    const pct = Math.round((n / TARGET) * 100);
+    return `<div class="caps"><div class="cap done"></div><div class="cap cur"><div class="liquid" style="height:calc(${pct}% - ${pct > 92 ? 10 : 0}px)">${wavePath("var(--accent)")}${wavePath("var(--accent)").replace('class="wave"', 'class="wave b"')}<span class="bubble" style="left:22%"></span><span class="bubble" style="left:58%;animation-delay:1.1s"></span><span class="bubble" style="left:78%;animation-delay:1.9s"></span></div></div><div class="cap"></div><div class="cap"></div><div class="cap"></div></div>`;
+  },
+  ring(n) {
+    const c = 2 * Math.PI * 62, off = c * (1 - n / TARGET);
+    return `<svg class="ring" viewBox="0 0 160 160" aria-hidden="true"><circle class="ripple" cx="80" cy="80" r="70" fill="none" stroke="var(--text)" stroke-width="2"/><circle cx="80" cy="80" r="62" fill="none" stroke="var(--text)" stroke-width="18"/><circle class="arc" cx="80" cy="80" r="62" fill="none" stroke="var(--accent)" stroke-width="10" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${off}" transform="rotate(-90 80 80)"/></svg><div class="ringnum"><b>${n}</b><span class="eyebrow">of ${TARGET}</span></div>`;
+  },
+  buddy(n) {
+    return `<span class="ground"></span><div class="buddywrap" style="transform:scale(${(0.72 + n * 0.035).toFixed(3)})"><div class="buddy"><span class="eye l"></span><span class="eye r"></span><span class="mouth"></span></div></div>`;
+  },
+  orbit(n) {
+    let sats = "";
+    for (let i = 0; i < n; i++) { const lane = i % 3, inset = [0, 18, 36][lane], dur = [14, 10, 7][lane], start = (i * 137) % 360; sats += `<div class="lane" style="inset:${inset}px;animation-duration:${dur}s;animation-delay:-${((start / 360) * dur).toFixed(2)}s;animation-direction:${lane === 1 ? "reverse" : "normal"}"><span class="sat"></span></div>`; }
+    return `<div class="orbit"><div class="lane guide"></div><div class="lane guide" style="inset:18px"></div><div class="lane guide" style="inset:36px"></div>${sats}<div class="core">Build</div></div>`;
+  },
+  bars(n) {
+    const base = [62, 0, 78, 0, 40, 0, 0], today = 4, extra = (n - START) * 14;
+    return `<div class="bars">${"MTWTFSS".split("").map((d, i) => { const h = i === today ? Math.min(100, base[i] + extra) : base[i]; return `<div class="bar ${h ? "" : "rest"} ${i === today ? "today" : ""}"><i style="height:${h || 8}%;animation-delay:${i * 0.12}s"></i><span class="eyebrow">${d}</span></div>`; }).join("")}</div>`;
+  },
+};
+const label = (id, n) => ({ liquid: `${Math.round((n / TARGET) * 100)}% full`, ring: `${TARGET - n} to go`, buddy: n >= TARGET ? "Fully grown" : "Growing", orbit: `${n} in orbit`, bars: "This week" })[id];
+
+function card(s, i) {
+  const el = document.createElement("section");
+  el.className = "card"; el.id = s.id;
+  el.innerHTML = `<div><div class="eyebrow">Sketch ${i + 1}</div><h2>${s.name}</h2></div><div class="stage" data-stage></div><div class="meta"><span><b>Build</b> <span class="sub">· stage 2 of 5</span></span><span class="eyebrow" data-label></span></div><p class="sub">${s.line}</p><div class="row"><button class="feed" data-feed>Log a session</button><button class="reset" data-reset>Reset</button></div>`;
+  grid.appendChild(el); paint(s.id);
+  el.querySelector("[data-feed]").addEventListener("click", () => feed(s.id));
+  el.querySelector("[data-reset]").addEventListener("click", () => { state[s.id] = START; paint(s.id); });
+}
+function paint(id) {
+  const el = document.getElementById(id);
+  el.querySelector("[data-stage]").innerHTML = DRAW[id](state[id]);
+  el.querySelector("[data-label]").textContent = label(id, state[id]);
+}
+function flash(node, cls, ms) { if (!node) return; node.classList.remove(cls); void node.offsetWidth; node.classList.add(cls); setTimeout(() => node.classList.remove(cls), ms); }
+function feed(id) {
+  if (state[id] >= TARGET) state[id] = START; else state[id]++;
+  const el = document.getElementById(id), stage = el.querySelector("[data-stage]"), n = state[id];
+  if (id === "liquid") { const pct = Math.round((n / TARGET) * 100); stage.querySelector(".liquid").style.height = `calc(${pct}% - ${pct > 92 ? 10 : 0}px)`; flash(stage.querySelector(".cap.cur"), "gulp", 500); }
+  else if (id === "ring") { const c = 2 * Math.PI * 62; stage.querySelector(".arc").style.strokeDashoffset = c * (1 - n / TARGET); stage.querySelector(".ringnum b").textContent = n; flash(stage.querySelector(".ring"), "hit", 700); }
+  else if (id === "buddy") { const p = document.createElement("span"); p.className = "pellet"; stage.appendChild(p); setTimeout(() => p.remove(), 400); setTimeout(() => { stage.querySelector(".buddywrap").style.transform = `scale(${(0.72 + n * 0.035).toFixed(3)})`; flash(stage.querySelector(".buddy"), "jump", 600); }, 260); }
+  else if (id === "orbit") { paint(id); const core = el.querySelector(".core"); core.classList.add("hit"); setTimeout(() => core.classList.remove("hit"), 250); }
+  else if (id === "bars") { const bars = [...stage.querySelectorAll(".bar")], t = bars[4]; t.querySelector("i").style.height = Math.min(100, 40 + (n - START) * 14) + "%"; bars.forEach((b, i) => setTimeout(() => flash(b, "kick", 500), Math.abs(i - 4) * 70)); }
+  el.querySelector("[data-label]").textContent = label(id, n);
+  const plus = document.createElement("span"); plus.className = "plus"; plus.textContent = "+1"; plus.style.cssText = "right:16px;top:60px"; stage.appendChild(plus); setTimeout(() => plus.remove(), 900);
+}
+SKETCHES.forEach(card);
+// Buddy's eyes follow the pointer a little.
+document.addEventListener("pointermove", (e) => {
+  const b = document.querySelector("#buddy .buddy"); if (!b) return;
+  const r = b.getBoundingClientRect(), dx = Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / 200)), dy = Math.max(-1, Math.min(1, (e.clientY - (r.top + r.height / 2)) / 200));
+  b.querySelectorAll(".eye").forEach((eye) => { eye.style.translate = `${dx * 4}px ${dy * 3}px`; });
+});
+</script>
+</body>
+</html>
