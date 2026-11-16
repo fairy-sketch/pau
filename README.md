@@ -89,6 +89,8 @@ app/                 routes: /, /styleguide, /offline, manifest, service worker
 src/config           APP_NAME and locale defaults (the product name lives only here)
 src/i18n             next-intl config and messages/en.json
 src/ui               design system components and the token mirror
+public/fonts         Satoshi and Switzer (Fontshare licence in FFL.txt; private repo only)
+prototype/           single-file clickable demo with made-up data (not the real app)
 src/domain           pure helpers (formatting, contrast)
 src/jobs             job runner, stores and the job registry
 src/pwa, src/server  manifest builder, validated environment

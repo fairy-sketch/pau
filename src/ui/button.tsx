@@ -2,20 +2,25 @@ import Link from "next/link";
 import type { ComponentProps } from "react";
 import { cx } from "./cx";
 
-export type ButtonVariant = "primary" | "accent" | "outline";
+/**
+ * primary: the one accent-coloured action on a screen.
+ * secondary: everything else that is a button.
+ * ghost: quiet actions such as "Close".
+ */
+export type ButtonVariant = "primary" | "secondary" | "ghost";
 
 const base =
-  "type-label inline-flex min-h-touch min-w-touch items-center justify-center gap-2 px-5 font-bold " +
-  "border-2 transition-colors duration-(--duration-quick) ease-(--ease-mechanical) " +
+  "inline-flex min-h-12 min-w-touch items-center justify-center gap-2 rounded-control border px-5 " +
+  "text-body font-semibold transition-[background-color,opacity] duration-(--duration-quick) " +
   "disabled:cursor-not-allowed disabled:opacity-50";
 
 const variants: Record<ButtonVariant, string> = {
-  primary: "border-fg bg-fg text-bg hover:bg-bg hover:text-fg",
-  accent: "border-accent bg-accent text-on-accent hover:border-fg hover:bg-fg hover:text-bg",
-  outline: "border-fg bg-transparent text-fg hover:bg-fg hover:text-bg",
+  primary: "border-accent bg-accent text-on-accent hover:opacity-90",
+  secondary: "border-hairline bg-surface text-ink hover:bg-soft",
+  ghost: "border-transparent bg-transparent text-secondary hover:bg-soft",
 };
 
-export function buttonClasses(variant: ButtonVariant = "primary", className?: string) {
+export function buttonClasses(variant: ButtonVariant = "secondary", className?: string) {
   return cx(base, variants[variant], className);
 }
 

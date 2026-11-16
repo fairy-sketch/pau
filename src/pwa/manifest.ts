@@ -28,8 +28,8 @@ export function buildManifest(input: {
     scope: "/",
     display: "standalone",
     orientation: "portrait",
-    background_color: tokenHex("ink"),
-    theme_color: tokenHex("ink"),
+    background_color: tokenHex("canvas"),
+    theme_color: tokenHex("canvas"),
     icons: [...PWA_ICONS],
   };
 }

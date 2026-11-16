@@ -6,35 +6,26 @@ export interface ProgressPoint {
   /** Already formatted x label, e.g. "W46". */
   label: string;
   value: number;
-  /** The current week or a new personal best: gets the one accent. */
+  /** The current week or a new personal best: gets the accent. */
   highlight?: boolean;
 }
 
 const tick = {
   fontFamily: "var(--font-mono)",
   fontSize: 10,
-  fill: "var(--surface-muted)",
+  fill: "var(--color-secondary)",
 };
 
-function SquareDot(props: { cx?: number; cy?: number; payload?: ProgressPoint }) {
+function HighlightDot(props: { cx?: number; cy?: number; payload?: ProgressPoint }) {
   const { cx, cy, payload } = props;
-  if (cx == null || cy == null) return null;
-  const size = payload?.highlight ? 10 : 6;
-  return (
-    <rect
-      x={cx - size / 2}
-      y={cy - size / 2}
-      width={size}
-      height={size}
-      fill={payload?.highlight ? "var(--org-accent)" : "var(--surface-fg)"}
-    />
-  );
+  if (cx == null || cy == null || !payload?.highlight) return null;
+  return <circle cx={cx} cy={cy} r={5} fill="var(--org-accent)" />;
 }
 
 /**
- * Progress line in the house style: one black line, square markers, thin
- * dotted rules, monospace axes, no animation. The same data is offered as a
- * table for screen readers, since the SVG itself is hidden from them.
+ * Quiet progress line: one thin near-black line on hairline rules, mono axis
+ * labels, and a single accent dot on the point that matters. No animation.
+ * The same data is offered as a table for screen readers.
  */
 export function ProgressChart({
   points,
@@ -49,37 +40,38 @@ export function ProgressChart({
 }) {
   return (
     <figure>
-      <figcaption className="type-label mb-3 flex justify-between gap-4 font-bold">
-        <span>{title}</span>
-        <span className="text-muted">{unit}</span>
+      <figcaption className="mb-3 flex items-baseline justify-between gap-4">
+        <span className="type-label text-secondary">{title}</span>
+        <span className="text-secondary text-xs">{unit}</span>
       </figcaption>
-      <div className="h-52" aria-hidden="true" data-chart>
+      <div className="h-44" aria-hidden="true" data-chart>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             accessibilityLayer={false}
             data={points}
             margin={{ top: 8, right: 8, bottom: 0, left: -16 }}
           >
-            <CartesianGrid vertical={false} stroke="var(--surface-fg)" strokeDasharray="1 4" />
+            <CartesianGrid vertical={false} stroke="var(--color-hairline)" />
             <XAxis
               dataKey="label"
               tick={tick}
               tickLine={false}
-              axisLine={{ stroke: "var(--surface-fg)", strokeWidth: 2 }}
+              axisLine={false}
               interval="preserveStartEnd"
             />
             <YAxis tick={tick} tickLine={false} axisLine={false} width={56} />
             <Line
               dataKey="value"
               type="linear"
-              stroke="var(--surface-fg)"
-              strokeWidth={2}
+              stroke="var(--color-ink)"
+              strokeWidth={1.75}
+              strokeLinejoin="round"
               isAnimationActive={false}
               dot={(dotProps) => {
                 const { key, ...rest } = dotProps as { key?: string } & Parameters<
-                  typeof SquareDot
+                  typeof HighlightDot
                 >[0];
-                return <SquareDot key={key} {...rest} />;
+                return <HighlightDot key={key} {...rest} />;
               }}
               activeDot={false}
             />

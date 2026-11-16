@@ -12,15 +12,23 @@ describe("design tokens", () => {
     }
   });
 
-  it("defines the two accent tokens named in the brief", () => {
-    expect(css).toContain("--color-accent-signal:");
-    expect(css).toContain("--color-accent-electric:");
+  it("has exactly one accent colour", () => {
+    const accents = [...css.matchAll(/--color-accent[\w-]*:\s*#[0-9a-f]{6}/g)];
+    expect(accents).toHaveLength(1);
+    expect(colorTokens.filter((t) => t.id.startsWith("accent"))).toHaveLength(1);
   });
 
-  it("drops Tailwind's default palette and radii", () => {
+  it("drops Tailwind's default palette and sets soft radii", () => {
     expect(css).toContain("--color-*: initial;");
     expect(css).toContain("--radius-*: initial;");
-    expect(css).toContain("--radius-none: 0;");
+    expect(css).toContain("--radius-control: 0.75rem;");
+    expect(css).toContain("--radius-card: 1rem;");
+  });
+
+  it("self-hosts the Fontshare fonts unmodified", () => {
+    expect(css).toContain('url("/fonts/Satoshi-Variable.woff2")');
+    expect(css).toContain('url("/fonts/Switzer-Variable.woff2")');
+    expect(css).not.toContain("Archivo");
   });
 
   it("keeps the motion token in sync", () => {

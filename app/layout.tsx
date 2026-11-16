@@ -12,14 +12,14 @@ export async function generateMetadata(): Promise<Metadata> {
     applicationName: APP_NAME,
     title: { default: APP_NAME, template: `%s · ${APP_NAME}` },
     description: t("description"),
-    appleWebApp: { capable: true, title: APP_NAME, statusBarStyle: "black" },
+    appleWebApp: { capable: true, title: APP_NAME, statusBarStyle: "default" },
     icons: { apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }] },
     formatDetection: { telephone: false },
   };
 }
 
 export const viewport: Viewport = {
-  themeColor: tokenHex("ink"),
+  themeColor: tokenHex("canvas"),
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -34,7 +34,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-dvh">
         <a
           href="#main"
-          className="type-label bg-fg text-bg sr-only z-50 p-3 focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+          className="rounded-control bg-ink text-surface sr-only z-50 px-4 py-3 font-semibold focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
         >
           {t("skipToContent")}
         </a>

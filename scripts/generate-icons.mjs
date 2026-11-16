@@ -3,9 +3,9 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import sharp from "sharp";
 
-const INK = "#000000";
+const INK = "#111111";
 const PAPER = "#ffffff";
-const SIGNAL = "#e40513";
+const ACCENT = "#c2410c";
 
 /** Two leaning lanes on black. `scale` shrinks the mark for the maskable safe zone. */
 function mark(scale = 1) {
@@ -13,7 +13,7 @@ function mark(scale = 1) {
   <rect width="512" height="512" fill="${INK}"/>
   <g transform="translate(256 256) scale(${scale}) translate(-256 -256)">
     <path d="M88 392h96l96-272h-96z" fill="${PAPER}"/>
-    <path d="M232 392h96l96-272h-96z" fill="${SIGNAL}"/>
+    <path d="M232 392h96l96-272h-96z" fill="${ACCENT}"/>
   </g>
 </svg>`;
 }

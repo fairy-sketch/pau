@@ -1,58 +1,71 @@
 import type { ComponentProps, ReactNode } from "react";
 import { cx } from "./cx";
 
-/** Big editorial headline. */
+/** The goal headline. Use once per screen, at most. */
 export function Display({
   as: Tag = "h1",
+  className,
+  ...rest
+}: ComponentProps<"h1"> & { as?: "h1" | "h2" | "p" }) {
+  return <Tag className={cx("type-goal text-balance", className)} {...rest} />;
+}
+
+/** Screen title (lg) or section title (md). Sentence case. */
+export function Heading({
+  as: Tag = "h2",
   size = "md",
   className,
   ...rest
-}: ComponentProps<"h1"> & { as?: "h1" | "h2" | "h3" | "p"; size?: "sm" | "md" | "lg" }) {
-  const sizes = { sm: "text-display-sm", md: "text-display-md", lg: "text-display-lg" };
-  return <Tag className={cx("type-display text-balance", sizes[size], className)} {...rest} />;
-}
-
-/** Small uppercase label. */
-export function Label({ className, ...rest }: ComponentProps<"span">) {
-  return <span className={cx("type-label", className)} {...rest} />;
-}
-
-/** Numbered section heading with a heavy rule, e.g. "[02] TYPE". */
-export function SectionHeading({ className, ...rest }: ComponentProps<"h2">) {
+}: ComponentProps<"h2"> & { as?: "h1" | "h2" | "h3" | "p"; size?: "md" | "lg" }) {
   return (
-    <h2 className={cx("type-label border-fg border-b-2 pb-1 font-bold", className)} {...rest} />
+    <Tag
+      className={cx(
+        "type-heading text-balance",
+        size === "lg" ? "text-heading" : "text-title",
+        className,
+      )}
+      {...rest}
+    />
   );
 }
 
-/** Switches the semantic tokens for everything inside it. */
-export function Surface({
-  tone,
-  as: Tag = "div",
-  ...rest
-}: ComponentProps<"div"> & { tone: "ink" | "paper"; as?: "div" | "section" | "header" }) {
-  return <Tag data-surface={tone} {...rest} />;
+/** Tiny uppercase mono label above a heading or a group. */
+export function Label({ className, ...rest }: ComponentProps<"span">) {
+  return <span className={cx("type-label text-secondary", className)} {...rest} />;
 }
 
-export type ChipTone = "neutral" | "booked" | "live" | "alert";
+/** White surface with a hairline and a soft shadow. `flat` drops the shadow. */
+export function Card({ flat, className, ...rest }: ComponentProps<"div"> & { flat?: boolean }) {
+  return (
+    <div
+      className={cx(
+        "rounded-card border-hairline bg-surface border p-5",
+        !flat && "shadow-card",
+        className,
+      )}
+      {...rest}
+    />
+  );
+}
 
-const chipTones: Record<ChipTone, string> = {
-  neutral: "border-fg text-fg",
-  booked: "border-accent-electric bg-accent-electric text-paper",
-  live: "border-fg bg-fg text-bg",
-  alert: "border-accent-signal bg-accent-signal text-paper",
+export type PillTone = "soft" | "line";
+
+const pillTones: Record<PillTone, string> = {
+  soft: "bg-soft text-ink",
+  line: "border border-hairline text-secondary",
 };
 
-/** State marker. Colour is never the only signal: the text says the state. */
-export function StatusChip({
-  tone = "neutral",
+/** Quiet state marker ("Booked", "Waitlist #2"). The text carries the meaning. */
+export function StatusPill({
+  tone = "soft",
   className,
   ...rest
-}: ComponentProps<"span"> & { tone?: ChipTone }) {
+}: ComponentProps<"span"> & { tone?: PillTone }) {
   return (
     <span
       className={cx(
-        "type-label inline-flex items-center border px-1.5 py-0.5 font-bold whitespace-nowrap",
-        chipTones[tone],
+        "rounded-pill inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium whitespace-nowrap",
+        pillTones[tone],
         className,
       )}
       {...rest}
@@ -62,20 +75,20 @@ export function StatusChip({
 
 /** Marks demo organisations and demo data. */
 export function DemoBadge({ className, ...rest }: ComponentProps<"span">) {
+  return <StatusPill tone="line" className={className} {...rest} />;
+}
+
+/** A card of rows separated by one hairline. */
+export function DataList({ className, ...rest }: ComponentProps<"ul">) {
   return (
-    <span
+    <ul
       className={cx(
-        "type-label border-fg inline-flex items-center border border-dashed px-1.5 py-0.5",
+        "rounded-card border-hairline bg-surface shadow-card divide-hairline divide-y border px-5",
         className,
       )}
       {...rest}
     />
   );
-}
-
-/** Dense editorial list with dotted dividers, instead of rounded cards. */
-export function DataList({ className, ...rest }: ComponentProps<"ul">) {
-  return <ul className={cx("border-fg border-t-2", className)} {...rest} />;
 }
 
 export function DataRow({
@@ -84,19 +97,19 @@ export function DataRow({
   meta,
   trailing,
 }: {
-  lead: ReactNode;
+  lead?: ReactNode;
   title: ReactNode;
   meta?: ReactNode;
   trailing?: ReactNode;
 }) {
   return (
-    <li className="border-fg flex min-h-touch items-center gap-4 border-b border-dotted py-3">
-      <span className="type-data text-data-lg shrink-0">{lead}</span>
+    <li className="flex min-h-14 items-center gap-4 py-3.5">
+      {lead ? <span className="type-data w-13 shrink-0">{lead}</span> : null}
       <span className="min-w-0 flex-1">
-        <span className="block font-bold uppercase">{title}</span>
-        {meta ? <span className="type-label text-muted block">{meta}</span> : null}
+        <span className="block font-semibold">{title}</span>
+        {meta ? <span className="text-small text-secondary block">{meta}</span> : null}
       </span>
-      {trailing ? <span className="shrink-0">{trailing}</span> : null}
+      {trailing ? <span className="text-small text-secondary shrink-0">{trailing}</span> : null}
     </li>
   );
 }

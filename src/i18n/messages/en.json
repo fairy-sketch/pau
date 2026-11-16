@@ -8,95 +8,99 @@
     "skipToContent": "Skip to content"
   },
   "home": {
-    "kicker": "[00] Foundations",
+    "kicker": "Foundations",
     "body": "The Path home arrives in the next milestone. This build proves the foundations underneath it.",
-    "styleguideLink": "[→] Open styleguide"
+    "styleguideLink": "Open the styleguide"
   },
   "offline": {
-    "title": "Offline",
-    "body": "You are offline. Pages you have opened before still work. Reconnect to load this one.",
-    "home": "[←] Back to start"
+    "title": "You're offline",
+    "body": "Pages you have opened before still work. Reconnect to load this one.",
+    "home": "Back to start"
   },
   "styleguide": {
     "title": "Styleguide",
-    "intro": "Tokens, type and core components. Every screen in the app is built from these.",
+    "intro": "Calm and minimal, with one focal element per screen. Every screen in the app is built from these.",
     "sections": {
-      "colour": "[01] Colour",
-      "type": "[02] Type",
-      "shape": "[03] Shape and motion",
-      "components": "[04] Components",
-      "stageTrack": "[05] Stage track",
-      "chart": "[06] Chart",
-      "cover": "[07] Path cover"
+      "colour": "Colour",
+      "type": "Type",
+      "shape": "Shape and space",
+      "components": "Components",
+      "stageTrack": "Stage track",
+      "chart": "Chart",
+      "cover": "Path sample"
     },
     "colour": {
       "usage": {
-        "ink": "Base. Text, rules and inverted surfaces.",
-        "paper": "Base. Default surface.",
-        "grey600": "Muted text on paper.",
-        "grey400": "Muted text on ink.",
-        "grey300": "Hairlines on paper.",
-        "grey700": "Hairlines on ink.",
-        "accentSignal": "State: alert, pain flag, the one primary action. Fills carry white text.",
-        "accentElectric": "State: booked, live. Fills carry white text. Never used as text on ink."
+        "canvas": "Screen background.",
+        "surface": "Cards, sheets and inputs.",
+        "soft": "Quiet fills: active tab, pills, notes.",
+        "hairline": "The one divider. 1 px.",
+        "ink": "Text.",
+        "secondary": "Secondary text.",
+        "accent": "The only accent. Primary action and progress, nothing else."
       }
     },
     "type": {
-      "displayLabel": "Display: Archivo, extra-black, expanded, italic",
-      "displaySample": "Sub‑40 10K",
-      "monoLabel": "UI and body: JetBrains Mono",
-      "monoSample": "Everything in the app supports or guides you on your path: your goal, your stages, your log and your coach.",
-      "labelLabel": "Label: uppercase, 0.05em tracking",
-      "labelSample": "My week [4]",
-      "dataLabel": "Data: monospace, tabular figures",
-      "dataSpots": "[{count}] spots"
+      "goalLabel": "Goal headline: Satoshi Black",
+      "goalSample": "Sub‑40 10K",
+      "headingLabel": "Headings: Satoshi Bold, sentence case",
+      "headingSample": "Book Thursday track",
+      "bodyLabel": "Body and UI: Switzer",
+      "bodySample": "Everything in the app supports or guides you on your path: your goal, your stages, your log and your coach.",
+      "labelLabel": "Label: JetBrains Mono, the only uppercase",
+      "labelSample": "Next step",
+      "dataLabel": "Times and numbers: JetBrains Mono",
+      "numberLabel": "Key numbers: Satoshi Bold",
+      "numberUnit": "credits left"
     },
     "shape": {
-      "radius": "Corners are square. Radius is 0 everywhere; a full pill is reserved for small tags.",
-      "dividers": "Lists are separated by thin dotted rules, not rounded cards.",
-      "motion": "Motion is quick and mechanical ({duration} ms) and switches off when reduced motion is requested.",
+      "radius": "Corners are soft: 12 px on buttons and inputs, 16 px on cards.",
+      "dividers": "Groups are separated by space or one hairline. No dotted rules.",
+      "space": "An 8 pt grid, with at least 24 px of padding at the screen edge.",
+      "elevation": "Cards sit on a hairline and a faint shadow. No heavy black blocks.",
+      "motion": "Motion is short ({duration} ms) and switches off when reduced motion is requested.",
       "targets": "Touch targets are at least 44 px."
     },
     "components": {
       "buttons": "Buttons",
-      "book": "[+] Book",
-      "joinWaitlist": "[+] Join waitlist",
-      "cancel": "[×] Cancel",
-      "chips": "Status chips",
-      "chipBooked": "Booked",
-      "chipLive": "Live",
-      "chipFull": "Full",
-      "chipAlert": "Pain flag",
-      "chipSpots": "[{count}] spots",
+      "book": "Book",
+      "joinWaitlist": "Join waitlist",
+      "close": "Close",
+      "pills": "Status",
+      "pillBooked": "Booked",
+      "pillWaitlist": "Waitlist #2",
+      "spots": "{count, plural, one {# spot} other {# spots}}",
+      "full": "Full",
+      "toggles": "Toggles",
+      "toggleLog": "Training log and progress",
+      "togglePain": "Pain flags",
+      "togglePainHint": "Health data. Off unless you turn it on",
       "list": "Session list",
-      "ticker": "Ticker",
-      "tickerLabel": "Next up",
-      "tickerPause": "[II] Pause",
-      "tickerPlay": "[▶] Play",
-      "tickerItems": {
-        "next": "Next: Track Thu {time}",
-        "spots": "6 spots left",
-        "stage": "Stage: Build, 12 days left",
-        "pb": "New PB 400 m 61.8"
-      }
+      "tabs": "Bottom navigation",
+      "tabsLabel": "Sections",
+      "tabPath": "Path",
+      "tabCoach": "Coach",
+      "tabLog": "Log",
+      "tabWeek": "Week",
+      "tabMe": "Me"
     },
     "sessions": {
       "track": {
         "title": "Track session",
-        "meta": "Sportanlage Fronwald · Coach Sara"
+        "meta": "Sportanlage Fronwald"
       },
       "gym": {
         "title": "Gym session",
-        "meta": "Balboa Underground · Coach Jonas"
+        "meta": "Balboa Underground"
       },
       "community": {
         "title": "Saturday community session",
-        "meta": "Sportanlage Fronwald · Open to everyone"
+        "meta": "Sportanlage Fronwald"
       }
     },
     "stageTrack": {
       "label": "Stages towards your goal",
-      "stage": "[{index}] {name}",
+      "position": "· stage {current} of {total}",
       "names": {
         "foundation": "Foundation",
         "build": "Build",
@@ -117,16 +121,16 @@
       "week": "W{number}",
       "columnPeriod": "Week",
       "columnValue": "Load",
-      "note": "Black line, thin rules, monospace axes. One accent marks the current week."
+      "note": "One thin line on hairline rules. The accent marks the current week."
     },
     "cover": {
-      "goalLine": "{goal} — {date}",
+      "goalLabel": "Your goal",
       "goal": "Sub‑40 10K",
-      "why": "Because I want to race the Zurich 10K with my club.",
+      "why": "By {date}. Because I want to race the Zurich 10K with my club.",
       "nextLabel": "Next step",
-      "nextTitle": "Book Thursday track {time}",
-      "nextMeta": "[{count}] spots · Uses Regular season pass",
-      "action": "[+] Book"
+      "nextTitle": "Book Thursday track, {time}",
+      "nextMeta": "{count} spots left · Uses Regular season pass",
+      "action": "Book"
     }
   }
 }

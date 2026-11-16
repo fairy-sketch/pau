@@ -6,61 +6,71 @@ test.describe("styleguide", () => {
     await page.goto("/styleguide");
 
     await expect(page.getByRole("heading", { level: 1, name: "Styleguide" })).toBeVisible();
-    for (const section of ["[01] Colour", "[02] Type", "[05] Stage track", "[06] Chart"]) {
+    for (const section of ["Colour", "Type", "Stage track", "Chart"]) {
       await expect(page.getByRole("heading", { level: 2, name: section })).toBeVisible();
     }
 
-    // Tokens: the two accents from the brief are listed.
-    await expect(page.getByText("accent-signal", { exact: true })).toBeVisible();
-    await expect(page.getByText("accent-electric", { exact: true })).toBeVisible();
+    // Tokens: exactly one accent is listed.
+    await expect(page.getByText("accent", { exact: true })).toHaveCount(1);
+    await expect(page.getByText("canvas", { exact: true })).toBeVisible();
 
     // Stage track: five stages, the second one current.
-    const track = page.getByRole("group", { name: "Stages towards your goal" }).first();
+    const track = page.getByRole("list", { name: "Stages towards your goal" }).first();
     await expect(track.getByRole("listitem")).toHaveCount(5);
-    await expect(track.locator('[aria-current="step"]')).toContainText("[02] Build");
-    await expect(track.locator('[aria-current="step"]')).toContainText("12 days left");
+    await expect(track.locator('[aria-current="step"]')).toContainText("Build");
+    await expect(page.getByText("12 days left").first()).toBeVisible();
 
     // Chart: the SVG line is drawn, and the same data exists as a table.
     await expect(page.locator("[data-chart] svg path.recharts-line-curve")).toBeVisible();
     await expect(page.getByRole("table", { name: "Weekly load" }).getByRole("row")).toHaveCount(13);
   });
 
-  test("uses the design tokens: square corners, mono body, heavy italic display", async ({
+  test("uses the design tokens: fonts, soft corners, off-white canvas, one accent", async ({
     page,
   }) => {
     await page.goto("/styleguide");
     await page.evaluate(() => document.fonts.ready);
 
-    const h1 = page.getByRole("heading", { level: 1 });
-    const display = await h1.evaluate((el) => {
-      const s = getComputedStyle(el);
-      return { family: s.fontFamily, weight: s.fontWeight, style: s.fontStyle };
-    });
-    expect(display.family).toContain("Archivo");
-    expect(display.weight).toBe("900");
-    expect(display.style).toBe("italic");
+    const style = (selector: string, prop: string) =>
+      page.evaluate(
+        ([s, p]) => getComputedStyle(document.querySelector(s!)!).getPropertyValue(p!),
+        [selector, prop],
+      );
 
-    const body = await page.evaluate(() => getComputedStyle(document.body).fontFamily);
-    expect(body).toContain("JetBrains Mono");
+    expect(await style("h1", "font-family")).toContain("Satoshi");
+    expect(await style("body", "font-family")).toContain("Switzer");
+    expect(await style("body", "background-color")).toBe("rgb(245, 245, 243)");
+    expect(await style("body", "color")).toBe("rgb(17, 17, 17)");
+    // Sentence case everywhere except the tiny mono labels.
+    expect(await style("h1", "text-transform")).toBe("none");
+    expect(await style(".type-label", "text-transform")).toBe("uppercase");
+    expect(await style(".type-label", "font-family")).toContain("JetBrains Mono");
 
     const loaded = await page.evaluate(() =>
       [...document.fonts].filter((f) => f.status === "loaded").map((f) => f.family),
     );
-    expect(loaded.join(" ")).toContain("Archivo");
-    expect(loaded.join(" ")).toContain("JetBrains Mono");
+    for (const family of ["Satoshi", "Switzer", "JetBrains Mono"]) {
+      expect(loaded.join(" ")).toContain(family);
+    }
 
-    const button = page.getByRole("button", { name: "[+] Book" }).first();
+    const button = page.getByRole("button", { name: "Book", exact: true }).first();
     const box = await button.boundingBox();
     expect(box?.height).toBeGreaterThanOrEqual(44);
-    expect(await button.evaluate((el) => getComputedStyle(el).borderRadius)).toBe("0px");
+    await expect(button).toHaveCSS("border-radius", "12px");
+    await expect(button).toHaveCSS("background-color", "rgb(194, 65, 12)");
+    await expect(button).toHaveCSS("text-transform", "none");
   });
 
-  test("fits a phone without sideways page scroll", async ({ page }) => {
+  test("fits a phone without sideways page scroll, with 24 px screen padding", async ({ page }) => {
     await page.goto("/styleguide");
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     expect(overflow).toBeLessThanOrEqual(0);
+    const padding = await page.evaluate(
+      () => getComputedStyle(document.querySelector("main")!).paddingLeft,
+    );
+    expect(parseFloat(padding)).toBeGreaterThanOrEqual(24);
   });
 
   test("has no automatically detectable accessibility violations", async ({ page }) => {
@@ -73,16 +83,16 @@ test.describe("styleguide", () => {
     }
   });
 
-  test("ticker can be paused and stops for reduced motion", async ({ page }) => {
+  test("toggles switch on and off, and tabs mark the current one", async ({ page }) => {
     await page.goto("/styleguide");
-    const trackEl = page.locator("[data-ticker-track]");
-    await expect(trackEl).toHaveCSS("animation-name", "ticker");
+    const pain = page.getByRole("switch", { name: /Pain flags/ });
+    await expect(pain).toHaveAttribute("aria-checked", "false");
+    await pain.click();
+    await expect(pain).toHaveAttribute("aria-checked", "true");
 
-    await page.getByRole("button", { name: "[II] Pause" }).click();
-    await expect(trackEl).toHaveCSS("animation-play-state", "paused");
-
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    await expect(trackEl).toHaveCSS("animation-name", "none");
+    const nav = page.getByRole("navigation", { name: "Sections" });
+    await expect(nav.getByRole("link")).toHaveCount(5);
+    await expect(nav.locator('[aria-current="page"]')).toHaveText("Path");
   });
 });
 
@@ -112,7 +122,7 @@ test.describe("PWA", () => {
     }
 
     await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveCount(1);
-    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#000000");
+    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#f5f5f3");
 
     const state = await page.evaluate(async () => {
       const registration = await navigator.serviceWorker.ready;
@@ -134,7 +144,7 @@ test.describe("PWA", () => {
 
     await context.setOffline(true);
     await page.goto("/a-page-never-visited");
-    await expect(page.getByRole("heading", { level: 1, name: "Offline" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "You're offline" })).toBeVisible();
     await context.setOffline(false);
   });
 });
