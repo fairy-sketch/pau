@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PATH plan progress sketches</title>
+<style>
+@font-face { font-family: "Satoshi"; src: url("fonts/Satoshi-Variable.woff2") format("woff2"); font-weight: 300 900; font-display: swap; }
+@font-face { font-family: "Switzer"; src: url("fonts/Switzer-Variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "JetBrains Mono"; src: url("fonts/JetBrainsMono-Variable.woff2") format("woff2"); font-weight: 100 800; font-display: swap; }
+:root {
+  /* Layout: a plan switcher on top, then five cards. Every card draws the SAME plan, so you can watch each design cope with a different shape of plan. */
+  --bg: #f1efea; --surface: #ffffff; --soft: #e6e3dc; --hairline: #dfdcd4; --track: #d2cec4;
+  --text: #1c1916; --text-2: #5e6259; --accent: #8e9a80;
+  --heading: "Satoshi", "Helvetica Neue", Arial, sans-serif;
+  --body: "Switzer", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --move: .6s cubic-bezier(.2, .8, .2, 1);
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 400 15px/1.5 var(--body); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
+:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+h1, h2, h3, p, ul, ol { margin: 0; padding: 0; } ul, ol { list-style: none; }
+.page { max-width: 1180px; margin: 0 auto; padding: 32px 24px 72px; }
+.eyebrow { font: 500 11px/1.3 var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--text-2); }
+h1 { font: 900 clamp(30px, 7vw, 44px)/1.05 var(--heading); letter-spacing: -.03em; margin: 8px 0 12px; text-wrap: balance; }
+.intro { color: var(--text-2); max-width: 64ch; }
+.bar { position: sticky; top: 0; z-index: 2; background: var(--bg); padding: 16px 0 12px; margin-top: 12px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; border-bottom: 1px solid var(--hairline); }
+.plans { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; flex: 1 1 420px; }
+.plans button { flex: none; height: 40px; padding: 0 14px; border-radius: 999px; background: var(--surface); border: 1px solid var(--hairline); font-size: 13px; font-weight: 500; color: var(--text-2); }
+.plans button[aria-pressed="true"] { background: var(--text); border-color: var(--text); color: var(--surface); font-weight: 600; }
+.feed { height: 40px; padding: 0 18px; border-radius: 12px; background: var(--accent); font-weight: 600; font-size: 14px; }
+.reset { height: 40px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--hairline); background: var(--surface); color: var(--text-2); font-size: 13px; }
+.about { margin-top: 16px; color: var(--text-2); font-size: 13px; }
+.about b { color: var(--text); font-weight: 600; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 24px; margin-top: 24px; align-items: start; }
+.card { background: var(--surface); border: 1px solid var(--hairline); border-radius: 20px; box-shadow: 0 1px 2px rgba(28,25,22,.04), 0 6px 20px rgba(28,25,22,.05); padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+.card h2 { font: 700 20px/1.2 var(--heading); letter-spacing: -.01em; margin-top: 4px; }
+.screen { background: var(--bg); border-radius: 16px; padding: 20px 18px; min-height: 150px; }
+.sub { color: var(--text-2); font-size: 13px; }
+.between { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.strong { font-weight: 600; }
+.name { font: 700 22px/1.15 var(--heading); letter-spacing: -.02em; }
+.num { font: 700 20px/1 var(--heading); letter-spacing: -.02em; }
+
+/* A: proportional bar */
+.pbar { display: flex; gap: 3px; height: 12px; position: relative; }
+.pbar i { display: block; border-radius: 6px; background: var(--track); min-width: 6px; position: relative; overflow: hidden; }
+.pbar i.done { background: var(--text); }
+.pbar i b { position: absolute; inset: 0 auto 0 0; background: var(--text); border-radius: 6px; transition: width var(--move); }
+.pbar i.cur { overflow: visible; }
+.pbar i.cur::after { content: ""; position: absolute; top: 50%; left: var(--at); width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: var(--accent); border: 2.5px solid var(--text); transition: left var(--move); }
+.pends { display: flex; justify-content: space-between; margin-top: 8px; }
+
+/* B: focus */
+.focus { display: flex; gap: 16px; align-items: center; }
+.focus svg { flex: none; }
+.arc { transition: stroke-dashoffset var(--move); }
+.dots { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
+.dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--track); }
+.dots i.done { background: var(--text); }
+.dots i.cur { background: var(--accent); outline: 2px solid var(--text); outline-offset: 1px; }
+
+/* C: vertical timeline */
+.tl { display: flex; flex-direction: column; }
+.tl li { display: flex; gap: 12px; position: relative; padding-bottom: 14px; }
+.tl li:last-child { padding-bottom: 0; }
+.tl li::before { content: ""; position: absolute; left: 9px; top: 22px; bottom: 0; width: 2px; background: var(--track); }
+.tl li.done::before { background: var(--text); }
+.tl li:last-child::before { display: none; }
+.tl .n { flex: none; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--track); background: var(--bg); display: grid; place-items: center; margin-top: 1px; }
+.tl .done .n { background: var(--text); border-color: var(--text); color: var(--surface); }
+.tl .cur .n { border-color: var(--text); background: var(--accent); }
+.tl .b { flex: 1; min-width: 0; }
+.tl .cur .b { background: var(--surface); border: 1px solid var(--hairline); border-radius: 14px; padding: 12px 14px; margin-top: -6px; }
+.line { height: 6px; border-radius: 3px; background: var(--track); margin: 10px 0 6px; overflow: hidden; }
+.line b { display: block; height: 100%; background: var(--text); border-radius: 3px; transition: width var(--move); }
+
+/* D: blocks */
+.groups { display: flex; flex-wrap: wrap; gap: 12px 14px; }
+.grp { display: flex; flex-direction: column; gap: 6px; }
+.grp .eyebrow { font-size: 9.5px; letter-spacing: .03em; white-space: nowrap; }
+.grp.now .eyebrow { color: var(--text); font-weight: 700; }
+.blocks { display: grid; grid-template-rows: repeat(2, 12px); grid-auto-flow: column; grid-auto-columns: 12px; gap: 4px; }
+.blocks.one { grid-template-rows: 12px; }
+.blocks i { border-radius: 3.5px; background: transparent; border: 1.5px solid var(--track); transition: background .3s ease, border-color .3s ease; }
+.blocks i.done { background: var(--text); border-color: var(--text); }
+.blocks i.next { background: var(--accent); border-color: var(--text); }
+
+/* E: dial */
+.dial { display: block; margin: 0 auto; }
+.dialtxt { text-align: center; margin-top: -52px; }
+.dialends { display: flex; justify-content: space-between; margin-top: 22px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="eyebrow">PATH · sketches, round 5</div>
+  <h1>Progress for any training plan</h1>
+  <p class="intro">Five new designs for the stage element. Pick a plan below: every card redraws the same plan, so you can see how each design copes with few or many stages, uneven lengths, weeks instead of sessions, and a plan with no stages at all.</p>
+  <div class="bar">
+    <div class="plans" id="plans" role="group" aria-label="Plan"></div>
+    <button class="feed" id="feed">Log one</button><button class="reset" id="reset">Reset</button>
+  </div>
+  <p class="about" id="about"></p>
+  <div class="grid" id="grid"></div>
+</div>
+<script>
+"use strict";
+const PLANS = [
+  { id: "tenk", label: "10K, 5 stages", goal: "Sub‑40 10K", unit: "sessions", start: 17, about: "Five stages of <b>uneven length</b>, counted in sessions.", stages: [["Foundation", 12], ["Build", 12], ["Sharpen", 12], ["Test", 8], ["Recover", 4]] },
+  { id: "strength", label: "Strength, 12 weeks", goal: "Squat 100 kg", unit: "weeks", start: 6, about: "Four phases counted in <b>weeks</b>, the last one very short.", stages: [["Hypertrophy", 4], ["Strength", 4], ["Peak", 3], ["Deload", 1]] },
+  { id: "marathon", label: "Marathon, 8 stages", goal: "First marathon", unit: "weeks", start: 9, about: "<b>Eight stages</b> over 19 weeks: the case that breaks designs with a label per stage.", stages: [["Base", 4], ["Aerobic", 3], ["Hills", 2], ["Tempo", 3], ["Long runs", 3], ["Peak", 1], ["Taper", 2], ["Race week", 1]] },
+  { id: "rehab", label: "Back from injury", goal: "Run 30 min pain-free", unit: "sessions", start: 5, about: "A <b>short, careful</b> plan: three stages, long names, few sessions.", stages: [["Walk without pain", 3], ["Walk and jog", 6], ["Continuous running", 8]] },
+  { id: "open", label: "No stages", goal: "Stay consistent", unit: "sessions", start: 2, about: "<b>No stages and no end date</b>: just a weekly target of 3 sessions.", stages: [], target: 3, history: [3, 2, 3, 3, 1, 3, 2] },
+];
+let plan = PLANS[0], done = plan.start;
+const tick = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+
+/* One model for every plan: where am I, how far in this stage, how far overall. */
+function calc() {
+  if (!plan.stages.length) { const t = plan.target, d = Math.min(done, t); return { open: true, total: t, d, frac: d / t, stage: -1, name: "This week", inSt: d, size: t, left: t - d, n: 0 }; }
+  const total = plan.stages.reduce((s, [, n]) => s + n, 0), d = Math.min(done, total);
+  let acc = 0, stage = plan.stages.length - 1, inSt = plan.stages[stage][1];
+  for (let k = 0; k < plan.stages.length; k++) { const n = plan.stages[k][1]; if (d < acc + n) { stage = k; inSt = d - acc; break; } acc += n; }
+  const fin = d >= total, size = plan.stages[stage][1];
+  return { total, d, frac: d / total, stage, name: fin ? "Goal reached" : plan.stages[stage][0], inSt, size, left: size - inSt, n: plan.stages.length, fin, next: plan.stages[stage + 1] ? plan.stages[stage + 1][0] : plan.goal };
+}
+const unit1 = (n) => (n === 1 ? plan.unit.slice(0, -1) : plan.unit);
+
+const DESIGNS = [
+  { id: "bar", name: "Proportional bar", line: "One bar, cut where the stages change. A long stage is a long piece, so the bar is honest about what is ahead. Only the current stage and the next are named.",
+    draw(c) {
+      if (c.open) return `<div class="between" style="margin-bottom:12px"><span class="name">${c.name}</span><span class="eyebrow">No end date</span></div><div class="pbar">${[...Array(c.total)].map((_, i) => `<i class="${i < c.d ? "done" : ""}" style="flex:1"></i>`).join("")}</div><p class="sub" style="margin-top:10px">${c.d} of ${c.total} sessions this week</p>`;
+      return `<div class="between" style="margin-bottom:12px"><span class="name">${c.name}</span><span class="eyebrow">Stage ${c.stage + 1} of ${c.n}</span></div>
+        <div class="pbar">${plan.stages.map(([, n], k) => k < c.stage || c.fin ? `<i class="done" style="flex:${n}"></i>` : k === c.stage ? `<i class="cur" style="flex:${n};--at:${(100 * c.inSt) / n}%"><b style="width:${(100 * c.inSt) / n}%"></b></i>` : `<i style="flex:${n}"></i>`).join("")}</div>
+        <div class="pends"><span class="sub">${c.inSt} of ${c.size} ${plan.unit}</span><span class="sub">${c.fin ? "" : `Next: ${c.next}`}</span></div>`;
+    } },
+  { id: "focus", name: "Focus ring", line: "Shows only where you are: one ring for the current stage, and a row of dots for the whole plan. The same size whether the plan has three stages or twenty.",
+    draw(c) {
+      const r = 30, C = 2 * Math.PI * r, f = c.fin ? 1 : c.inSt / c.size;
+      const ring = `<svg viewBox="0 0 76 76" width="76" height="76" aria-hidden="true"><circle cx="38" cy="38" r="${r}" fill="var(--surface)" stroke="var(--track)" stroke-width="7"/><circle class="arc" cx="38" cy="38" r="${r}" fill="none" stroke="var(--text)" stroke-width="7" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - f)}" transform="rotate(-90 38 38)"/><text x="38" y="43" text-anchor="middle" style="font:700 15px var(--heading);fill:var(--text)">${c.inSt}/${c.size}</text></svg>`;
+      const dots = c.open ? plan.history.map((h) => `<i class="${h >= plan.target ? "done" : ""}"></i>`).join("") + '<i class="cur"></i>' : plan.stages.map((_, k) => `<i class="${k < c.stage || c.fin ? "done" : k === c.stage ? "cur" : ""}"></i>`).join("");
+      return `<div class="focus">${ring}<div><div class="eyebrow">${c.open ? "This week" : `Stage ${c.stage + 1} of ${c.n}`}</div><div class="name" style="margin:4px 0 2px">${c.open ? plan.goal : c.name}</div><div class="sub">${c.fin ? "Well done." : c.left === 0 ? "Week complete" : `${c.left} ${unit1(c.left)} to ${c.open ? "hit your week" : c.next}`}</div></div></div><div class="dots" aria-hidden="true">${dots}</div>${c.open ? '<p class="sub" style="margin-top:8px;font-size:12px">Last 7 weeks, then this one</p>' : ""}`;
+    } },
+  { id: "timeline", name: "Timeline", line: "Stages run top to bottom like a route description. Finished ones fold up, the current one opens, and the next two are listed. Long names and many stages are no problem.",
+    draw(c) {
+      if (c.open) return `<ol class="tl"><li class="cur"><span class="n"></span><div class="b"><div class="between"><span class="strong">This week</span><span class="sub">${c.d} of ${c.total}</span></div><div class="line"><b style="width:${100 * c.frac}%"></b></div><span class="sub">No end date. A new week starts on Monday.</span></div></li></ol>`;
+      const rows = [];
+      if (c.stage > 1) rows.push(`<li class="done"><span class="n">${tick}</span><div class="b sub">${c.stage - 1} earlier ${c.stage - 1 === 1 ? "stage" : "stages"} done</div></li>`);
+      if (c.stage > 0) rows.push(`<li class="done"><span class="n">${tick}</span><div class="b"><span class="strong">${plan.stages[c.stage - 1][0]}</span> <span class="sub">· done</span></div></li>`);
+      rows.push(c.fin ? `<li class="done"><span class="n">${tick}</span><div class="b"><span class="strong">${plan.stages[c.stage][0]}</span> <span class="sub">· done</span></div></li>` : `<li class="cur"><span class="n"></span><div class="b"><div class="between"><span class="strong">${c.name}</span><span class="sub">${c.inSt} of ${c.size} ${plan.unit}</span></div><div class="line"><b style="width:${(100 * c.inSt) / c.size}%"></b></div><span class="sub">Stage ${c.stage + 1} of ${c.n}</span></div></li>`);
+      plan.stages.slice(c.stage + 1, c.stage + 3).forEach(([n, s]) => rows.push(`<li><span class="n"></span><div class="b"><span>${n}</span> <span class="sub">· ${s} ${s === 1 ? plan.unit.slice(0, -1) : plan.unit}</span></div></li>`));
+      const more = c.n - c.stage - 3;
+      rows.push(`<li><span class="n"></span><div class="b"><span class="sub">${more > 0 ? `${more} more, then ` : ""}</span><span class="strong">${plan.goal}</span></div></li>`);
+      return `<ol class="tl">${rows.join("")}</ol>`;
+    } },
+  { id: "blocks", name: "Blocks", line: "Every session or week is one small block, grouped by stage. You see the true size of the plan, and the next block to fill is the one in sage.",
+    draw(c) {
+      if (c.open) return `<div class="groups">${plan.history.map((h, i) => `<div class="grp"><span class="eyebrow">W-${plan.history.length - i}</span><div class="blocks one">${[...Array(plan.target)].map((_, j) => `<i class="${j < h ? "done" : ""}"></i>`).join("")}</div></div>`).join("")}<div class="grp now"><span class="eyebrow">This week</span><div class="blocks one">${[...Array(c.total)].map((_, j) => `<i class="${j < c.d ? "done" : j === c.d ? "next" : ""}"></i>`).join("")}</div></div></div>`;
+      let acc = 0;
+      return `<div class="groups">${plan.stages.map(([name, n], k) => { const start = acc; acc += n; return `<div class="grp ${k === c.stage && !c.fin ? "now" : ""}"><span class="eyebrow">${name}</span><div class="blocks ${n <= 4 ? "one" : ""}">${[...Array(n)].map((_, j) => `<i class="${start + j < c.d ? "done" : start + j === c.d ? "next" : ""}"></i>`).join("")}</div></div>`; }).join("")}</div><div class="between" style="margin-top:14px"><span class="strong">${c.name} <span class="sub">· ${c.inSt} of ${c.size} ${plan.unit}</span></span><span class="eyebrow">${c.d} / ${c.total}</span></div>`;
+    } },
+  { id: "dial", name: "Arc", line: "The whole plan as one arc from start to goal, with a small notch where each stage begins. Reads like a gauge: how far round are you?",
+    draw(c) {
+      const R = 96, cx = 130, cy = 112, L = Math.PI * R, pt = (f) => [cx - R * Math.cos(Math.PI * f), cy - R * Math.sin(Math.PI * f)];
+      const notch = (f) => { const a = Math.PI * f, x1 = cx - (R - 9) * Math.cos(a), y1 = cy - (R - 9) * Math.sin(a), x2 = cx - (R + 9) * Math.cos(a), y2 = cy - (R + 9) * Math.sin(a); return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--bg)" stroke-width="3"/>`; };
+      let acc = 0; const notches = c.open ? [...Array(c.total - 1)].map((_, i) => notch((i + 1) / c.total)).join("") : plan.stages.slice(0, -1).map(([, n]) => { acc += n; return notch(acc / c.total); }).join("");
+      const [mx, my] = pt(c.frac), d = `M${cx - R} ${cy}A${R} ${R} 0 0 1 ${cx + R} ${cy}`;
+      return `<svg class="dial" viewBox="0 0 260 128" width="100%" style="max-width:300px" role="img" aria-label="${Math.round(c.frac * 100)} percent of the plan"><path d="${d}" fill="none" stroke="var(--track)" stroke-width="12" stroke-linecap="round"/><path class="arc" d="${d}" fill="none" stroke="var(--text)" stroke-width="12" stroke-linecap="round" stroke-dasharray="${L}" stroke-dashoffset="${L * (1 - c.frac)}"/>${notches}<circle cx="${mx}" cy="${my}" r="9" fill="var(--accent)" stroke="var(--text)" stroke-width="2.5" style="transition:cx var(--move),cy var(--move)"/></svg>
+        <div class="dialtxt"><div class="eyebrow">${c.open ? "This week" : `Stage ${c.stage + 1} of ${c.n}`}</div><div class="name" style="margin-top:2px">${c.open ? `${c.d} of ${c.total}` : c.name}</div></div>
+        <div class="dialends"><span class="sub">${c.open ? "Monday" : "Start"}</span><span class="sub">${c.open ? "" : `${c.inSt} of ${c.size} ${plan.unit}`}</span><span class="sub strong" style="color:var(--text)">${c.open ? "Sunday" : plan.goal}</span></div>`;
+    } },
+];
+
+const grid = document.getElementById("grid");
+grid.innerHTML = DESIGNS.map((d, i) => `<section class="card"><div><div class="eyebrow">Design ${String.fromCharCode(65 + i)}</div><h2>${d.name}</h2></div><div class="screen" id="d-${d.id}"></div><p class="sub">${d.line}</p></section>`).join("");
+function paint() {
+  const c = calc();
+  for (const d of DESIGNS) document.getElementById("d-" + d.id).innerHTML = d.draw(c);
+  document.getElementById("about").innerHTML = `<b>${plan.goal}.</b> ${plan.about}`;
+  document.getElementById("feed").textContent = `Log one ${plan.unit.slice(0, -1)}`;
+  document.querySelectorAll("#plans button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.id === plan.id)));
+}
+document.getElementById("plans").innerHTML = PLANS.map((p) => `<button data-id="${p.id}">${p.label}</button>`).join("");
+document.getElementById("plans").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; plan = PLANS.find((p) => p.id === b.dataset.id); done = plan.start; paint(); });
+document.getElementById("feed").addEventListener("click", () => { const max = plan.stages.length ? plan.stages.reduce((s, [, n]) => s + n, 0) : plan.target; done = done >= max ? plan.start : done + 1; paint(); });
+document.getElementById("reset").addEventListener("click", () => { done = plan.start; paint(); });
+paint();
+</script>
+</body>
+</html>
