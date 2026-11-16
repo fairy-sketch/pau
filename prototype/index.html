@@ -146,7 +146,34 @@ th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06e
 .tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 @media (min-width: 700px) { .tiles { grid-template-columns: repeat(4, 1fr); } }
 svg text { font-family: var(--mono); font-size: 10px; fill: var(--text-2); }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+/* The path line: the one dark panel in the app, so the lime can glow (decisions R22). */
+.linepanel { background: var(--text); color: #fff; border-radius: var(--r-card); padding: 18px 16px 14px; }
+.linepanel svg { display: block; width: 100%; height: auto; overflow: visible; }
+.linepanel .sub, .linepanel .eyebrow { color: #a3a8b3; }
+.l-ahead { fill: none; stroke: #3a3a3a; stroke-width: 3; stroke-linecap: round; }
+.l-halo { fill: none; stroke: var(--accent); stroke-width: 16; stroke-linecap: round; filter: blur(9px); opacity: .9; transition: stroke-dasharray 1.1s cubic-bezier(.2,.8,.2,1); animation: l-breathe 2.8s ease-in-out infinite; }
+.l-done { fill: none; stroke: var(--accent); stroke-width: 4.5; stroke-linecap: round; transition: stroke-dasharray 1.1s cubic-bezier(.2,.8,.2,1); }
+.l-spark { fill: none; stroke: #fff; stroke-width: 4.5; stroke-linecap: round; stroke-dasharray: 2.5 400; animation: l-run 2.6s cubic-bezier(.5,0,.5,1) infinite; }
+@keyframes l-run { from { stroke-dashoffset: 3px; opacity: 0; } 12% { opacity: .9; } 88% { opacity: .9; } to { stroke-dashoffset: calc(var(--p) * -1px + 2.5px); opacity: 0; } }
+@keyframes l-breathe { 50% { opacity: .5; } }
+.l-node { fill: var(--text); stroke: #5a5a5a; stroke-width: 2; transition: fill .3s ease, stroke .3s ease; }
+.l-node.lit { fill: var(--accent); stroke: var(--text); }
+.l-node.pop { animation: l-pop .6s cubic-bezier(.34,1.56,.64,1); transform-box: fill-box; transform-origin: center; }
+@keyframes l-pop { 40% { transform: scale(2); } }
+.l-you { transition: transform 1.1s cubic-bezier(.2,.8,.2,1); }
+.l-dot { fill: var(--accent); stroke: var(--text); stroke-width: 2.5; }
+.l-youhalo { fill: var(--accent); filter: blur(6px); transform-box: fill-box; transform-origin: center; animation: l-pulse 1.8s ease-out infinite; }
+@keyframes l-pulse { from { transform: scale(.6); opacity: .7; } to { transform: scale(2.2); opacity: 0; } }
+.linepanel.surge .l-halo { animation: l-surge 1.4s ease-out; }
+@keyframes l-surge { 30% { opacity: 1; stroke-width: 30; } }
+/* Hold to log: the button charges with lime while held, then releases into the line. */
+.hold { position: relative; overflow: hidden; width: 100%; min-height: 56px; border-radius: var(--r-control); background: var(--text); color: #fff; font-weight: 600; text-align: center; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: box-shadow .3s ease, transform .15s ease; }
+.hold::before { content: ""; position: absolute; inset: 0; background: var(--accent); transform: scaleX(0); transform-origin: left; transition: transform .25s ease; }
+.hold span { position: relative; transition: color .15s linear; }
+.hold.holding { transform: scale(.98); box-shadow: 0 0 0 4px rgba(179,255,59,.25), 0 0 36px rgba(179,255,59,.9); transition: box-shadow .65s ease-in, transform .15s ease; }
+.hold.holding::before { transform: scaleX(1); transition: transform .65s linear; }
+.hold.holding span { color: var(--text); transition: color .2s linear .22s; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } .l-spark { display: none; } }
 </style>
 </head>
 <body>
@@ -223,7 +250,7 @@ function seed() {
     role: "athlete", org: "pau", tab: { athlete: "path", coach: "today", admin: "dash" }, banner: true, sheet: null, toast: "", day: ymd(TODAY), logTab: "log", rosterSid: null,
     me: { name: "Mia Keller", sports: "Running · Strength" },
     goal: { title: "Sub‑40 10K", date: new Date(2027, 4, 9), why: "Because I want to race the Zurich 10K with my club." },
-    stages: ["Foundation", "Build", "Sharpen", "Test", "Recover"], stage: 1, stageDaysLeft: 12,
+    stages: ["Foundation", "Build", "Sharpen", "Test", "Recover"], stage: 1, stageDaysLeft: 12, stageSessions: 5, lineFrom: null,
     sessions: {}, bookings: [], waitlist: [], ledger: [], entries: [], pbs: [], chat: [], audit: [], alerts: [], attendance: {},
     passes: [
       { id: "p-pau", org: "pau", name: "Drop-in season pass", kind: "limit", max: 4, valid: "Valid until 31 Mar 2027" },
@@ -462,13 +489,33 @@ function lineChart(points, hi) {
 const isoWeek = (d) => { const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7)); return Math.ceil(((t - Date.UTC(t.getUTCFullYear(), 0, 1)) / 864e5 + 1) / 7); };
 const loadPts = (st) => st.wl.map((w) => ({ l: "W" + isoWeek(w.start), v: w.load }));
 
+const PER = 12, LX0 = 12, LX1 = 308, LY = 24;
+const lineP = () => Math.min(100, ((S.stage + S.stageSessions / PER) / S.stages.length) * 100);
+const lineX = (p) => LX0 + ((LX1 - LX0) * p) / 100;
+/* The stage as a glowing line ("Neon"): travelled part glows, a spark runs along it, a dot marks where you are. */
+function pathLine() {
+  const p = S.lineFrom ?? lineP(), d = `M${LX0} ${LY}H${LX1}`, left = PER - S.stageSessions;
+  return `<div class="linepanel" id="linepanel" style="margin-top:24px"><svg viewBox="0 0 320 48" role="img" aria-label="Stage ${S.stage + 1} of ${S.stages.length}: ${S.stages[S.stage]}. ${left} sessions to the next stage."><path class="l-ahead" d="${d}"/><path class="l-halo" pathLength="100" d="${d}" style="stroke-dasharray:${p} 200"/><path class="l-done" pathLength="100" d="${d}" style="stroke-dasharray:${p} 200"/><path class="l-spark" pathLength="100" d="${d}" style="--p:${p}"/>${S.stages.map((_, k) => `<circle class="l-node ${p >= (k + 1) * 20 ? "lit" : ""}" data-at="${(k + 1) * 20}" cx="${lineX((k + 1) * 20)}" cy="${LY}" r="${k === S.stages.length - 1 ? 6.5 : 4.5}"/>`).join("")}<g class="l-you" style="transform:translate(${lineX(p)}px,${LY}px)"><circle class="l-youhalo" r="9"/><circle class="l-dot" r="6"/></g></svg>
+    <div class="between"><span class="strong">${S.stages[S.stage]} <span class="sub">· stage ${S.stage + 1} of ${S.stages.length}</span></span><span class="eyebrow">${left} ${left === 1 ? "session" : "sessions"} to next</span></div></div>`;
+}
+/* After a log: let the glow flow from the old position to the new one. */
+function flowLine() {
+  if (S.lineFrom == null) return;
+  S.lineFrom = null; const p = lineP(), panel = document.getElementById("linepanel"); if (!panel) return;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    panel.querySelectorAll(".l-halo, .l-done").forEach((el) => { el.style.strokeDasharray = `${p} 200`; });
+    panel.querySelector(".l-spark").style.setProperty("--p", p);
+    panel.querySelector(".l-you").style.transform = `translate(${lineX(p)}px,${LY}px)`;
+    panel.classList.add("surge");
+    panel.querySelectorAll(".l-node").forEach((n) => { if (p >= Number(n.dataset.at) && !n.classList.contains("lit")) setTimeout(() => n.classList.add("lit", "pop"), 800); });
+  }));
+}
 function vPath() {
   const n = nextStep(), st = stats(), wk = monday(TODAY);
   const week = [...Array(7)].map((_, i) => { const d = addDays(wk, i), done = S.entries.some((e) => ymd(e.at) === ymd(d)), bk = S.bookings.some((b) => active(b) && ymd(S.sessions[b.sid].start) === ymd(d)), today = ymd(d) === ymd(TODAY); return `<div class="d"><span class="eyebrow" style="${today ? "color:var(--text);font-weight:700" : ""}">${WD[d.getDay()][0]}</span><span class="dot ${done ? "done" : bk ? "booked" : ""}" title="${done ? "Done" : bk ? "Booked" : "Open"}"></span></div>`; }).join("");
   return `<section class="pad stack-l">
     <div><div class="eyebrow">Your goal</div><h1 class="goal">${S.goal.title}</h1><p class="sub" style="font-size:15px">By ${S.goal.date.getDate()} ${MOL[S.goal.date.getMonth()]} ${S.goal.date.getFullYear()}. ${esc(S.goal.why)}</p>
-      <div class="stages" style="margin-top:24px" role="img" aria-label="Stage ${S.stage + 1} of ${S.stages.length}: ${S.stages[S.stage]}">${S.stages.map((_, i) => `<i class="${i < S.stage ? "done" : i === S.stage ? "cur" : ""}"></i>`).join("")}</div>
-      <div class="between" style="margin-top:10px"><span class="strong">${S.stages[S.stage]} <span class="sub">· stage ${S.stage + 1} of ${S.stages.length}</span></span><span class="eyebrow">${S.stageDaysLeft} days left</span></div></div>
+      ${pathLine()}</div>
     <div class="card stack"><div><div class="eyebrow">Next step</div><p class="h2" style="font-size:22px;margin-top:6px">${esc(n.title)}</p><p class="sub" style="margin-top:4px">${n.meta}</p></div>
       <button class="btn acc full" data-a="${n.a}" data-v="${n.v || ""}">${n.cta}</button>
       <details><summary>Why this?</summary><p class="sub" style="margin-bottom:8px">${n.reason}</p><ul>${n.factors.map((f) => `<li>${esc(f)}</li>`).join("")}</ul></details></div>
@@ -493,7 +540,7 @@ function vLog() {
     ${sw(f.pain, "pain", "", "Something hurt", "", false)}
     ${f.pain ? `<div class="two"><label class="f">Where?<input id="log-where" data-d="painWhere" value="${esc(f.painWhere || "")}"></label><label class="f">Level, 0 to 10<input id="log-level" data-d="painLevel" type="number" min="0" max="10" value="${esc(f.painLevel || 3)}"></label></div><p class="note">Pain is health data. It is stored only because you enter it here. ${S.consent.pau["alerts.pain"] ? "Coach Sara at PAU will see it, because you share pain alerts." : "No club or coach sees it. You can share pain alerts with a club under Me."}</p>` : ""}
     <label class="f">Notes<input id="log-notes" data-d="notes" value="${esc(f.notes || "")}"></label>
-    <button class="btn acc full" type="submit">Save to log</button></form>
+    <button class="hold" type="button" data-hold aria-label="Log this session"><span>Hold to log</span></button></form>
     <div class="stack"><div class="eyebrow">Recent</div><div class="card rows">${S.entries.slice(0, 6).map((e) => `<div class="row" style="align-items:flex-start"><span class="mid"><span class="strong">${esc(e.title)}${e.pain ? ' <span class="pill line">Pain ' + e.painLevel + "</span>" : ""}</span><span class="sub">${fDay(e.at)} · ${e.dur} min · RPE ${e.rpe}${e.dist ? " · " + esc(e.dist) + " km" : ""}${e.notes ? " · " + esc(e.notes) : ""}</span>${e.comments.map((c) => `<span class="note" style="margin-top:8px"><span class="strong" style="color:var(--text)">${esc(c.by)}</span> ${esc(c.text)}</span>`).join("")}</span></div>`).join("")}</div></div></section>`;
 }
 function vWeek() {
@@ -579,6 +626,7 @@ function render() {
     <nav class="tabs" aria-label="Sections">${TABS[S.role].map(([v, l, ic]) => `<button data-a="tab" data-v="${v}" ${tab === v ? 'aria-current="page"' : ""}><span class="ic">${I(P[ic])}</span>${l}${v === "alerts" && badge ? ` (${badge})` : ""}</button>`).join("")}</nav>${vSheet()}`;
   const view = document.getElementById("view"); view.scrollTop = tab === "coach" && S.role === "athlete" ? view.scrollHeight : top; lastKey = key;
   if (S.sheet) { const b = app.querySelector(".sheet .btn"); if (b) b.focus(); }
+  flowLine();
 }
 const ACT = {
   tab: (v) => { S.tab[S.role] = v; S.rosterSid = null; }, day: (v) => { S.day = v; }, logtab: (v) => { S.logTab = v; },
@@ -629,6 +677,9 @@ document.addEventListener("submit", (e) => {
       const val = Number(d.value), pb = d.metric && val > 0 && S.pbs.find((p) => p.metric === d.metric);
       if (pb && (pb.better === "lower" ? val < pb.value : val > pb.value)) { msg += ` New personal best: ${pb.metric} ${val} ${pb.unit} (was ${pb.value}).`; pb.value = val; pb.at = now(); pb.isNew = true; }
       if (d.pain) { if (S.consent.pau["alerts.pain"]) { S.alerts.push({ id: S.seq++, kind: `Pain flag: ${e2.painWhere || "no location"}, level ${e2.painLevel}`, at: now(), status: "open" }); msg += " Coach Sara was alerted."; } else msg += " The pain flag stays private."; if (e2.painLevel >= 7) msg += " That is a high level: please see a doctor or physio."; }
+      S.lineFrom = lineP(); S.stageSessions++;
+      if (S.stageSessions >= PER && S.stage < S.stages.length - 1) { msg += ` Stage complete: ${S.stages[S.stage]}. Next up: ${S.stages[S.stage + 1]}.`; S.stage++; S.stageSessions = 0; }
+      S.tab.athlete = "path";
       S.toast = msg; S.form = { rpe: 0, pain: false };
     }
   }
@@ -636,6 +687,24 @@ document.addEventListener("submit", (e) => {
   if (f === "adjust") { const n = Number(document.getElementById("adj-n").value), r = document.getElementById("adj-r").value.trim(); if (!r) S.toast = "A reason is required for every credit change."; else if (!n) S.toast = "Enter a change other than 0."; else { const p = S.passes.find((x) => x.org === S.org); S.ledger.push({ pass: p.id, delta: n, kind: "admin_adjust", reason: "Admin: " + r, at: now() }); S.audit.unshift({ what: `Adjusted ${S.me.name}'s credits by ${n > 0 ? "+" : ""}${n}: ${r}`, at: now() }); S.toast = `Credits adjusted. New balance: ${balance(p.id)}.`; } }
   render();
 });
+/* Hold to log. A plain tap only nudges; keyboard and reduced-motion users get a normal press. */
+const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let holdTimer = null;
+function releaseHold() {
+  const btn = document.querySelector("[data-hold].holding"); if (!btn || !holdTimer) return;
+  clearTimeout(holdTimer); holdTimer = null; btn.classList.remove("holding");
+  const label = btn.querySelector("span"); label.textContent = "Keep holding to log";
+  setTimeout(() => { if (label.isConnected) label.textContent = "Hold to log"; }, 1400);
+}
+document.addEventListener("pointerdown", (e) => {
+  const btn = e.target.closest("[data-hold]"); if (!btn || calm) return;
+  btn.classList.add("holding");
+  holdTimer = setTimeout(() => { holdTimer = null; btn.classList.remove("holding"); btn.closest("form").requestSubmit(); }, 650);
+});
+document.addEventListener("pointerup", releaseHold);
+document.addEventListener("pointercancel", releaseHold);
+document.addEventListener("contextmenu", (e) => { if (e.target.closest("[data-hold]")) e.preventDefault(); });
+document.addEventListener("click", (e) => { const btn = e.target.closest("[data-hold]"); if (btn && (e.detail === 0 || calm)) btn.closest("form").requestSubmit(); });
 seed(); render();
 </script>
 </body>

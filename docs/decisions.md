@@ -100,3 +100,20 @@ Ramon supplied four reference palettes, reviewed six sketches ("PATH colour dire
 | R19 | Progress (stage track, week dots) is near-black, not lime. This narrows the earlier rule "accent for primary action and progress".                                 | Lime on a near-white ground is about 1.2:1, so a thin lime line or dot cannot be seen.                   |
 | R20 | The chart marks the current point with a lime dot ringed in near-black. Lime never appears as text or as an unringed thin mark.                                    | Keeps one small accent in the chart while staying visible.                                               |
 | R21 | The other palette colours (violet, blues, orange, lilac) are not used. The dark "Night" theme is not built.                                                        | One accent only; a dark theme can be revisited later as a separate decision.                             |
+
+## Living stage line (chosen by Ramon, 16 Nov 2026) — on trial in the demo
+
+After three rounds of sketches (living elements, glowing paths, six lines), Ramon picked **line 1, "Neon"**, with
+line 6, "Beads", as the fallback, and asked about a press-and-hold button. Built into the clickable demo first, to
+try it; the app's `StageTrack` component follows once he confirms. This supersedes R13 (thin segments) and
+adjusts R18, R19 and R10.
+
+| #   | Decision                                                                                                                                                                          | Reason                                                                                         |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| R22 | The stage progress on the Path is one glowing lime line on a **dark panel**: travelled part glows, a spark runs along it, a pulsing dot marks the position, stages are waypoints. | Ramon: it should represent a path and glow in lime. Lime only reads as light on a dark ground. |
+| R23 | That panel is the **single exception** to "no dark blocks" (R10), and the line is the single exception to "lime only for the primary action" (R18, R19). **Ramon to confirm.**    | Keeps the rest of the system calm while giving the Path one energetic element.                 |
+| R24 | Progress along the line is counted in **sessions logged** (12 per stage in the demo), not days. The real rule (sessions, load or dates per stage) is open; see open question 15.  | "Feeding" the path needs each log to move it visibly.                                          |
+| R25 | **Hold to log:** saving a log entry is a 0.65 s press-and-hold. The button charges with lime; on release the app returns to the Path and the glow flows to the new position.      | Makes logging the satisfying moment. Short enough to keep logging well under 30 seconds.       |
+| R26 | Hold is used **only** for logging. Booking, cancelling and paying stay a plain tap.                                                                                               | The brief promises booking in one or two taps; hold there would be friction.                   |
+| R27 | A plain tap shows "Keep holding to log" and changes nothing. Keyboard, screen-reader and reduced-motion users log with a normal press, with no hold and no animation.             | A hold-only control would lock some people out (WCAG 2.5).                                     |
+| R28 | The line never moves backwards and nothing decays on rest days.                                                                                                                   | The brief bans streaks and guilt mechanics.                                                    |
