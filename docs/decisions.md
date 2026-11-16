@@ -130,3 +130,14 @@ normal light background. R22 and R23 are withdrawn; R24 to R28 stand.
 | R31 | The line is the single place where lime appears outside the primary action (narrows R18).                                                                                         | Gives the Path one energetic element; everything else stays black and white.      |
 | R32 | The hold-to-log button is light at rest (white with a near-black outline) and fills with lime while held.                                                                         | A black button would bring back the heavy block Ramon just removed.               |
 | R33 | Stage boundaries are small ticks on the line; a passed tick turns near-black. The goal is a ring at the far end.                                                                  | Keeps the line quiet; the comet is the only thing that glows.                     |
+
+### Revised again (16 Nov 2026): Steps, no glow
+
+Ramon found the Comet did not look good on the light background, asked for lines without glow, and chose
+**"Steps"** from six flat sketches. R29 to R31 and R33 are withdrawn. R24 to R28 and R32 stand.
+
+| #   | Decision                                                                                                                                                                     | Reason                                                                                    |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| R34 | The stage progress is **five stops on a line**, flat, no glow, directly on the canvas. Finished stages are black with a tick; upcoming ones are hollow; every stop is named. | Ramon's choice. Lime cannot glow on a light ground, and he does not want a dark panel.    |
+| R35 | The current stage is a ring that closes as sessions are logged, with a small lime dot (dark edge) in its centre. That dot is the only lime outside the primary action.       | Progress stays black (R19); the lime dot marks "you are here" without colouring the line. |
+| R36 | After a log the ring closes a step on screen and the dot beats once; finishing a stage ticks it off and moves the ring to the next stop.                                     | Keeps the "feed it" reward with motion instead of glow.                                   |
