@@ -148,14 +148,14 @@ th { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06e
 @media (min-width: 700px) { .tiles { grid-template-columns: repeat(4, 1fr); } }
 svg text { font-family: var(--mono); font-size: 10px; fill: var(--text-2); }
 /* The path line ("Blocks", on trial): one block per session, grouped by stage. The next block to fill is sage. */
-.groups { display: flex; gap: 12px; width: 100%; }
-.grp { flex: var(--cols) 1 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.groups { display: flex; gap: 10px; width: 100%; }
+.grp { flex: var(--cols) 1 0; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
 .grp .eyebrow { font-size: 9px; letter-spacing: .02em; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .grp.now .eyebrow { color: var(--text); font-weight: 700; }
-.blocks { display: grid; grid-template-columns: repeat(var(--cols), 1fr); gap: 4px; }
-.blk { aspect-ratio: 1; border-radius: 4px; border: 1.5px solid var(--track); transition: background .3s ease, border-color .3s ease; }
-.blk.done { background: var(--text); border-color: var(--text); }
-.blk.next { background: var(--accent); border-color: var(--text); }
+.blocks { display: grid; grid-template-columns: repeat(var(--cols), 1fr); gap: 3px; }
+.blk { aspect-ratio: 1; border-radius: 2.5px; background: var(--hairline); transition: background .3s ease; }
+.blk.done { background: var(--text); }
+.blk.next { background: var(--accent); outline: 1.5px solid var(--text); outline-offset: 1px; }
 .blk.pop { animation: blk-pop .55s cubic-bezier(.34,1.56,.64,1); }
 @keyframes blk-pop { 40% { scale: 1.7; } }
 /* Photography: the only imagery. Muted, one photo per screen, text below the picture or on the faded part. */
@@ -516,9 +516,9 @@ const loadPts = (st) => st.wl.map((w) => ({ l: "W" + isoWeek(w.start), v: w.load
 
 const PER = 12;
 /* The stage as blocks: one per session, grouped by stage, laid out as ONE row that fills the width.
-   Works for any plan: pick the fewest rows per group that keep the whole plan within about 16 columns. */
+   Works for any plan: pick the fewest rows per group that keep the whole plan within about 30 columns, so the blocks stay small and the strip stays low. */
 function blockCols(sizes) {
-  for (let rows = 1; rows <= 8; rows++) { const cols = sizes.map((n) => Math.ceil(n / rows)); if (cols.reduce((a, b) => a + b, 0) <= 16) return cols; }
+  for (let rows = 1; rows <= 8; rows++) { const cols = sizes.map((n) => Math.ceil(n / rows)); if (cols.reduce((a, b) => a + b, 0) <= 30) return cols; }
   return sizes.map((n) => Math.ceil(n / 8));
 }
 function pathLine() {
