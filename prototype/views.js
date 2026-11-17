@@ -256,6 +256,7 @@ function vCoach() {
   }
   if (t === "today") return vCoachToday();
   if (t === "plans") return vCoachPlans();
+  if (t === "week") return vCoachWeek();
   if (t === "athletes") return vCoachAthletes();
   if (t === "review") {
     const d = currentDraft();

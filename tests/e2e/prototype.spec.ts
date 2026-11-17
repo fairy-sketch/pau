@@ -598,7 +598,7 @@ test("B10 switching club keeps the current tab, in every role", async ({ page })
   await open(page);
   const all = {
     athlete: ["Path", "Week", "Explore", "Coach", "Me"],
-    coach: ["Today", "Athletes", "Review", "Alerts"],
+    coach: ["Today", "Week", "Athletes", "Plans", "Review"],
     admin: ["Home", "Schedule", "Members", "Products", "Money"],
   } as const;
   for (const role of ["athlete", "coach", "admin"] as const) {

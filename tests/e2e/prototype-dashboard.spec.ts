@@ -40,7 +40,7 @@ test("Athletes: needs-attention first, every status says why, filters narrow the
   await open(page);
   await asRole(page, "coach");
   await tab(page, "Athletes");
-  await expect(page.locator("#roster-answer")).toHaveText("6 need you, 2 to watch, 20 on track");
+  await expect(page.locator("#roster-answer")).toHaveText("6 need you, 2 to watch, 41 on track");
   const order = await page
     .locator("#athlete-list .row")
     .evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.status));
@@ -70,13 +70,13 @@ test("a coach sees only what is shared: private pain never shows, an unshared lo
   await tab(page, "Athletes");
   // Emma has a pain flag she does not share: her status must not mention it.
   const emma = await demo(page, (d) => {
-    const a = d.athletes().find((x: any) => x.id === "a7");
+    const a = d.athletes().find((x: any) => x.id === "a15");
     return { pain: !!a.pain, shared: a.shares.pain, why: d.statusOf(a).why };
   });
   expect(emma.pain).toBe(true);
   expect(emma.shared).toBe(false);
   expect(emma.why).not.toMatch(/flag|pain|calf/i);
-  await openAthlete(page, "a7");
+  await openAthlete(page, "a15");
   await expect(page.locator("#athlete-detail")).not.toContainText(/calf|level 4/i);
   await expect(page.locator("#sharing")).toContainText("Private: pain flags");
   // An athlete who keeps the log to themselves.
@@ -148,7 +148,7 @@ test("the coach screens pass axe (WCAG A and AA) and keep 44 px targets", async 
   await check("today");
   await tab(page, "Athletes");
   await check("athletes");
-  await openAthlete(page, "a1");
+  await openAthlete(page, "a9");
   await check("detail, invented athlete");
   await page.getByRole("button", { name: "Back to athletes" }).click();
   await openAthlete(page, "mia");
@@ -204,7 +204,7 @@ test.describe("Plans (K-7 to K-11)", () => {
     await page.locator("#plan-list .row", { hasText: "Spring 5K" }).click();
     await page.getByRole("button", { name: /^Track/ }).click();
     await page.getByRole("button", { name: "Share with Track" }).click();
-    await expect(page.locator(".toast")).toContainText("Shared with Track: 19 athletes");
+    await expect(page.locator(".toast")).toContainText("Shared with Track: 33 athletes");
     await expect(page.locator("#personal")).toContainText("waits for your approval in Review");
     await asRole(page, "athlete");
     const card = page.locator("#from-coach [data-plan]", { hasText: "Spring 5K" });
@@ -335,4 +335,94 @@ test("free words: a description becomes a draft, written-out sessions keep the c
   await page.locator("#draft-sessions .stext").first().fill("Tempo run, by feel");
   await page.getByRole("button", { name: "Save plan" }).click();
   await expect(page.locator("#plan-detail")).toContainText("Tempo run, by feel");
+});
+
+test.describe("Week: groups and one-to-one in one place (K-14 to K-18)", () => {
+  test("the week lists every session, a group opens its plan and who is coming, a person opens their page", async ({
+    page,
+  }) => {
+    await open(page);
+    await asRole(page, "coach");
+    await tab(page, "Week");
+    await expect(page.locator("#week-answer")).toHaveText(
+      "9 sessions: 6 groups, 3 one-to-one, 1 open slot",
+    );
+    await expect(page.locator('#coach-week [data-kind="group"]')).toHaveCount(6);
+    await expect(page.locator('#coach-week [data-kind="one"]')).toHaveCount(3);
+    await expect(page.locator('#coach-week [data-kind="open"]')).toHaveCount(1);
+    // Each session says which plan it runs on.
+    const monday = page.locator('[data-day="2026-11-16"] [data-kind="group"]');
+    await expect(monday).toContainText("Track session");
+    await expect(monday).toContainText("Base block, week 1: Track: 4 × 1 km at 10K pace");
+    await expect(page.locator('#coach-week [data-kind="one"]').first()).toContainText(
+      "Jonas Meier",
+    );
+    await expect(page.locator('#coach-week [data-kind="one"]').first()).toContainText("Base block");
+
+    // A group: the plan for that session and everyone who is coming, each one a tap away.
+    await monday.click();
+    await expect(page.locator("#session-plan")).toContainText(
+      "Track: 4 × 1 km at 10K pace, 2 min jog",
+    );
+    const people = page.locator("#attendees .row");
+    expect(await people.count()).toBeGreaterThan(10);
+    const id = await people.nth(3).getAttribute("data-v");
+    const name = await page.evaluate(
+      (id) => window.PATH_DEMO.athletes().find((a: any) => a.id === id).name,
+      id,
+    );
+    await people.nth(3).click();
+    await expect(page.locator("#athlete-detail h1")).toHaveText(name);
+    await expect(page.locator("#plan-from-you")).toContainText(/Base block|No plan from you yet/);
+    await page.getByRole("button", { name: "Back to the session" }).click();
+    await expect(page.locator("#coach-session")).toBeVisible();
+    await page.getByRole("button", { name: "Check in" }).click();
+    await expect(page.getByRole("button", { name: "Mark all present" })).toBeVisible();
+
+    // A private coach sees the same screen with only people on it.
+    await tab(page, "Week");
+    await page.getByRole("button", { name: "One-to-one", exact: true }).click();
+    await expect(page.locator('#coach-week [data-kind="group"]')).toHaveCount(0);
+    await page.locator('#coach-week [data-kind="one"]').first().click();
+    await expect(page.locator("#athlete-detail h1")).toHaveText("Jonas Meier");
+    // Next week is there too.
+    await page.getByRole("button", { name: "Back to the session" }).click();
+    await page.getByRole("button", { name: "Next week" }).click();
+    await expect(page.locator("#coach-week")).toContainText("Next week");
+  });
+
+  test("Mia shows up in the session she booked, and the Week screens pass axe with 44 px targets", async ({
+    page,
+  }) => {
+    await open(page);
+    await demo(page, (d) => {
+      d.book("pau-track-2026-11-16", "sheet");
+      d.render();
+    });
+    await asRole(page, "coach");
+    await tab(page, "Week");
+    const check = async (label: string) => {
+      const r = await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+        .analyze();
+      expect(
+        r.violations.map((v) => `${label}: ${v.id}`),
+        label,
+      ).toEqual([]);
+      const small = await page.evaluate(() =>
+        [...document.querySelectorAll<HTMLElement>("#app button")]
+          .map((el) => ({
+            r: el.getBoundingClientRect(),
+            t: (el.getAttribute("aria-label") || el.textContent || "").trim().slice(0, 30),
+          }))
+          .filter((x) => x.r.width && (x.r.width < 44 || x.r.height < 44))
+          .map((x) => `${x.t} ${Math.round(x.r.width)}x${Math.round(x.r.height)}`),
+      );
+      expect(small, label).toEqual([]);
+    };
+    await check("week");
+    await page.locator('[data-day="2026-11-16"] [data-kind="group"]').click();
+    await expect(page.locator("#attendees")).toContainText("Mia Keller");
+    await check("session");
+  });
 });

@@ -75,7 +75,7 @@ const policyText = (org) => {
 };
 /* Made-up members. Each session's roster is a deterministic slice of this list. */
 const NAMES = [];
-for (const last of ["Brunner", "Meier", "Rossi", "Frei", "Sutter", "Aziz"]) for (const first of ["Jana", "Luca", "Sofia", "Noah", "Elin", "Tariq", "Mara", "Ben"]) NAMES.push(`${first} ${last}`);
+for (const last of ["Brunner", "Meier", "Rossi", "Frei", "Sutter", "Aziz"]) for (const first of ["Lea", "Jonas", "Sofia", "Noah", "Elin", "Tariq", "Mara", "Ben"]) NAMES.push(`${first} ${last}`);
 
 /* ---------- state ---------- */
 const STORE_KEY = "path-demo-v4", WEEKS = 4, PER = 12, LOAD_LIMIT = 1.1, CARD_TTL_MIN = 15;

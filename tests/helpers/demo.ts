@@ -28,6 +28,11 @@ const nav = (page: Page, name: string) =>
   page.getByRole("navigation", { name: "Sections" }).getByRole("button", { name }).click();
 /** Log has no tab of its own (design pass, D-3): it is reached from "Log a session" on Path. */
 export async function tab(page: Page, name: string) {
+  if (name === "Alerts") {
+    // Alerts has no tab of its own (K-14): it opens from the coach's Today.
+    await nav(page, "Today");
+    return page.getByRole("button", { name: "Alerts", exact: true }).click();
+  }
   if (name !== "Log") return nav(page, name);
   await nav(page, "Path");
   await page.getByRole("button", { name: "Log a session" }).click();
