@@ -75,14 +75,14 @@ const mySessions = () => sessList(S.org).filter((s) => coachOf(s) === coachMe())
 /* ---------- Today ---------- */
 function vCoachToday() {
   const T = today(), all = mySessions(), todays = all.filter((s) => ymd(s.start) === ymd(T)), next = all.filter((s) => s.start > addDays(T, 1)).slice(0, 5);
-  const list = athletes().map((a) => ({ a, st: statusOf(a) })), needs = list.filter((x) => x.st.level === 2).sort((x, y) => y.st.kinds.length - x.st.kinds.length || (x.a.live ? -1 : 1));
+  const coming = comingToday(), list = athletes().map((a) => ({ a, st: statusOf(a) })), needs = list.filter((x) => x.st.level === 2).sort((x, y) => Number(coming.has(y.a.name)) - Number(coming.has(x.a.name)) || y.st.kinds.length - x.st.kinds.length || (x.a.live ? -1 : 1));
   const back = list.find((x) => x.a.back), pain = list.find((x) => x.st.kinds.includes("pain"));
   const brief = [`${todays.length} ${todays.length === 1 ? "session" : "sessions"} today, ${todays.reduce((n, s) => n + booked(s), 0)} booked.`, back ? `${back.a.first} is back after ${Math.round(back.a.away / 7)} weeks off.` : "", pain ? `${pain.a.first} shared a ${pain.a.pain.where.toLowerCase()} flag, so a lighter option is ready for the next hard session.` : needs.length ? `${needs.length} ${needs.length === 1 ? "athlete needs" : "athletes need"} you.` : "Nobody needs you right now."].filter(Boolean).join(" ");
   const card = (s) => `<div class="card stack" data-today="${s.id}" style="gap:12px"><div class="between" style="align-items:flex-start"><span><span class="h2" style="display:block">${fTime(s.start)} · ${offOf(s).name}</span><span class="sub">${offOf(s).loc} · ${coachOf(s)}</span></span><span class="end"><span class="num">${booked(s)}<span class="sub" style="font-weight:400"> / ${s.cap}</span></span>${waitTotal(s) ? `<span class="sub" style="display:block">${waitTotal(s)} waiting</span>` : ""}</span></div><button class="btn acc full" data-a="roster" data-v="${s.id}">Check in</button></div>`;
   return `<section class="pad stack-l" id="coach-today"><div><div class="eyebrow">${esc(coachMe())} · ${esc(ORGS[S.org].name)}</div><h1 class="h1">${["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][T.getDay()]}, ${T.getDate()} ${MOL[T.getMonth()]}</h1></div>
     <div class="stack" style="gap:8px"><p id="briefing" style="font-size:18px;line-height:28px">${esc(brief)}</p><p class="sub">Drafted by PATH from bookings and from what athletes share with this club.</p></div>
     <div class="stack"><div class="eyebrow">Today</div>${todays.length ? todays.map(card).join("") : `<p class="sub">No sessions today.</p>`}</div>
-    <div class="stack" id="needs"><div class="between" style="align-items:center"><span class="eyebrow">Needs you · ${needs.length > 5 ? `5 of ${needs.length}` : needs.length}</span><button class="btn sm" data-a="tab" data-v="alerts">Alerts</button></div>${needs.length ? `<div class="card rows">${needs.slice(0, 5).map(({ a, st }) => `<button class="row" data-a="${st.kinds[0] === "draft" ? "tab" : "athlete"}" data-v="${st.kinds[0] === "draft" ? "review" : a.id}"><span class="mid"><span class="strong">${sdot(st)}${esc(a.name)}</span><span class="sub">${esc(st.why)}</span></span><span class="end sub">${st.kinds[0] === "draft" ? "Review" : "Open"}</span></button>`).join("")}</div>${needs.length > 5 ? `<button class="btn sm link" data-a="needs-all">See all ${needs.length} in Athletes</button>` : ""}` : `<p class="sub">Nothing is waiting for you.</p>`}</div>
+    <div class="stack" id="needs"><div class="between" style="align-items:center"><span class="eyebrow">Who needs what · ${needs.length > 5 ? `5 of ${needs.length}` : needs.length}</span><button class="btn sm" data-a="tab" data-v="alerts">Alerts</button></div>${needs.length ? `<div class="card rows">${needs.slice(0, 5).map(({ a, st }) => `<button class="row" data-a="${st.kinds[0] === "draft" ? "tab" : "athlete"}" data-v="${st.kinds[0] === "draft" ? "review" : a.id}"><span class="mid"><span class="strong">${sdot(st)}${esc(a.name)}</span><span class="sub">${esc(st.why)}</span><span class="sub" data-what style="color:var(--text)">${coming.has(a.name) ? "Coming today. " : ""}${esc(whatFor(a, st))}</span></span><span class="end sub">${st.kinds[0] === "draft" ? "Review" : "Open"}</span></button>`).join("")}</div>${needs.length > 5 ? `<button class="btn sm link" data-a="needs-all">See all ${needs.length} in Athletes</button>` : ""}` : `<p class="sub">Nothing is waiting for you.</p>`}</div>
     <div class="stack"><div class="eyebrow">Coming up</div><div class="card rows">${next.map((s) => `<button class="row" data-a="roster" data-v="${s.id}"><span class="lead time" style="width:64px">${WD[s.start.getDay()]} ${s.start.getDate()}</span><span class="mid"><span class="strong">${offOf(s).name}</span><span class="sub">${fTime(s.start)} · ${offOf(s).loc}</span></span><span class="end">${booked(s)} / ${s.cap}${waitTotal(s) ? `<span class="sub" style="display:block">${waitTotal(s)} waiting</span>` : ""}${(S.walkins[s.id] || []).length ? `<span class="sub" style="display:block">+${S.walkins[s.id].length} walk-in</span>` : ""}</span></button>`).join("")}</div></div>
     <p class="sub">Demo data: the athletes besides ${esc(S.me.name)} are invented.</p></section>`;
 }
@@ -120,6 +120,7 @@ function vAthleteDetail(a) {
     <div class="stack"><div class="eyebrow">Training log</div>${logs.length ? "" : `<p class="sub">No sessions logged yet.</p>`}<div class="card rows" id="detail-logs" ${logs.length ? "" : "hidden"}>${logs.map(logRow).join("")}</div></div>` : `<p class="sub" id="log-private">Training log not shared.</p>`}
     <div class="stack"><div class="eyebrow">Plan</div><div class="card stack"><p class="sub" id="plan-from-you">From you: <span class="strong" style="color:var(--text)">${esc(planNames(a))}</span></p>${M && shares("path.read") ? `<p class="sub" id="plan-changes-coach">${(() => { const ch = S.plan.items.filter((x) => planWeekOf(x.date) >= 1 && planChanged(x)), you = ch.filter((x) => planChanged(x) === "you").length; return ch.length ? [you ? `${you} ${you === 1 ? "day" : "days"} eased by ${esc(a.first)}` : "", ch.length - you ? `${ch.length - you} changed by you in review` : ""].filter(Boolean).join(" · ") : `${esc(a.first)} follows it as you set it.`; })()}</p>` : ""}${proposal}</div></div>
     <form class="stack" data-f="cnote" data-ath="${a.id}" style="gap:8px"><label class="f">Your private notes<input id="cnote" value="${esc(clubData().notes[a.id] || "")}" placeholder="Only you see this" autocomplete="off"></label><div class="between" style="align-items:center"><span class="sub">${esc(a.first)} never sees these notes.</span><button class="btn sm" type="submit">Save note</button></div></form>
+    ${(() => { const ns = Object.entries(clubData().sessNotes || {}).filter(([k]) => k.split("|")[1] === a.name).map(([k, v]) => ({ s: S.sessions[k.split("|")[0]], v })).filter((x) => x.s).sort((x, y) => y.s.start - x.s.start); return ns.length ? `<div class="stack" id="session-notes" style="gap:8px"><div class="eyebrow">Your notes from sessions</div><div class="card rows">${ns.map((x) => `<div class="row"><span class="mid"><span>${esc(x.v)}</span><span class="sub">${offOf(x.s).name}, ${fDay(x.s.start)}</span></span></div>`).join("")}</div></div>` : ""; })()}
     <p class="note" id="sharing">${esc(a.first)} shares with ${org}: ${shared.filter((x) => x[1]).map((x) => x[0].toLowerCase()).join(", ") || "name only"}. ${shared.some((x) => !x[1]) ? `Private: ${shared.filter((x) => !x[1]).map((x) => x[0].toLowerCase()).join(", ")}.` : "Nothing is held back."}</p></section>`;
 }
 const isKudos = (c) => c.by === coachMe() && c.text === "Kudos. Well done.";
@@ -455,4 +456,151 @@ Object.assign(DASH_ACT, {
   sess: (v) => { dash().sess = v || null; S.tab.coach = "week"; lastKey = ""; },
   cwk: (v) => { const d = dash(); d.wk = Math.min(WEEKS - 1, Math.max(0, (d.wk || 0) + Number(v))); },
   wkind: (v) => { dash().wkind = v; },
+});
+
+/* ================= Coach, milestone B (N-02): who needs what today, the live session, the group recap, the review queue =================
+   The rules of the house hold here too: PATH drafts, the coach approves every word that reaches an athlete; and the coach
+   sees only what an athlete shares with this club. A group message never says anything about one person. */
+
+/* What an athlete needs from the coach today, in the coach's words. One line, from the first reason. */
+const WHAT = {
+  pain: (a) => `A lighter option for the next hard session; ask how the ${a.pain.where.toLowerCase()} feels`,
+  draft: () => "Look at the plan change PATH drafted",
+  ask: () => "Answer the question",
+  load: () => "Ease the next hard session",
+  away: (a) => (a.back ? "A short, easy first session back" : "A short hello, no pressure"),
+};
+const whatFor = (a, st) => (WHAT[st.kinds[0]] ? WHAT[st.kinds[0]](a) : "");
+/* Who is coming to one of this coach's sessions today. */
+function comingToday() {
+  const names = new Set();
+  for (const s of mySessions().filter((x) => ymd(x.start) === ymd(today()) && !x.cancelled)) { for (const n of rosterNames(s).booked) names.add(n); if (myBooking(s.id)) names.add(S.me.name); }
+  return names;
+}
+
+/* ---------- Live session: check-in, who needs what, a note per athlete, then the recap ---------- */
+const noteKey = (sid, name) => `${sid}|${name}`;
+const sessNotes = () => (clubData().sessNotes ||= {});
+const checkedIn = (s) => { const att = S.attendance[s.id] || {}; return rosterRows(s).filter((r) => att[r.name] === "present" || att[r.name] === "late"); };
+function vCoachRoster(s) {
+  const d = dash(), rows = rosterRows(s), att = S.attendance[s.id] || {}, wait = rosterNames(s).queue, R = roster(), pl = planLine(s, Math.max(0, planWeekOf(ymd(s.start)) - 1));
+  const came = checkedIn(s).length, live = s.start <= now() && endOf(s) > now(), rc = (clubData().recaps || {})[s.id];
+  const person = (name) => (name === S.me.name ? liveAthlete() : R.find((a) => a.name === name));
+  const row = (r, i) => {
+    const a = person(r.name), st = a ? statusOf(a) : null, note = sessNotes()[noteKey(s.id, r.name)] || "", editing = d.noteFor === r.name;
+    return `<div class="row" data-row="${esc(r.name)}" style="align-items:flex-start;flex-wrap:wrap"><span class="mid"><span class="strong">${st ? sdot(st) : ""}${esc(r.name)}</span>${r.kind === "walkin" ? `<span class="sub">Walk-in</span>` : ""}</span><span class="btns">${["present", "late", "absent"].map((x) => `<button class="btn sm ${att[r.name] === x ? "on" : ""}" aria-pressed="${att[r.name] === x}" aria-label="${esc(r.name)}: ${x}" data-a="mark" data-v="${s.id}|${i}|${x}">${x[0].toUpperCase() + x.slice(1)}</button>`).join("")}</span>
+      <span style="flex-basis:100%">${st && st.level ? `<span class="sub" data-need style="display:block;margin-bottom:4px">${esc(st.why)}${whatFor(a, st) ? `. ${esc(whatFor(a, st))}` : ""}</span>` : ""}${editing ? `<form data-f="snote" data-sid="${s.id}" data-name="${esc(r.name)}" style="display:flex;gap:8px;align-items:center"><input class="inp" style="min-height:44px" id="snote" maxlength="160" aria-label="Note on ${esc(r.name)} for this session" placeholder="One line, only you see it" value="${esc(note)}"><button class="btn sm" type="submit">Save</button></form>` : `<button class="btn sm link ghost" style="padding-left:0;text-align:left" data-a="snote" data-v="${i}" aria-label="${note ? "Change the note on" : "Add a note on"} ${esc(r.name)}">${note ? `<span class="sub" data-note>Note: ${esc(note)}</span>` : "Add a note"}</button>`}</span></div>`;
+  };
+  return `<section class="pad stack-l" id="coach-roster" data-live="${live}"><div><button class="btn sm ghost" style="padding-left:0" data-a="roster" data-v="" aria-label="Back to sessions">${I(P.back, 16)}Sessions</button><div class="eyebrow" style="margin-top:8px">${live ? "Live now · " : ""}${fDay(s.start)} · ${fTime(s.start)} · <span id="roster-count">${rows.length}</span> on the roster</div><h1 class="h1">${offOf(s).name}</h1>${pl && pl.text ? `<p class="sub" style="margin-top:4px" id="live-plan">Plan: ${esc(pl.text)}</p>` : ""}<p class="sub" style="margin-top:4px" id="live-count">${came} of ${rows.length} checked in</p></div>
+    <div class="stack">${rows.length ? `<button class="btn acc full" data-a="all-present" data-v="${s.id}">Mark all present</button><div class="card rows" id="roster">${rows.map(row).join("")}</div>` : `<p class="sub">Nobody is booked for this session.</p>`}
+      <form class="stack" data-f="walkin" data-id="${s.id}" style="gap:8px"><label class="f">Add a walk-in<input id="walkin-name" placeholder="Name" autocomplete="off"></label><button class="btn full" type="submit">Add to roster</button></form>
+      <p class="sub">${rows.filter((r) => r.kind === "booked").length} booked${rows.some((r) => r.kind === "walkin") ? ` and ${rows.filter((r) => r.kind === "walkin").length} walk-in` : ""}, capacity ${s.cap}. Only people with a confirmed booking or added here as a walk-in appear.</p>
+      ${wait.length ? `<div class="stack" style="gap:8px"><div class="eyebrow">Waitlist · not on the roster</div><ol class="sub" id="roster-wait" style="padding-left:20px">${wait.map((n) => `<li>${esc(n)}${s.offerTo && s.offerTo.name === n ? ` · a spot is held until ${fTime(s.offerTo.expiresAt)}` : ""}</li>`).join("")}</ol></div>` : ""}
+      <div class="stack" id="recap-entry" style="gap:8px"><div class="eyebrow">After the session</div>${rc ? `<p class="note" id="recap-sent">Recap sent to the ${rc.to} who came, ${fDay(rc.at)} at ${fTime(rc.at)}.</p><button class="btn sm link" data-a="recap" data-v="${s.id}">Read it</button>` : came ? `<button class="btn full" data-a="recap" data-v="${s.id}">Draft the group recap</button><p class="sub">PATH drafts it from who came and what was planned. Nothing is sent until you approve it.</p>` : `<p class="sub">Check people in first. The recap goes to those who came.</p>`}</div></div></section>`;
+}
+/* PATH's draft of the recap: group facts only. No names, no notes, nothing anybody shared. */
+function draftRecap(s) {
+  const came = checkedIn(s).length, pl = planLine(s, Math.max(0, planWeekOf(ymd(s.start)) - 1)), next = mySessions().find((x) => x.start > endOf(s) && !x.cancelled);
+  const did = pl && pl.text ? ` We did ${pl.text.charAt(0).toLowerCase() + pl.text.slice(1).replace(/\.$/, "")}.` : "";
+  return `${offOf(s).name}, ${fDay(s.start)}: thank you, all ${came} of you.${did} Good work. Take a moment to log how it felt: one tap in PATH, and it helps me plan the next one.${next ? ` Next session: ${offOf(next).name}, ${WDL[next.start.getDay()]} ${fTime(next.start)}.` : ""} ${coachMe()}`;
+}
+function vCoachRecap(s) {
+  const d = dash(), came = checkedIn(s), missed = rosterRows(s).length - came.length, rc = (clubData().recaps || {})[s.id];
+  const back = `<button class="btn sm link ghost" data-a="recap" data-v="" aria-label="Back to the session">${I(P.back, 16)}${offOf(s).name}</button>`;
+  if (rc) return `<section class="pad stack-l" id="coach-recap">${back}<div><div class="eyebrow">Group recap · sent</div><h1 class="h1">Sent to the ${rc.to} who came</h1><p class="sub" style="margin-top:4px">${fDay(rc.at)} at ${fTime(rc.at)}, approved by you.</p></div><p id="recap-text">${esc(rc.text)}</p></section>`;
+  return `<section class="pad stack-l" id="coach-recap">${back}<div><div class="eyebrow">Group recap · drafted by PATH</div><h1 class="h1">${came.length} came, ${missed} missed it</h1><p class="sub" style="margin-top:4px">It goes to the ${came.length} who came, as one message to the group. It says nothing about any one person.</p></div>
+    <form class="stack" data-f="recap" data-sid="${s.id}" novalidate><label class="f">Message<textarea id="recap-text" class="inp" rows="8" maxlength="900">${esc(d.recapText ?? draftRecap(s))}</textarea></label>${d.recapError ? `<p class="err" role="alert">${esc(d.recapError)}</p>` : ""}<p class="sub">Change any word. Nothing is sent until you approve it. Demo: no real message leaves PATH.</p><button class="btn acc full" type="submit" ${came.length ? "" : "disabled"}>Approve and send to ${came.length}</button></form>
+    <button class="btn full ghost" data-a="recap" data-v="">Not now</button></section>`;
+}
+
+/* ---------- Review queue: every change PATH proposes waits here. Approve, edit first, or reject; low-risk ones can go together. ---------- */
+/* A line that only makes a day easier. Used to sort the queue and to hold the guardrail on what a coach types. */
+const isEasier = (t) => /\b(easy|rest|walk|recover\w*|stretch\w*|mobility|off)\b/i.test(t) && !/\d\s*[×x]\s*\d|interval|tempo|race|threshold|hill|sprint|all.?out|RPE\s*(?:[5-9]|10)\b/i.test(t);
+const reviewState = (id) => ((clubData().reviews ||= {})[id] ||= { status: "pending", edit: {} });
+function reviewItems() {
+  const items = [], thu = nextChangeable(4), mon = nextChangeable(1), sat = nextChangeable(6);
+  if (shares("plan.write") && S.draftStatus === "pending_review") { const d = currentDraft(); items.push({ id: "mia", live: true, a: liveAthlete(), d, low: !!d.guard || d.items.every((i) => i.load <= 0 && i.intensity !== "high"), why: d.guard ? d.guard.reasons.map(guardReasonForCoach).join(" ") : d.rationale }); }
+  for (const a of athletes()) {
+    if (a.live) continue;
+    const st = statusOf(a), p = plansOf(a.group)[0], lineOn = (day) => (p && (p.sessions.find((x) => x.week === 1 && x.day === day) || {}).text) || `${a.group} session`;
+    if (st.kinds.includes("pain") || (st.kinds.includes("load") && st.level === 2)) items.push({ id: "rv-" + a.id, a, why: st.why, low: true, lines: [{ day: fDay(thu), from: lineOn("Thu"), to: "Easy 30 min @ RPE 3" }] });
+    else if (a.back) items.push({ id: "rv-" + a.id, a, why: st.why, low: true, lines: [{ day: fDay(mon), from: lineOn("Mon"), to: "First session back: 20 min easy, then 4 relaxed strides" }] });
+    else if (a.ask && /swap/i.test(a.ask) && !clubData().answered[a.id]) items.push({ id: "rv-" + a.id, a, why: `Asked: "${a.ask}"`, low: false, lines: [{ day: fDay(thu), from: lineOn("Thu"), to: "Rest day" }, { day: fDay(sat), from: "Rest day", to: lineOn("Thu") }] });
+  }
+  return items.map((it) => ({ ...it, state: it.live ? { status: "pending", edit: (clubData().reviews || {}).mia ? clubData().reviews.mia.edit : {} } : reviewState(it.id) }));
+}
+function vCoachReview() {
+  const d = dash(), all = reviewItems(), open = all.filter((x) => x.state.status === "pending"), low = open.filter((x) => x.low), done = all.filter((x) => x.state.status !== "pending");
+  const noShare = !shares("plan.write") ? `<p class="sub" id="no-plan-share">${esc(S.me.name)} has not allowed coaches at this club to review plans.</p>` : "";
+  const miaDone = shares("plan.write") && S.draftStatus !== "pending_review" ? `<p class="sub" id="mia-decided">${esc(S.me.name)}: you ${S.draftStatus} "${esc(currentDraft().title)}".</p>` : "";
+  const card = (it) => {
+    const editing = d.rvEdit === it.id, name = esc(it.a.name), lbl = it.live ? "" : ` the change for ${name}`;
+    if (it.live) {
+      const dr = it.d;
+      return `<div class="card stack" id="draft" data-review="mia" data-guarded="${!!dr.guard}" data-low="${it.low}"><div><div class="eyebrow">${name} · AI draft · ${it.low ? "low risk: only reduces load" : "needs a look"}</div><p class="h2" style="font-size:22px;margin-top:6px">${esc(dr.title)}</p></div>
+        ${dr.guard ? `<div class="guard" role="note" id="guard"><b>Guardrail applied: this draft can only reduce load</b><ul class="stack" style="gap:4px">${dr.guard.reasons.map((r) => `<li>${esc(guardReasonForCoach(r))}</li>`).join("")}</ul></div>` : ""}
+        <p class="sub">${esc(dr.rationale)}</p>
+        ${editing ? `<form class="stack" data-f="rvedit" data-id="mia" novalidate style="gap:12px">${dr.items.map((x, i) => (x.from === x.to && !x.changed ? "" : `<label class="f">${x.day}<span class="sub" style="display:block">was: ${esc(x.changed ? x.from : x.from)}</span><textarea class="inp grow" rows="1" data-line="${i}" maxlength="120">${esc((it.state.edit || {})[i] ?? x.to)}</textarea></label>`)).join("")}${d.rvError ? `<p class="err" role="alert" id="rv-error">${esc(d.rvError)}</p>` : ""}<div class="btns"><button class="btn acc" style="flex:1" type="submit">Approve as edited</button><button class="btn" type="button" data-a="rv-edit" data-v="">Cancel</button></div></form>`
+        : `<ul class="stack" style="gap:8px" id="draft-items">${dr.items.map((x) => `<li data-intensity="${x.intensity}" data-load="${x.load}"><span class="eyebrow" data-date="${ymd(x.date)}">${x.day}</span><br>${x.changed ? `<span class="was">${esc(x.was)}</span> <span class="strong">${esc(x.to)}</span>` : x.from === x.to ? `${esc(x.to)} <span class="sub">(unchanged)</span>` : `<span class="sub">${esc(x.from)} becomes</span> <span class="strong">${esc(x.to)}</span>`}</li>`).join("")}</ul>
+        <div class="btns"><button class="btn acc" style="flex:1" data-a="draft" data-v="approved">Approve</button><button class="btn" data-a="rv-edit" data-v="mia" aria-label="Edit before approving">Edit</button><button class="btn" data-a="draft" data-v="rejected">Reject</button></div>`}
+        <p class="sub">A drafted plan never reaches the athlete until a coach approves it. Guardrails are applied in code before you see it, and again on approval.</p></div>`;
+    }
+    const lines = it.lines.map((x, i) => ({ ...x, to: (it.state.edit || {})[i] ?? x.to }));
+    return `<div class="card stack" data-review="${it.id}" data-low="${it.low}"><div><div class="eyebrow">${name} · ${it.low ? "low risk: only reduces load" : "needs a look"}</div><p class="sub" style="margin-top:4px">${esc(it.why)}</p></div>
+      ${editing ? `<form class="stack" data-f="rvedit" data-id="${it.id}" novalidate style="gap:12px">${lines.map((x, i) => `<label class="f">${x.day}<span class="sub" style="display:block">was: ${esc(x.from)}</span><textarea class="inp grow" rows="1" data-line="${i}" maxlength="120">${esc(x.to)}</textarea></label>`).join("")}${d.rvError ? `<p class="err" role="alert" id="rv-error">${esc(d.rvError)}</p>` : ""}<div class="btns"><button class="btn acc" style="flex:1" type="submit">Approve as edited</button><button class="btn" type="button" data-a="rv-edit" data-v="">Cancel</button></div></form>`
+      : `<ul class="stack" style="gap:8px">${lines.map((x) => `<li><span class="eyebrow">${x.day}</span><br><span class="sub">${esc(x.from)} becomes</span> <span class="strong">${esc(x.to)}</span></li>`).join("")}</ul>
+      <div class="btns"><button class="btn" style="flex:1" data-a="rv-approve" data-v="${it.id}" aria-label="Approve${lbl}">Approve</button><button class="btn" data-a="rv-edit" data-v="${it.id}" aria-label="Edit${lbl}">Edit</button><button class="btn" data-a="rv-reject" data-v="${it.id}" aria-label="Reject${lbl}">Reject</button></div>`}</div>`;
+  };
+  return `<section class="pad stack-l" id="coach-review"><div><h1 class="h1">Review queue</h1><p class="sub" style="margin-top:4px" id="review-answer">${open.length ? `${open.length} waiting for you, ${low.length} of them low risk.` : "Nothing is waiting."} Nothing reaches an athlete before you approve it.</p></div>
+    ${noShare}${low.length >= 2 ? `<button class="btn acc full" data-a="rv-bulk" id="rv-bulk">Approve the ${low.length} low-risk changes</button>` : ""}
+    ${open.map(card).join("")}
+    ${miaDone || done.length ? `<div class="stack" id="review-done" style="gap:8px"><div class="eyebrow">Decided</div>${miaDone}${done.length ? `<div class="card rows">${done.map((it) => `<button class="row" data-a="athlete" data-v="${it.a.id}" style="align-items:flex-start"><span class="mid"><span class="strong">${esc(it.a.name)}</span><span class="sub">${it.state.status === "approved" ? `Approved ${fDay(it.state.at)}${Object.keys(it.state.edit || {}).length ? ", with your changes" : ""}. ${esc(it.a.first)} sees it as the next step.` : `Rejected ${fDay(it.state.at)}. ${esc(it.a.first)} keeps the plan as it is.`}</span></span></button>`).join("")}</div>` : ""}</div>` : ""}
+    <p class="sub">Demo data: the athletes besides ${esc(S.me.name)} are invented.</p></section>`;
+}
+/* Approving Mia's draft with the coach's own words. The guardrail is held again, on what the coach typed. */
+function approveEdited(edits) {
+  const d = guardDraft(RAW_DRAFT), g = guard();
+  for (const [k, raw] of Object.entries(edits)) {
+    const i = Number(k), it = d.items[i], text = String(raw || "").trim().slice(0, 120); if (!it || !text || text === it.to) continue;
+    if (g.active && !isEasier(text)) return err("GUARDRAIL", `${it.day} can only be made easier right now: ${g.reasons.map(guardReasonForCoach).join(" ")} "${text}" adds intensity.`);
+    d.items[i] = { ...it, to: text, edited: true, changed: it.changed, was: it.changed ? it.was : undefined, intensity: isEasier(text) ? "low" : it.intensity, load: isEasier(text) ? -1 : it.load };
+  }
+  S.draftApproved = d; S.draftStatus = "approved"; S.planNews = true;
+  return { ok: true, msg: `Approved with your changes. ${S.me.name} now sees it as the next step.` };
+}
+Object.assign(DASH_ACT, {
+  snote: (v) => { const s = S.sessions[S.rosterSid], r = s && rosterRows(s)[Number(v)]; dash().noteFor = r ? r.name : null; },
+  recap: (v) => { Object.assign(dash(), { recap: v || null, recapText: null, recapError: "" }); lastKey = ""; },
+  "rv-edit": (v) => { Object.assign(dash(), { rvEdit: v || null, rvError: "" }); },
+  "rv-approve": (v) => { const it = reviewItems().find((x) => x.id === v); if (!it) return; Object.assign(reviewState(v), { status: "approved", at: now() }); UI.toast = `Approved. ${it.a.first} now sees it as the next step.`; },
+  "rv-reject": (v) => { const it = reviewItems().find((x) => x.id === v); if (!it) return; Object.assign(reviewState(v), { status: "rejected", at: now() }); UI.toast = `Rejected. ${it.a.first} keeps the plan as it is.`; },
+  "rv-bulk": () => {
+    const low = reviewItems().filter((x) => x.state.status === "pending" && x.low); let n = 0;
+    for (const it of low) { if (it.live) ACT.draft("approved"); else Object.assign(reviewState(it.id), { status: "approved", at: now() }); n++; }
+    UI.toast = `${n} low-risk changes approved. Each athlete sees theirs as the next step. The ones that need a look are still here.`;
+  },
+});
+document.addEventListener("submit", (e) => {
+  const f = e.target.dataset.f; if (!["snote", "recap", "rvedit"].includes(f)) return; e.preventDefault(); const d = dash(); UI.toast = "";
+  if (f === "snote") {
+    const v = document.getElementById("snote").value.trim().slice(0, 160), k = noteKey(e.target.dataset.sid, e.target.dataset.name);
+    if (v) sessNotes()[k] = v; else delete sessNotes()[k];
+    d.noteFor = null; UI.toast = v ? "Note saved. Only you can see it." : "Note removed.";
+  }
+  if (f === "recap") {
+    const s = S.sessions[e.target.dataset.sid], text = document.getElementById("recap-text").value, came = checkedIn(s), r = sendApproved(S.org, `the ${came.length} who came to ${offOf(s).name}, ${fDay(s.start)}`, "recap", text, s.id, coachMe());
+    if (!r.ok) { d.recapText = text; d.recapError = r.msg; }
+    else {
+      (clubData().recaps ||= {})[s.id] = { text: text.trim(), at: now(), to: came.length };
+      if (came.some((x) => x.name === S.me.name)) S.chat.push({ who: "coach", text: `From ${coachMe()}, to everyone who came: ${text.trim()}` });
+      Object.assign(d, { recap: null, recapText: null, recapError: "" }); UI.toast = `Recap sent to the ${came.length} who came. Demo: no real message leaves PATH.`; lastKey = "";
+    }
+  }
+  if (f === "rvedit") {
+    const id = e.target.dataset.id, edits = {}; e.target.querySelectorAll("[data-line]").forEach((el) => { edits[el.dataset.line] = el.value.replace(/\s+/g, " "); });
+    if (Object.values(edits).some((v) => !String(v).trim())) { d.rvError = "A day can't be left empty. Write what it should be, or Cancel."; (clubData().reviews ||= {})[id] = { ...(clubData().reviews[id] || { status: "pending" }), edit: edits }; }
+    else if (id === "mia") { const r = approveEdited(edits); if (r.ok) { UI.toast = r.msg; Object.assign(d, { rvEdit: null, rvError: "" }); delete (clubData().reviews || {}).mia; } else { d.rvError = r.msg; (clubData().reviews ||= {}).mia = { status: "pending", edit: edits }; } }
+    else { const it = reviewItems().find((x) => x.id === id); Object.assign(reviewState(id), { status: "approved", at: now(), edit: edits }); Object.assign(d, { rvEdit: null, rvError: "" }); UI.toast = `Approved with your changes. ${it.a.first} now sees it as the next step.`; }
+  }
+  render();
 });

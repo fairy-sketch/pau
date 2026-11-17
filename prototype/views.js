@@ -294,28 +294,12 @@ function coachAlerts() {
 }
 function vCoach() {
   const t = S.tab.coach;
-  if (S.rosterSid && S.sessions[S.rosterSid]) {
-    const s = S.sessions[S.rosterSid], rows = rosterRows(s), att = S.attendance[s.id] || {}, wait = rosterNames(s).queue;
-    return `<section class="pad stack-l"><div><button class="btn sm ghost" style="padding-left:0" data-a="roster" data-v="" aria-label="Back to sessions">${I(P.back, 16)}Sessions</button><div class="eyebrow" style="margin-top:8px">${fDay(s.start)} · ${fTime(s.start)} · <span id="roster-count">${rows.length}</span> on the roster</div><h1 class="h1">${offOf(s).name}</h1></div>
-      <div class="stack">${rows.length ? `<button class="btn acc full" data-a="all-present" data-v="${s.id}">Mark all present</button><div class="card rows" id="roster">${rows.map((r, i) => `<div class="row" data-row="${esc(r.name)}"><span class="mid"><span class="strong">${esc(r.name)}</span>${r.kind === "walkin" ? `<span class="sub">Walk-in</span>` : ""}</span><span class="btns">${["present", "late", "absent"].map((x) => `<button class="btn sm ${att[r.name] === x ? "on" : ""}" aria-pressed="${att[r.name] === x}" aria-label="${esc(r.name)}: ${x}" data-a="mark" data-v="${s.id}|${i}|${x}">${x[0].toUpperCase() + x.slice(1)}</button>`).join("")}</span></div>`).join("")}</div>` : `<p class="sub">Nobody is booked for this session.</p>`}
-        <form class="stack" data-f="walkin" data-id="${s.id}" style="gap:8px"><label class="f">Add a walk-in<input id="walkin-name" placeholder="Name" autocomplete="off"></label><button class="btn full" type="submit">Add to roster</button></form>
-        <p class="sub">${rows.filter((r) => r.kind === "booked").length} booked${rows.some((r) => r.kind === "walkin") ? ` and ${rows.filter((r) => r.kind === "walkin").length} walk-in` : ""}, capacity ${s.cap}. Only people with a confirmed booking or added here as a walk-in appear.</p>
-        ${wait.length ? `<div class="stack" style="gap:8px"><div class="eyebrow">Waitlist · not on the roster</div><ol class="sub" id="roster-wait" style="padding-left:20px">${wait.map((n) => `<li>${esc(n)}${s.offerTo && s.offerTo.name === n ? ` · a spot is held until ${fTime(s.offerTo.expiresAt)}` : ""}</li>`).join("")}</ol></div>` : ""}</div></section>`;
-  }
+  if (S.rosterSid && S.sessions[S.rosterSid]) return dash().recap === S.rosterSid ? vCoachRecap(S.sessions[S.rosterSid]) : vCoachRoster(S.sessions[S.rosterSid]);
   if (t === "today") return vCoachToday();
   if (t === "plans") return vCoachPlans();
   if (t === "week") return vCoachWeek();
   if (t === "athletes") return vCoachAthletes();
-  if (t === "review") {
-    const d = currentDraft();
-    const body = !shares("plan.write") ? `<p>${esc(S.me.name)} has not allowed coaches at this club to review plans.</p>` : S.draftStatus !== "pending_review" ? `<p class="sub">Nothing is waiting. You ${S.draftStatus} "${esc(d.title)}".</p>`
-      : `<div class="card stack" id="draft" data-guarded="${!!d.guard}"><div><div class="eyebrow">${esc(S.me.name)} · AI draft · waiting for you</div><p class="h2" style="font-size:22px;margin-top:6px">${esc(d.title)}</p></div>
-        ${d.guard ? `<div class="guard" role="note" id="guard"><b>Guardrail applied: this draft can only reduce load</b><ul class="stack" style="gap:4px">${d.guard.reasons.map((r) => `<li>${esc(guardReasonForCoach(r))}</li>`).join("")}</ul></div>` : ""}
-        <p class="sub">${esc(d.rationale)}</p>
-        <ul class="stack" style="gap:8px" id="draft-items">${d.items.map((it) => `<li data-intensity="${it.intensity}" data-load="${it.load}"><span class="eyebrow" data-date="${ymd(it.date)}">${it.day}</span><br>${it.changed ? `<span class="was">${esc(it.was)}</span> <span class="strong">${esc(it.to)}</span>` : it.from === it.to ? `${esc(it.to)} <span class="sub">(unchanged)</span>` : `<span class="sub">${esc(it.from)} becomes</span> <span class="strong">${esc(it.to)}</span>`}</li>`).join("")}</ul>
-        <div class="btns"><button class="btn acc" style="flex:1" data-a="draft" data-v="approved">Approve</button><button class="btn" data-a="draft" data-v="rejected">Reject</button></div><p class="sub">A drafted plan never reaches the athlete until a coach approves it. Guardrails are applied in code before you see it, and again on approval.</p></div>`;
-    return `<section class="pad stack-l"><h1 class="h1">Review queue</h1>${body}</section>`;
-  }
+  if (t === "review") return vCoachReview();
   const al = coachAlerts();
   return `<section class="pad stack-l"><h1 class="h1">Alerts</h1>${al.length ? `<div class="card rows">${al.map((a) => `<div class="row"><span class="mid"><span class="strong">${esc(a.kind)}</span><span class="sub">${esc(S.me.name)} · ${fDay(a.at)}</span></span>${a.status === "open" ? `<button class="btn sm" data-a="ack" data-v="${a.id}">Got it</button>` : `<span class="sub">Seen</span>`}</div>`).join("")}</div>` : texture(`<p class="h2">No alerts</p><p class="sub" style="margin-top:6px">Pain alerts appear only for athletes who share them.</p>`)}</section>`;
 }

@@ -537,7 +537,7 @@ test.describe("Coach Sara: a training day", () => {
     });
     const text = await screen(page, "coach", "today");
     expect(text).toContain(`${facts.n} session today, ${facts.booked} booked.`);
-    expect(text.toLowerCase()).toContain(`needs you · 5 of ${facts.needs}`);
+    expect(text.toLowerCase()).toContain(`who needs what · 5 of ${facts.needs}`);
   });
 
   test("check-in during the session: present, late, no-show and a walk-in, and the athlete's side follows", async ({
@@ -603,13 +603,107 @@ test.describe("Coach Sara: a training day", () => {
     );
     expect(miss).toEqual({ status: "no_show", pass: "4 of 4 used in November" });
   });
-  test.fixme("a one-line note per athlete during check-in", () => {
-    // Not built (dashboard milestone B, live session mode).
+  test("live session: who needs what is on the roster, a note per athlete stays with the coach, and the recap is drafted, approved, then sent", async ({
+    page,
+  }) => {
+    await start(page);
+    await sim(page, (d) => d.book("pau-track-2026-11-16", "t"));
+    await clock(page, ZURICH("2026-11-16T18:40"));
+    await screen(page, "coach", "today");
+    await page.locator("[data-today]").getByRole("button", { name: "Check in" }).click();
+    await expect(page.locator("#coach-roster")).toHaveAttribute("data-live", "true");
+    await expect(page.locator("#live-plan")).toHaveText(
+      "Plan: Track: 4 × 1 km at 10K pace, 2 min jog",
+    );
+    await expect(page.locator("#live-count")).toHaveText(/^0 of \d+ checked in$/);
+    // Who needs what, from what they share. Someone who keeps pain private shows nothing of it here.
+    const lea = page.locator('#roster [data-row="Lea Brunner"]');
+    if (await lea.count())
+      await expect(lea.locator("[data-need]")).toContainText(
+        "Back after 2 weeks off. A short, easy first session back",
+      );
+    expect(await page.locator("#roster").innerText()).not.toMatch(/calf or shin/i);
+    // No recap before anyone is checked in.
+    await expect(page.locator("#recap-entry")).toContainText("Check people in first.");
+    await page.getByRole("button", { name: "Mark all present" }).click();
+    const n = await sim(page, (d) => d.rosterRows(d.state.sessions["pau-track-2026-11-16"]).length);
+    await page
+      .locator('#roster [data-row="Mia Keller"]')
+      .getByRole("button", { name: "Mia Keller: late" })
+      .click();
+    await page
+      .locator("#roster .row")
+      .first()
+      .getByRole("button", { name: /: absent$/ })
+      .click();
+    await expect(page.locator("#live-count")).toHaveText(`${n - 1} of ${n} checked in`);
+    // A note on one athlete: one line, saved, only the coach's.
+    const mia = page.locator('#roster [data-row="Mia Keller"]');
+    await mia.getByRole("button", { name: "Add a note on Mia Keller" }).click();
+    await page.locator("#snote").fill("Went out too fast on rep 1, held 3 and 4 well");
+    await page.locator("#snote").press("Enter");
+    await expect(page.locator(".toast")).toContainText("Note saved. Only you can see it.");
+    await expect(mia.locator("[data-note]")).toHaveText(
+      "Note: Went out too fast on rep 1, held 3 and 4 well",
+    );
+    // The recap: drafted from who came and what was planned; it names nobody and repeats no note.
+    await page.getByRole("button", { name: "Draft the group recap" }).click();
+    await expect(page.locator("#coach-recap h1")).toHaveText(`${n - 1} came, 1 missed it`);
+    const draft = await page.locator("#recap-text").inputValue();
+    expect(draft).toContain(`Track session, Mon 16 Nov: thank you, all ${n - 1} of you.`);
+    expect(draft).toContain("We did track: 4 × 1 km at 10K pace, 2 min jog.");
+    expect(draft).toContain("log how it felt");
+    expect(draft).not.toMatch(/Mia|Lea|Jonas|too fast|knee|pain/);
+    expect(await sim(page, (d) => d.state.outbox.length)).toBe(0);
+    // "Not now" sends nothing. Then the coach changes a word and approves.
+    await page.getByRole("button", { name: "Not now" }).click();
+    expect(await sim(page, (d) => d.state.outbox.length)).toBe(0);
+    await page.getByRole("button", { name: "Draft the group recap" }).click();
+    await page
+      .locator("#recap-text")
+      .fill(draft.replace("Good work.", "Strong session, everyone."));
+    await page.getByRole("button", { name: `Approve and send to ${n - 1}` }).click();
+    await expect(page.locator(".toast")).toContainText(`Recap sent to the ${n - 1} who came.`);
+    await expect(page.locator("#recap-sent")).toContainText(`Recap sent to the ${n - 1} who came`);
+    await expect(page.getByRole("button", { name: "Draft the group recap" })).toHaveCount(0);
+    expect(await sim(page, (d) => d.state.outbox.map((x: any) => x.kind))).toEqual(["recap"]);
+    // The athlete: the recap is in her chat with the coach's words, the note is nowhere, and she is asked to log.
+    await clock(page, ZURICH("2026-11-16T20:30"));
+    const chat = await screen(page, "athlete", "coach");
+    expect(chat).toContain("From Coach Sara, to everyone who came: Track session, Mon 16 Nov");
+    expect(chat).toContain("Strong session, everyone.");
+    for (const [role, tab] of [
+      ["athlete", "path"],
+      ["athlete", "week"],
+      ["athlete", "coach"],
+      ["athlete", "me"],
+      ["athlete", "log"],
+    ] as const)
+      expect(await screen(page, role, tab), `${tab}`).not.toContain("too fast");
+    expect(await screen(page, "athlete", "path")).toContain("How did it go?");
+    // The coach finds the note again on her page; the other club's coach does not.
+    const open = async (org: string) => {
+      await sim(
+        page,
+        (d, org) => {
+          const S = d.state;
+          S.role = "coach";
+          S.org = org;
+          S.tab.coach = "athletes";
+          S.rosterSid = null;
+          d.render();
+          S.dash.athlete = "mia";
+          d.render();
+        },
+        org,
+      );
+      return (await page.locator("#athlete-detail").innerText()).replace(/\s+/g, " ");
+    };
+    expect(await open("pau")).toMatch(
+      /YOUR NOTES FROM SESSIONS Went out too fast on rep 1, held 3 and 4 well Track session, Mon 16 Nov/,
+    );
+    expect(await open("studio")).not.toContain("too fast");
   });
-  test.fixme("one tap sends a group recap, drafted by PATH and editable, and asks athletes to log", () => {
-    // Not built (dashboard milestone B).
-  });
-
   test("plan changes: approve reaches the athlete with the coach's name; reject reaches nobody", async ({
     page,
   }) => {
@@ -628,8 +722,96 @@ test.describe("Coach Sara: a training day", () => {
     expect(await screen(page, "athlete", "path")).not.toMatch(/approved|Sharpen/);
     expect(await sim(page, (d) => d.state.plan.title)).not.toBe("Sharpen block");
   });
-  test.fixme("edit a proposed change before approving it, and approve low-risk changes in one go", () => {
-    // Not built (dashboard milestone B): the queue offers Approve and Reject only.
+  test("review queue: every proposal waits; edit before approving, approve the low-risk ones together, and the guardrail holds on what the coach types", async ({
+    page,
+  }) => {
+    await start(page);
+    const text = await screen(page, "coach", "review");
+    const q = await sim(page, (d) =>
+      d.reviewItems().map((x: any) => ({ id: x.id, low: x.low, name: x.a.name })),
+    );
+    expect(q.length).toBeGreaterThan(3);
+    expect(text).toContain(
+      `${q.length} waiting for you, ${q.filter((x: any) => x.low).length} of them low risk.`,
+    );
+    expect(text).toContain("Nothing reaches an athlete before you approve it.");
+    // Only what is shared: the athlete who keeps a pain flag private has no proposal that mentions it.
+    expect(text).not.toMatch(/calf or shin/i);
+    // Edit one first: the coach's words are what gets approved.
+    const lea = page.locator('[data-review="rv-a0"]');
+    await expect(lea).toContainText("low risk: only reduces load");
+    await lea.getByRole("button", { name: "Edit the change for Lea Brunner" }).click();
+    await lea.locator("[data-line]").fill("");
+    await lea.getByRole("button", { name: "Approve as edited" }).click();
+    await expect(page.locator("#rv-error")).toContainText("A day can't be left empty.");
+    await lea.locator("[data-line]").fill("15 min easy jog with me before the group starts");
+    await lea.getByRole("button", { name: "Approve as edited" }).click();
+    await expect(page.locator(".toast")).toContainText(
+      "Approved with your changes. Lea now sees it as the next step.",
+    );
+    await expect(page.locator("#review-done")).toContainText(
+      "Approved Mon 16 Nov, with your changes. Lea sees it as the next step.",
+    );
+    // The one that is not a pure reduction is marked, and is not part of "approve together".
+    const swap = page.locator('[data-review][data-low="false"]');
+    await expect(swap).toHaveCount(1);
+    await expect(swap).toContainText("needs a look");
+    await expect(swap).toContainText('Asked: "Can I swap Thursday for Saturday this week?"');
+    const lowLeft = q.filter((x: any) => x.low).length - 1;
+    await page.getByRole("button", { name: `Approve the ${lowLeft} low-risk changes` }).click();
+    await expect(page.locator(".toast")).toContainText(`${lowLeft} low-risk changes approved.`);
+    await expect(page.locator("[data-review]")).toHaveCount(1);
+    await expect(page.locator("#review-answer")).toContainText(
+      "1 waiting for you, 0 of them low risk.",
+    );
+    // Mia's was low risk (the guardrail had already reduced it), so it went with them, and she sees it.
+    expect(await sim(page, (d) => d.state.draftStatus)).toBe("approved");
+    expect(await screen(page, "athlete", "path")).toContain("Your coach approved your plan");
+    // Reject the last one: the athlete keeps the plan.
+    await screen(page, "coach", "review");
+    await swap.getByRole("button", { name: /^Reject the change for/ }).click();
+    await expect(page.locator(".toast")).toContainText("keeps the plan as it is.");
+    await expect(page.locator("#review-answer")).toContainText("Nothing is waiting.");
+  });
+  test("editing the playable athlete's draft: an easier day is accepted in the coach's words, a harder one is refused while the guardrail is on", async ({
+    page,
+  }) => {
+    await start(page);
+    await screen(page, "coach", "review");
+    const card = page.locator("#draft");
+    await expect(card).toHaveAttribute("data-guarded", "true");
+    await card.getByRole("button", { name: "Edit before approving" }).click();
+    const first = card.locator("[data-line]").first();
+    await first.fill("Track: 8 × 400 m at 5K pace");
+    await card.getByRole("button", { name: "Approve as edited" }).click();
+    await expect(page.locator("#rv-error")).toContainText(
+      /can only be made easier right now: .*"Track: 8 × 400 m at 5K pace" adds intensity\./,
+    );
+    expect(await sim(page, (d) => d.state.draftStatus)).toBe("pending_review");
+    await expect(first).toHaveValue("Track: 8 × 400 m at 5K pace"); // what was typed is still there
+    await first.fill("Easy 25 min, then stretch");
+    await card.getByRole("button", { name: "Approve as edited" }).click();
+    await expect(page.locator(".toast")).toContainText(
+      "Approved with your changes. Mia Keller now sees it as the next step.",
+    );
+    await screen(page, "athlete", "path");
+    await page.getByRole("button", { name: "Review plan" }).click();
+    expect(await screen(page, "athlete", "path")).toMatch(
+      /Easy 25 min, then stretch Changed by Coach Sara/,
+    );
+    // Without a guardrail the coach may also make a day harder.
+    await sim(page, (d) => {
+      d.resetDemo();
+      d.state.entries = d.state.entries.filter((e: any) => e.at < new Date(Date.now() - 6 * 864e5));
+      d.render();
+    });
+    await screen(page, "coach", "review");
+    await expect(page.locator("#draft")).toHaveAttribute("data-guarded", "false");
+    await expect(page.locator("#draft")).toContainText("needs a look");
+    await page.locator("#draft").getByRole("button", { name: "Edit before approving" }).click();
+    await page.locator("#draft [data-line]").first().fill("Track: 8 × 400 m at 5K pace");
+    await page.locator("#draft").getByRole("button", { name: "Approve as edited" }).click();
+    await expect(page.locator(".toast")).toContainText("Approved with your changes.");
   });
 
   test("comments and kudos on a log reach the athlete; five taps on Kudos send it once", async ({

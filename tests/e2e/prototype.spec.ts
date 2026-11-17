@@ -70,7 +70,7 @@ test.describe("B1 guardrails", () => {
     await expect(page.locator("#guard")).toContainText("Knee, level 4");
 
     // Approving keeps the guarded version: the athlete never gets the race-pace session.
-    await page.getByRole("button", { name: "Approve" }).click();
+    await page.getByRole("button", { name: "Approve", exact: true }).click();
     const approved = await page.evaluate(() => window.PATH_DEMO.currentDraft());
     expect(approved.items.every((i: any) => i.intensity !== "high" && i.load <= 0)).toBe(true);
     expect(JSON.stringify(approved.items.map((i: any) => i.to))).not.toContain("10K pace");
@@ -180,7 +180,7 @@ test("B1 plan changes never touch a session that is in the past, has started or 
   const before = await upToToday();
   await asRole(page, "coach");
   await tab(page, "Review");
-  await page.getByRole("button", { name: "Approve" }).click();
+  await page.getByRole("button", { name: "Approve", exact: true }).click();
   await asRole(page, "athlete");
   await tab(page, "Path");
   // (Tuesday's yoga class ended two days ago and is not logged, so Path first asks how it went. Log it.)

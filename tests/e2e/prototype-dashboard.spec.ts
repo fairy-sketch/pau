@@ -27,8 +27,12 @@ test("Today opens with a briefing, today's session with a check-in, and at most 
   await expect(card).toContainText("18:30 · Track session");
   const rows = page.locator("#needs .row");
   expect(await rows.count()).toBeLessThanOrEqual(5);
-  await expect(rows.first()).toContainText("Mia Keller");
-  await expect(rows.first()).toContainText("Plan draft waiting for you");
+  // Who needs what today: the people coming to today's session first, each with what they need.
+  await expect(rows.first()).toContainText("Coming today.");
+  await expect(rows.first().locator("[data-what]")).not.toBeEmpty();
+  const mia = page.locator("#needs .row", { hasText: "Mia Keller" });
+  await expect(mia).toContainText("Plan draft waiting for you");
+  await expect(mia.locator("[data-what]")).toHaveText("Look at the plan change PATH drafted");
   // The check-in button opens the roster that was already there.
   await card.getByRole("button", { name: "Check in" }).click();
   await expect(page.getByRole("button", { name: "Mark all present" })).toBeVisible();

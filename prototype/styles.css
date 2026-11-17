@@ -216,6 +216,7 @@ svg text { font-family: var(--body); font-size: 11px; fill: var(--text-2); }
 .guard b { display: block; font-weight: 500; margin-bottom: 4px; }
 .was { text-decoration: line-through; color: var(--text-2); }
 .scroll:focus-visible, #view:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
+#view.quiet-focus:focus-visible { outline: none; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 #weekpane { touch-action: pan-y; }
@@ -332,3 +333,4 @@ textarea.inp.big { min-height: 248px; padding: 16px; }
 /* The office (N-04). Existing pieces only; these lines place them. */
 .sub.demo .tag, p .tag { margin-left: 4px; }
 .delta { font-size: 13px; line-height: 18px; }
+textarea.grow { display: block; width: 100%; min-height: 44px; padding: 10px 12px; line-height: 24px; resize: none; overflow: hidden; }

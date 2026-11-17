@@ -641,12 +641,12 @@ function draftCheckin(org, m) {
 }
 const draftReminder = (i) => `Hi ${i.member.split(" ")[0]}, a friendly reminder: invoice ${i.id} for ${i.what} (${chf(i.amount)}) was due on ${fDay(i.due)}. You can pay it in the app under Me, or by bank transfer. If it is already on its way, please ignore this. Thank you, ${ORGS[i.org].name}`;
 /* The one way a message to a member leaves the office: an admin approved exactly this text. */
-function sendApproved(org, to, kind, text, ref) {
+function sendApproved(org, to, kind, text, ref, by = "the admin") {
   const body = String(text || "").trim(); if (!body) return err("EMPTY", "Write the message first.");
   (S.outbox ||= []).push({ id: S.seq++, org, to, kind, text: body, at: now(), ref: ref || null });
   if (kind === "reminder") { const i = S.invoices.find((x) => x.id === ref); if (i) i.reminded = now(); }
   if (to === S.me.name) S.chat.push({ who: "coach", text: `From ${ORGS[org].name}: ${body}` });
-  S.audit.unshift({ what: `${kind === "reminder" ? "Payment reminder" : "Message"} to ${to}, approved by the admin${ref ? ` (${ref})` : ""}`, at: now() });
+  S.audit.unshift({ what: `${kind === "reminder" ? "Payment reminder" : kind === "recap" ? "Group recap" : "Message"} to ${to}, approved by ${by}${ref && kind === "reminder" ? ` (${ref})` : ""}`, at: now() });
   return { ok: true, msg: `Sent to ${to}. Demo: no real message leaves PATH.` };
 }
 /* How the club is doing, against last month. Counted from the member list, the schedule and the invoices; "last month" is demo data. */
