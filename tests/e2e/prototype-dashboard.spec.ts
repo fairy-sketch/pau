@@ -150,3 +150,126 @@ test("the coach screens pass axe (WCAG A and AA) and keep 44 px targets", async 
   await openAthlete(page, "mia");
   await check("detail, Mia");
 });
+
+test.describe("Plans (K-7 to K-11)", () => {
+  test("build a plan with PATH, change it, save it, share it: the athlete sees it only after sharing", async ({
+    page,
+  }) => {
+    await open(page);
+    await asRole(page, "coach");
+    await tab(page, "Plans");
+    await expect(page.locator("#plans-answer")).toHaveText("2 plans, 1 shared with your groups");
+    await page.getByRole("button", { name: "Add a plan" }).click();
+    await page.locator("#pprompt").fill("6 weeks towards a 5K");
+    await page.getByRole("button", { name: "Draft it" }).click();
+    await expect(page.locator("#plan-draft")).toContainText("18 sessions over 6 weeks");
+    await expect(page.locator("#draft-sessions")).toContainText("6 × 400 m at 5K pace");
+    // PATH helps to be creative, and the coach steers.
+    await page.getByRole("button", { name: "A playful session each week" }).click();
+    await expect(page.locator("#plan-draft")).toContainText("24 sessions over 6 weeks");
+    await expect(page.locator("#draft-sessions")).toContainText("Relay games");
+    await page.getByRole("button", { name: "Make it easier" }).click();
+    await expect(page.locator("#draft-sessions")).toContainText("4 × 400 m at 5K pace");
+    await page.locator("#ptitle").fill("Spring 5K");
+    await page.getByRole("button", { name: "Save plan" }).click();
+    await expect(page.locator("#plan-status")).toContainText("Not shared yet");
+
+    // Not shared: Mia sees nothing of it.
+    await asRole(page, "athlete");
+    await expect(page.locator("#from-coach")).not.toContainText("Spring 5K");
+    await asRole(page, "coach");
+    await tab(page, "Plans");
+    await page.locator("#plan-list .row", { hasText: "Spring 5K" }).click();
+    await page.getByRole("button", { name: /^Track/ }).click();
+    await page.getByRole("button", { name: "Share with Track" }).click();
+    await expect(page.locator(".toast")).toContainText("Shared with Track: 19 athletes");
+    await expect(page.locator("#personal")).toContainText("waits for your approval in Review");
+    await asRole(page, "athlete");
+    const card = page.locator("#from-coach [data-plan]", { hasText: "Spring 5K" });
+    await expect(card).toContainText("Coach Sara shared this with the Track group");
+    await expect(card).toContainText("Relay games");
+    // And it goes away when the coach stops sharing. It survives a reload until then.
+    await page.reload();
+    await expect(page.locator("#from-coach")).toContainText("Spring 5K");
+    await asRole(page, "coach");
+    await tab(page, "Plans");
+    await page.locator("#plan-list .row", { hasText: "Spring 5K" }).click();
+    await page.getByRole("button", { name: "Stop sharing" }).click();
+    await asRole(page, "athlete");
+    await expect(page.locator("#from-coach")).not.toContainText("Spring 5K");
+  });
+
+  test("bring your own plan: pasted text and a text file are read into weeks and sessions", async ({
+    page,
+  }) => {
+    await open(page);
+    await asRole(page, "coach");
+    await tab(page, "Plans");
+    await page.getByRole("button", { name: "Add a plan" }).click();
+    await page.getByRole("button", { name: "Upload or paste" }).click();
+    await page.getByRole("button", { name: "Read my plan" }).click();
+    await expect(page.locator("#pnote")).toContainText("found no sessions");
+    await page
+      .locator("#ptext")
+      .fill("Woche 1\nMo: 5 x 1 km\n- Do: Tempolauf 25 min\nWeek 2\nSat: long run 80 min");
+    await page.getByRole("button", { name: "Read my plan" }).click();
+    await expect(page.locator("#plan-draft")).toContainText("3 sessions over 2 weeks");
+    await expect(page.locator("#draft-sessions .row").first()).toHaveText("Mon5 x 1 km");
+    await page.getByRole("button", { name: "Start over" }).click();
+    await page.locator("#pfile").setInputFiles({
+      name: "herbst-block.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("Mon: hills\nThu: track"),
+    });
+    await expect(page.locator("#pnote")).toContainText('Read "herbst-block.txt"');
+    await page.getByRole("button", { name: "Read my plan" }).click();
+    await expect(page.locator("#ptitle")).toHaveValue("herbst-block");
+    // A file PATH cannot read in the demo says so plainly.
+    await page.getByRole("button", { name: "Start over" }).click();
+    await page.locator("#pfile").setInputFiles({
+      name: "plan.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from("%PDF"),
+    });
+    await expect(page.locator("#pnote")).toContainText("is not a text file");
+  });
+
+  test("the Plans screens pass axe and keep 44 px targets", async ({ page }) => {
+    await open(page);
+    await asRole(page, "coach");
+    await tab(page, "Plans");
+    const check = async (name: string) => {
+      const r = await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+        .analyze();
+      expect(
+        r.violations.map((v) => `${name}: ${v.id}`),
+        name,
+      ).toEqual([]);
+      const small = await page.evaluate(() =>
+        [
+          ...document.querySelectorAll<HTMLElement>(
+            "#app button, #app input:not(.sr), #app textarea, #app label.btn",
+          ),
+        ]
+          .map((el) => ({
+            r: el.getBoundingClientRect(),
+            t: (el.getAttribute("aria-label") || el.textContent || "").trim().slice(0, 30),
+          }))
+          .filter((x) => x.r.width && (x.r.width < 44 || x.r.height < 44))
+          .map((x) => `${x.t} ${Math.round(x.r.width)}x${Math.round(x.r.height)}`),
+      );
+      expect(small, name).toEqual([]);
+    };
+    await check("list");
+    await page.getByRole("button", { name: "Add a plan" }).click();
+    await check("new, with PATH");
+    await page.getByRole("button", { name: "Upload or paste" }).click();
+    await check("new, own");
+    await page.getByRole("button", { name: "Build with PATH" }).click();
+    await page.getByRole("button", { name: "Race week taper" }).click();
+    await check("draft");
+    await page.getByRole("button", { name: "Save plan" }).click();
+    await check("detail");
+  });
+});

@@ -17,6 +17,7 @@ const texture = (inner) => `<div class="tex"><img src="images/${TEXTURE_IMAGE[0]
 const I = (d, s = 22) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 /* PATH icon set (same drawings as src/ui/icons.tsx in the app). Places carry one solid sparkle (Y-1). */
 const P = {
+  plan: '<path d="M7 3.5h7l4.5 4.5v11a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5z"/><path d="M14 3.5V8h4.5"/><path fill="currentColor" stroke="none" d="M11.5 10.6Q12.2 13.3 14.9 14Q12.2 14.7 11.5 17.4Q10.8 14.7 8.1 14Q10.8 13.3 11.5 10.600Z"/>',
   flag: '<circle cx="5.5" cy="19" r="1.6"/><path d="M5.5 17.4V16.5a4 4 0 0 1 4-4h5a4 4 0 0 0 0-8h-1.5"/><path fill="currentColor" stroke="none" d="M9 0.5Q9.8 3.7 13 4.5Q9.8 5.3 9 8.5Q8.2 5.3 5 4.5Q8.2 3.7 9 0.5Z"/>',
   chat: '<path d="M4 7a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-5.5L7 20v-4a3 3 0 0 1-3-3z"/><path fill="currentColor" stroke="none" d="M12 6Q12.8 9.2 16 10Q12.8 10.8 12 14Q11.2 10.8 8 10Q11.2 9.2 12 6Z"/>',
   plus: '<circle cx="12" cy="12" r="8.5"/><path fill="currentColor" stroke="none" d="M12 6.4Q13.1 10.9 17.6 12Q13.1 13.1 12 17.6Q10.9 13.1 6.4 12Q10.9 10.9 12 6.4Z"/>',
@@ -98,6 +99,7 @@ function vPath() {
       <button class="btn acc full" data-a="${n.a}" data-v="${n.v || ""}">${n.cta}</button>
       <details style="margin:-8px 0 -12px"><summary>Why this?</summary><p class="sub" style="margin-bottom:8px">${n.reason}</p><ul style="margin-bottom:12px">${n.factors.map((f) => `<li>${esc(f)}</li>`).join("")}</ul></details></div>
     ${S.tryPlans.length ? `<div class="stack" id="trying" style="gap:8px"><div class="eyebrow">You're trying</div><div class="card rows">${S.tryPlans.map(tryToday).map((t) => `<button class="row" data-a="prov-open" data-v="${t.o.id}"><span class="mid"><span class="strong">${esc(providerOf(t.o).plan.title)} <span class="sub" style="font-weight:400">· ${esc(t.o.club)}</span></span><span class="sub">Day ${t.n} of ${t.of}: ${esc(t.text)}</span></span><span class="end sub">${signedUp(t.o.id) ? "Booked" : "Book"}</span></button>`).join("")}</div></div>` : ""}
+    ${coachPlansCard()}
     <div class="stack"><div class="between"><span class="eyebrow">This week</span><span class="sub">${S.entries.filter((e) => e.at >= wk).length} done</span></div><div class="week7">${week}</div><div><p class="sub">${passLine(pass)}</p><button class="btn sm link" data-a="tab" data-v="log">Log a session</button></div></div>
     <div class="stack" id="progress"><div class="between"><span class="eyebrow">Weekly load</span><span class="sub">${Math.round(st.ratio * 100)}% of your average</span></div>${lineChart(loadPts(st), st.wl.length - 1)}<p class="sub">Duration × effort. A simple guide, not a medical measure.</p></div>
     <div class="stack" id="pbs"><div class="eyebrow">Personal bests</div><div class="card rows">${S.pbs.map((p) => `<div class="row"><span class="mid"><span class="strong">${p.metric}</span><span class="sub">${fDay(p.at)}${p.isNew ? " · new" : ""}</span></span><span class="num">${p.value}<span class="sub" style="font-weight:400"> ${p.unit}</span></span></div>`).join("")}</div></div></section>`;
@@ -253,6 +255,7 @@ function vCoach() {
         ${wait.length ? `<div class="stack" style="gap:8px"><div class="eyebrow">Waitlist · not on the roster</div><ol class="sub" id="roster-wait" style="padding-left:20px">${wait.map((n) => `<li>${esc(n)}</li>`).join("")}</ol></div>` : ""}</div></section>`;
   }
   if (t === "today") return vCoachToday();
+  if (t === "plans") return vCoachPlans();
   if (t === "athletes") return vCoachAthletes();
   if (t === "review") {
     const d = currentDraft();

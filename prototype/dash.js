@@ -129,3 +129,114 @@ document.addEventListener("submit", (e) => {
   else { const inp = e.target.querySelector("input"), v = inp.value.trim(); if (!v) return; (dash().kudos[e.target.dataset.id] ||= []).push({ by: COACH_ME, text: v }); if (a.ask) dash().answered[a.id] = true; UI.toast = `Sent to ${a.first}.`; }
   render();
 });
+
+/* ================= Plans (K-7 to K-11): upload or paste a plan, or build one with PATH, then share it with a group ================= */
+const PLAN_SEED = () => [
+  { id: "p1", title: "Base block", source: "Yours", sessions: genPlan({ kind: "10k", weeks: 4, level: 0, fun: false }), shared: ["Track"] },
+  { id: "p2", title: "Race week taper", source: "Yours", sessions: genPlan({ kind: "taper", weeks: 1, level: 0, fun: false }), shared: [] },
+];
+const plans = () => (dash().plans ||= PLAN_SEED());
+const planById = (id) => plans().find((p) => p.id === id);
+const weeksOf = (p) => Math.max(1, ...p.sessions.map((s) => s.week));
+const planMeta = (p) => `${weeksOf(p)} ${weeksOf(p) === 1 ? "week" : "weeks"} · ${p.sessions.length} sessions`;
+const groupSize = (g) => athletes().filter((a) => a.group === g).length;
+
+/* PATH's draft: simple, readable rules. The coach changes anything before saving; nothing is sent to anyone here. */
+function planParams(text) {
+  const t = text.toLowerCase(), w = t.match(/(\d+)\s*(?:weeks?|wochen?)/);
+  const kind = /taper|race week|wettkampfwoche/.test(t) ? "taper" : /strength|kraft|gym/.test(t) ? "strength" : /\b5\s?k/.test(t) ? "5k" : /half|halbmarathon/.test(t) ? "half" : "10k";
+  return { kind, weeks: kind === "taper" ? 1 : Math.min(12, Math.max(1, w ? Number(w[1]) : 4)), level: 0, fun: /fun|spass|spiel|game|relay|staffel/.test(t) };
+}
+function genPlan({ kind, weeks, level, fun }) {
+  const out = [], add = (week, day, text) => out.push({ week, day, text });
+  for (let w = 1; w <= weeks; w++) {
+    const easy = weeks >= 4 && w === weeks, k = w - 1 + level - (easy ? 2 : 0);
+    if (kind === "taper") { add(w, "Mon", "Track: 4 × 400 m at race pace, long rests"); add(w, "Wed", "Easy run 30 min, then 4 relaxed strides"); add(w, "Fri", "Rest, or 20 min very easy"); add(w, "Sun", "Race day. Warm up 15 min, then enjoy it"); }
+    else if (kind === "strength") { add(w, "Tue", `Gym: squats, lunges, calf raises, ${3 + Math.min(k, 2)} × 8`); add(w, "Thu", `Core circuit, ${15 + 5 * Math.min(k, 3)} min`); add(w, "Sat", "Hops and bounds on grass, 15 min, full rest between sets"); }
+    else if (kind === "5k") { add(w, "Mon", `Track: ${Math.max(4, 6 + 2 * k)} × 400 m at 5K pace, 90 s jog`); add(w, "Thu", `Hills: ${Math.max(4, 6 + k)} × 60 s, walk down`); add(w, "Sat", `Easy run ${40 + 5 * k} min, then strides`); }
+    else if (kind === "half") { add(w, "Tue", `Tempo run: ${Math.max(15, 20 + 5 * k)} min steady`); add(w, "Thu", `Track: ${Math.max(3, 4 + k)} × 1 km at 10K pace, 2 min jog`); add(w, "Sun", `Long run: ${Math.max(60, 75 + 10 * k)} min easy`); }
+    else { add(w, "Mon", `Track: ${Math.max(3, 4 + k)} × 1 km at 10K pace, 2 min jog`); add(w, "Thu", `Tempo run: ${Math.max(15, 20 + 5 * k)} min steady`); add(w, "Sat", `Long run: ${Math.max(50, 60 + 10 * k)} min easy`); }
+    if (fun) add(w, "Wed", ["Relay games in mixed teams, 4 × 200 m handovers", "Partner runs: one talks, one listens, swap every 5 min", "Hill tag and a sprint ladder, laughing allowed", "Parkour loop: benches, steps and balance lines"][(w - 1) % 4]);
+    const order = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], wk = out.filter((x) => x.week === w).sort((x, y) => order.indexOf(x.day) - order.indexOf(y.day)); out.splice(out.length - wk.length, wk.length, ...wk);
+    if (easy && kind !== "taper") out.filter((s) => s.week === w).forEach((s) => { s.text += " (recovery week)"; });
+  }
+  return out;
+}
+/* A pasted or uploaded plan: "Week 2" starts a week, every other line is a session; a leading weekday is kept. */
+function parsePlan(text) {
+  let week = 1; const out = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.replace(/^[\s\-*•\d.)]+(?=\D)/, "").trim(); if (!line) continue;
+    const wk = raw.trim().match(/^(?:week|woche|wk)\s*(\d+)/i); if (wk) { week = Number(wk[1]); continue; }
+    const d = line.match(/^(mon|tue|wed|thu|fri|sat|sun|mo|di|mi|do|fr|sa|so)[a-zäöü]*[\s:,.\-–]+(.+)$/i);
+    const map = { mo: "Mon", di: "Tue", mi: "Wed", do: "Thu", fr: "Fri", sa: "Sat", so: "Sun" };
+    out.push(d ? { week, day: map[d[1].toLowerCase()] || d[1][0].toUpperCase() + d[1].slice(1, 3).toLowerCase(), text: d[2].trim() } : { week, day: "", text: line });
+  }
+  return out;
+}
+const sessionRows = (list) => [...new Set(list.map((s) => s.week))].map((w) => `<div class="stack" style="gap:8px"><div class="sub">Week ${w}</div><div class="card rows">${list.filter((s) => s.week === w).map((s) => `<div class="row"><span class="lead time" style="width:40px">${s.day || "·"}</span><span class="mid">${esc(s.text)}</span></div>`).join("")}</div></div>`).join("");
+/* Who would get a personal version, and why. Only from what they share. The coach approves each one in Review. */
+const personalFor = (p) => athletes().filter((a) => p.shared.includes(a.group)).map((a) => ({ a, st: statusOf(a) })).filter((x) => x.st.kinds.some((k) => k === "pain" || k === "load" || k === "away"));
+
+function vCoachPlans() {
+  const d = dash(), list = plans();
+  if (d.planView === "new") return vPlanNew();
+  if (d.planView && planById(d.planView)) return vPlanDetail(planById(d.planView));
+  const shared = list.filter((p) => p.shared.length);
+  return `<section class="pad stack-l" id="coach-plans"><div><div class="eyebrow">Plans</div><h1 class="h1" id="plans-answer">${list.length} ${list.length === 1 ? "plan" : "plans"}, ${shared.length} shared with your groups</h1><p class="sub" style="margin-top:4px">Bring your own plans or build one with PATH. Your athletes see a plan only after you share it.</p></div>
+    <button class="btn acc full" data-a="plan-new">Add a plan</button>
+    ${list.length ? `<div class="card rows" id="plan-list">${list.map((p) => `<button class="row" data-a="plan-open" data-v="${p.id}"><span class="mid"><span class="strong">${esc(p.title)}</span><span class="sub">${planMeta(p)} · ${p.shared.length ? "Shared with " + p.shared.join(", ") : "Not shared"}</span></span><span class="end sub">Open</span></button>`).join("")}</div>` : `<p class="sub">No plans yet.</p>`}</section>`;
+}
+function vPlanNew() {
+  const d = dash(), dr = d.pdraft, mode = d.pmode || "path";
+  const back = `<button class="btn sm link ghost" data-a="plan-open" data-v="" aria-label="Back to plans">${I(P.back, 16)}Plans</button>`;
+  if (dr) return `<section class="pad stack-l" id="plan-draft">${back}<div><div class="eyebrow">${dr.source === "path" ? "Drafted by PATH" : "Read from your plan"}</div><h1 class="h1">${dr.sessions.length} sessions over ${Math.max(1, ...dr.sessions.map((s) => s.week))} ${Math.max(1, ...dr.sessions.map((s) => s.week)) === 1 ? "week" : "weeks"}</h1><p class="sub" style="margin-top:4px">${dr.source === "path" ? "A starting point, not a prescription. Change anything; you know your group." : "Check that PATH read it the way you meant it."}</p></div>
+    <label class="f">Name<input id="ptitle" value="${esc(dr.title)}" autocomplete="off"></label>
+    ${dr.source === "path" ? `<div class="filters" role="group" aria-label="Change the draft"><button class="chip" data-a="plan-refine" data-v="easier">Make it easier</button><button class="chip" data-a="plan-refine" data-v="harder">Make it harder</button><button class="chip" data-a="plan-refine" data-v="fun" aria-pressed="${dr.params.fun}">A playful session each week</button><button class="chip" data-a="plan-refine" data-v="longer">One more week</button></div>` : ""}
+    <div class="stack" id="draft-sessions">${sessionRows(dr.sessions)}</div>
+    <div class="stack" style="gap:8px"><button class="btn acc full" data-a="plan-save">Save plan</button><button class="btn full ghost" data-a="plan-reset">Start over</button></div></section>`;
+  return `<section class="pad stack-l" id="plan-new">${back}<div><div class="eyebrow">Add a plan</div><h1 class="h1">${mode === "path" ? "Tell PATH what you want to coach" : "Bring a plan you already have"}</h1></div>
+    <div class="seg full" role="group" aria-label="How to add a plan"><button data-a="plan-mode" data-v="path" aria-pressed="${mode === "path"}">Build with PATH</button><button data-a="plan-mode" data-v="own" aria-pressed="${mode === "own"}">Upload or paste</button></div>
+    ${mode === "path" ? `<form class="stack" data-f="pgen"><label class="f">In your own words<input id="pprompt" placeholder="4 weeks towards a 10K, three sessions a week" autocomplete="off"></label><div class="filters" role="group" aria-label="Ideas"><button class="chip" type="button" data-a="plan-gen" data-v="4 weeks 10K build">4 weeks 10K build</button><button class="chip" type="button" data-a="plan-gen" data-v="6 weeks 5K with fun sessions">6 weeks 5K, playful</button><button class="chip" type="button" data-a="plan-gen" data-v="Race week taper">Race week taper</button><button class="chip" type="button" data-a="plan-gen" data-v="6 weeks strength for runners">Strength for runners</button></div><button class="btn acc full" type="submit">Draft it</button><p class="sub">PATH drafts, you decide. Nothing reaches an athlete from here.</p></form>`
+    : `<form class="stack" data-f="ppaste"><label class="btn full filebtn" for="pfile">Choose a file</label><input class="sr" type="file" id="pfile" accept=".txt,.csv,.md,text/plain" aria-label="Choose a plan file"><label class="f">Or paste it here<textarea id="ptext" class="inp" rows="7" placeholder="Week 1&#10;Mon: 5 × 1 km at 10K pace&#10;Thu: tempo 25 min&#10;Sat: long run 70 min">${esc(d.ptext || "")}</textarea></label>${d.pnote ? `<p class="note" id="pnote">${esc(d.pnote)}</p>` : ""}<button class="btn acc full" type="submit">Read my plan</button><p class="sub">One session per line. "Week 2" starts a new week. In this demo PATH reads text files; PDFs, photos and spreadsheets come with the real app.</p></form>`}</section>`;
+}
+function vPlanDetail(p) {
+  const d = dash(), groups = [...new Set(athletes().map((a) => a.group))], pick = d.pgroups || [], pers = personalFor(p);
+  return `<section class="pad stack-l" id="plan-detail" data-plan="${p.id}"><div><button class="btn sm link ghost" data-a="plan-open" data-v="" aria-label="Back to plans">${I(P.back, 16)}Plans</button><div class="eyebrow" style="margin-top:8px">${p.source === "path" ? "Built with PATH" : p.source === "own" ? "Your upload" : "Your plan"}</div><h1 class="h1">${esc(p.title)}</h1><p class="sub" style="margin-top:4px" id="plan-status">${planMeta(p)} · ${p.shared.length ? `Shared with ${p.shared.map((g) => `${g} (${groupSize(g)})`).join(", ")}` : "Not shared yet"}</p></div>
+    <div class="stack" id="share"><div class="eyebrow">Share with a group</div><div class="filters" role="group" aria-label="Groups">${groups.map((g) => `<button class="chip" data-a="plan-group" data-v="${g}" aria-pressed="${p.shared.includes(g) || pick.includes(g)}" ${p.shared.includes(g) ? "disabled" : ""}>${g} · ${groupSize(g)}</button>`).join("")}</div>
+      ${pick.length ? `<button class="btn acc full" data-a="plan-share">Share with ${pick.join(" and ")}</button>` : `<p class="sub">${p.shared.length ? "Everyone in these groups sees it on their Path." : "Pick a group. Athletes see the plan on their Path once you share it."}</p>`}
+      ${p.shared.length ? `<button class="btn sm link ghost" data-a="plan-unshare">Stop sharing</button>` : ""}</div>
+    ${p.shared.length && pers.length ? `<div class="stack" id="personal"><div class="eyebrow">Personal versions</div><p class="sub">PATH suggests a lighter version for ${pers.length} ${pers.length === 1 ? "athlete" : "athletes"}, from what they share. Each one waits for your approval in Review; until then they get the plan as it is.</p><div class="card rows">${pers.slice(0, 5).map(({ a, st }) => `<button class="row" data-a="athlete" data-v="${a.id}"><span class="mid"><span class="strong">${esc(a.name)}</span><span class="sub">${esc(st.why)}</span></span><span class="end sub">Open</span></button>`).join("")}</div></div>` : ""}
+    <div class="stack">${sessionRows(p.sessions)}</div>
+    ${p.shared.length ? "" : `<button class="btn full ghost" data-a="plan-del">Delete plan</button>`}</section>`;
+}
+/* What the athlete sees: only plans shared with their group, by their coach, at this club. */
+function coachPlansCard() {
+  if (S.org !== "pau") return "";
+  const mine = plans().filter((p) => p.shared.includes("Track")); if (!mine.length) return "";
+  return `<div class="stack" id="from-coach"><div class="eyebrow">From your coach</div>${mine.map((p) => `<div class="card stack" data-plan="${p.id}" style="gap:12px"><div><p class="h2">${esc(p.title)}</p><p class="sub">${COACH_ME} shared this with the Track group · ${planMeta(p)}</p></div><div class="rows">${p.sessions.filter((s) => s.week === 1).map((s) => `<div class="row"><span class="lead time" style="width:40px">${s.day || "·"}</span><span class="mid">${esc(s.text)}</span></div>`).join("")}</div></div>`).join("")}</div>`;
+}
+const newDraft = (prompt) => { const params = planParams(prompt), names = { "10k": "10K build", "5k": "5K build", half: "Half marathon build", taper: "Race week taper", strength: "Strength for runners" }; dash().pdraft = { source: "path", params, title: `${names[params.kind]}${params.kind === "taper" ? "" : `, ${params.weeks} weeks`}`, sessions: genPlan(params) }; };
+Object.assign(DASH_ACT, {
+  "plan-open": (v) => { Object.assign(dash(), { planView: v || null, pdraft: null, pgroups: [], pnote: "" }); S.tab.coach = "plans"; lastKey = ""; },
+  "plan-new": () => { Object.assign(dash(), { planView: "new", pdraft: null, pnote: "", ptext: "" }); lastKey = ""; },
+  "plan-mode": (v) => { dash().pmode = v; }, "plan-gen": (v) => { newDraft(v); lastKey = ""; },
+  "plan-refine": (v) => { const dr = dash().pdraft, p = dr.params; if (v === "easier") p.level -= 1; if (v === "harder") p.level += 1; if (v === "fun") p.fun = !p.fun; if (v === "longer" && p.kind !== "taper") p.weeks = Math.min(12, p.weeks + 1); dr.title = (document.getElementById("ptitle") || {}).value || dr.title; dr.sessions = genPlan(p); },
+  "plan-reset": () => { dash().pdraft = null; lastKey = ""; },
+  "plan-save": () => { const d = dash(), dr = d.pdraft, title = (document.getElementById("ptitle").value || "").trim() || dr.title, id = "p" + Date.now().toString(36); plans().unshift({ id, title, source: dr.source, sessions: dr.sessions, shared: [] }); Object.assign(d, { pdraft: null, planView: id, pgroups: [] }); UI.toast = "Plan saved. Only you can see it until you share it."; lastKey = ""; },
+  "plan-group": (v) => { const d = dash(); d.pgroups = (d.pgroups || []).includes(v) ? d.pgroups.filter((g) => g !== v) : [...(d.pgroups || []), v]; },
+  "plan-share": () => { const d = dash(), p = planById(d.planView), n = d.pgroups.reduce((s, g) => s + groupSize(g), 0); p.shared.push(...d.pgroups); UI.toast = `Shared with ${d.pgroups.join(" and ")}: ${n} athletes see it on their Path.`; d.pgroups = []; },
+  "plan-unshare": () => { const p = planById(dash().planView); p.shared = []; UI.toast = "Sharing stopped. Athletes no longer see this plan."; },
+  "plan-del": () => { const d = dash(); d.plans = plans().filter((p) => p.id !== d.planView); d.planView = null; UI.toast = "Plan deleted."; },
+});
+document.addEventListener("submit", (e) => {
+  const f = e.target.dataset.f; if (f !== "pgen" && f !== "ppaste") return; e.preventDefault(); const d = dash();
+  if (f === "pgen") { const v = document.getElementById("pprompt").value.trim(); if (!v) { document.getElementById("pprompt").focus(); return; } newDraft(v); }
+  else { d.ptext = document.getElementById("ptext").value; const s = parsePlan(d.ptext); if (!s.length) { d.pnote = "PATH found no sessions. Put one session on each line."; } else { d.pnote = ""; d.pdraft = { source: "own", title: d.pfileName ? d.pfileName.replace(/\.[^.]+$/, "") : "My plan", sessions: s }; } }
+  lastKey = ""; render();
+});
+document.addEventListener("change", (e) => {
+  if (e.target.id !== "pfile" || !e.target.files[0]) return; const file = e.target.files[0], d = dash(); d.ptext = document.getElementById("ptext").value;
+  if (!/\.(txt|csv|md)$/i.test(file.name) && !file.type.startsWith("text/")) { d.pnote = `"${file.name}" is not a text file. In this demo PATH reads .txt, .csv and .md; PDFs, photos and spreadsheets come with the real app.`; render(); return; }
+  file.text().then((t) => { d.ptext = t.slice(0, 20000); d.pfileName = file.name; d.pnote = `Read "${file.name}". Check it below, then tap Read my plan.`; render(); });
+});

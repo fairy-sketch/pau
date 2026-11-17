@@ -1,7 +1,7 @@
 "use strict";
 /* PATH clickable demo, part 4 of 4: the shell. Top bar, tabs, actions, events, start-up. */
 
-const TABS = { athlete: [["path", "Path", "flag"], ["week", "Week", "cal"], ["explore", "Explore", "compass"], ["coach", "Coach", "chat"], ["me", "Me", "user"]], coach: [["today", "Today", "clock"], ["athletes", "Athletes", "users"], ["review", "Review", "check"], ["alerts", "Alerts", "bell"]], admin: [["dash", "Home", "home"], ["sched", "Schedule", "cal"], ["members", "Members", "users"], ["products", "Products", "tag"], ["money", "Money", "card"]] };
+const TABS = { athlete: [["path", "Path", "flag"], ["week", "Week", "cal"], ["explore", "Explore", "compass"], ["coach", "Coach", "chat"], ["me", "Me", "user"]], coach: [["today", "Today", "clock"], ["athletes", "Athletes", "users"], ["plans", "Plans", "plan"], ["review", "Review", "check"], ["alerts", "Alerts", "bell"]], admin: [["dash", "Home", "home"], ["sched", "Schedule", "cal"], ["members", "Members", "users"], ["products", "Products", "tag"], ["money", "Money", "card"]] };
 /* The wordmark in the header (decision D-2): PATH in Satoshi Bold, 20 px, on the content edge. */
 const mono = (o) => esc(ORGS[o].name.trim()[0].toUpperCase());
 /* Your colour (S-9): one accent, chosen by each person. All six sit at the same lightness as sage, so black text reads on every one. */
@@ -13,7 +13,7 @@ function render() {
   document.documentElement.style.setProperty("--accent", (ACCENTS[S.accent] || ACCENTS.sage)[1]);
   for (const v of ["--bg", "--surface", "--soft"]) document.documentElement.style.setProperty(v, (GROUNDS[S.ground] || GROUNDS.stone)[1]);
   ensureSessions(); sweep(); sweepProposals(); sweepOffers(); runSeries();
-  const app = document.getElementById("app"), tab = S.tab[S.role], key = S.role + tab + S.org + (S.rosterSid || "") + ((S.dash && S.dash.athlete) || "") + (tab === "explore" ? S.explore.open || "" : ""), old = document.getElementById("view"), top = old && key === lastKey ? old.scrollTop : 0;
+  const app = document.getElementById("app"), tab = S.tab[S.role], key = S.role + tab + S.org + (S.rosterSid || "") + ((S.dash && (S.dash.athlete || S.dash.planView)) || "") + (tab === "explore" ? S.explore.open || "" : ""), old = document.getElementById("view"), top = old && key === lastKey ? old.scrollTop : 0;
   const body = S.role === "athlete" ? { path: vPath, coach: vCoachChat, log: vLog, week: vWeek, me: vMe, explore: vExplore }[tab]() : S.role === "coach" ? vCoach() : vAdmin();
   const badge = S.role === "coach" ? S.alerts.filter((a) => a.status === "open" && (a.info || shares("alerts.pain"))).length : 0;
   app.className = S.role === "admin" ? "wide" : "";
@@ -179,7 +179,7 @@ document.addEventListener("pointercancel", () => { swipe = null; });
 
 /* The coach and club dashboard brings its own actions (dash.js). Leaving a tab or going home also leaves an open athlete. */
 Object.assign(ACT, DASH_ACT);
-for (const k of ["home", "tab"]) { const f = ACT[k]; ACT[k] = (v) => { const r = f(v); if (S.dash) S.dash.athlete = null; return r; }; }
+for (const k of ["home", "tab"]) { const f = ACT[k]; ACT[k] = (v) => { const r = f(v); if (S.dash) Object.assign(S.dash, { athlete: null, planView: null, pdraft: null }); return r; }; }
 /* For the tests and for poking around in the console. */
 window.PATH_DEMO = {
   get state() { return S; }, ACCENTS, GROUNDS, athletes, statusOf, roster, ui: UI, ORGS, LOAD_LIMIT, CARD_TTL_MIN, STORE_KEY,
