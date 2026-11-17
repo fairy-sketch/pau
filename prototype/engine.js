@@ -118,6 +118,18 @@ let S;
 /* Things that belong to the open screen, not to the demo's data. Never saved. */
 const UI = { sheet: null, toast: "", undo: null, lineFrom: null, justDone: null, resetArmed: false };
 
+/* The athlete's own week, day by day: what each day is before a coach's plan is laid over it. */
+const OWN_WEEK = { 1: ["club", "Track session", "track"], 2: ["workout", "Easy run 40 min @ RPE 4"], 3: ["rest", "Rest day"], 4: ["club", "Track session", "track"], 5: ["club", "Gym session", "gym"], 6: ["club", "Saturday community session", "community"], 0: ["workout", "Long run 75 min @ RPE 5"] };
+/* The plan has a day for every date the demo shows: from this week's Monday for `weeks` weeks (at least as far as the schedule runs).
+   Called before every draw, so the plan never runs out as the days go by. Days that exist are never touched here. */
+function ensurePlan(weeks = WEEKS) {
+  const mon = monday(today()), have = new Set(S.plan.items.map((x) => x.date));
+  for (let i = 0; i < 7 * Math.max(weeks, WEEKS); i++) {
+    const d = addDays(mon, i), t = OWN_WEEK[d.getDay()]; if (have.has(ymd(d))) continue;
+    S.plan.items.push({ date: ymd(d), kind: t[0], title: t[1], off: t[2] || null, status: "planned", base: { kind: t[0], title: t[1], off: t[2] || null } });
+  }
+  S.plan.items.sort((a, b) => (a.date < b.date ? -1 : 1));
+}
 function ensureSessions() {
   const T = today();
   for (const [oid, o] of Object.entries(ORGS)) for (const off of o.offerings) for (let i = -21; i <= 7 * WEEKS; i++) {
@@ -200,8 +212,7 @@ function seed() {
   S.entries.sort((a, b) => b.at - a.at);
   S.entries[1].comments.push({ by: "Coach Sara", text: "Strong last two reps. Keep the first lap calmer next time." });
   S.pbs = [{ metric: "400 m", value: 63.2, unit: "s", better: "lower", at: addDays(T, -23) }, { metric: "5K", value: 20.4, unit: "min", better: "lower", at: addDays(T, -44) }, { metric: "Squat 1RM", value: 82.5, unit: "kg", better: "higher", at: addDays(T, -31) }];
-  const tpl = { 1: ["club", "Track session", "track"], 2: ["workout", "Easy run 40 min @ RPE 4"], 3: ["rest", "Rest day"], 4: ["club", "Track session", "track"], 5: ["club", "Gym session", "gym"], 6: ["club", "Saturday community session", "community"], 0: ["workout", "Long run 75 min @ RPE 5"] };
-  for (let i = 0; i < 14; i++) { const d = addDays(monday(T), i), t = tpl[d.getDay()]; S.plan.items.push({ date: ymd(d), kind: t[0], title: t[1], off: t[2] || null, status: "planned", base: { kind: t[0], title: t[1], off: t[2] || null } }); }
+  ensurePlan();
   S.form = newForm();
   S.chat = [{ who: "coach", text: "Hi Mia. I can book or cancel sessions, look at your week, ease your plan or tell you how you are doing. I always ask before I change anything." }];
 }
@@ -418,6 +429,20 @@ function cancel(bid, key) {
   /* Her spot does not stay open while people are waiting: it goes down the queue like any other freed spot (QA-01). */
   const on = s.waitOthers > 0 ? " " + passSpotOn(s, "Your spot") : "";
   return remember(key, { ok: true, status: b.status, bid: b.id, msg: `Cancelled: ${offOf(s).name}, ${fDay(s.start)}.${tail}${on}` });
+}
+/* Undo a cancel (step 0): the same booking comes back and the pass counts it again, as long as the spot is still free.
+   A spot that already went to the waitlist stays there: Undo never jumps the queue. */
+const canUndoCancel = (b) => { const s = b && S.sessions[b.sid]; return !!b && (b.status === "cancelled" || b.status === "late_cancelled") && !b.byClub && !s.cancelled && s.start > now() && spots(s) > 0 && !myBooking(s.id) && !myWait(s.id); };
+function undoCancel(bid) {
+  const b = S.bookings.find((x) => x.id === bid), s = b && S.sessions[b.sid];
+  if (!b || !(b.status === "cancelled" || b.status === "late_cancelled") || b.byClub) return err("NOT_FOUND", "There is nothing to undo.");
+  if (s.start <= now()) return err("WINDOW_CLOSED", "That session has already started.");
+  if (!canUndoCancel(b)) return err("SESSION_FULL", `Your spot in ${offOf(s).name} has gone to someone else. You can join the waitlist.`);
+  const c = check(s); if (!c.ok) return c;
+  const pass = S.passes.find((p) => p.id === b.pass), back = S.ledger.filter((l) => l.bid === b.id && l.kind === "refund_cancel").length > S.ledger.filter((l) => l.bid === b.id && l.kind === "undo_cancel").length;
+  b.status = "confirmed";
+  if (pass && back) S.ledger.push({ pass: pass.id, delta: -1, kind: "undo_cancel", reason: `Cancel undone: ${offOf(s).name}, ${fDay(s.start)}`, at: now(), period: ym(s.start), bid: b.id });
+  return { ok: true, status: "confirmed", bid: b.id, msg: `Undone. You are booked again: ${offOf(s).name}, ${fDay(s.start)} ${fTime(s.start)}.${pass ? ` ${pass.name}: ${passState(pass, s.start).text}.` : ""}` };
 }
 /* The member leaves the queue (or is taken out of it). Whoever joined behind her stays in it. */
 function dropWait(s) {

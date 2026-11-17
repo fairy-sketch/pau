@@ -112,8 +112,12 @@ const audit = () =>
       if (vis(img) && img.getAttribute("alt") == null)
         out.push(["img-no-alt", img.getAttribute("src")]);
     for (const img of root.querySelectorAll("img"))
-      if (vis(img) && img.complete && img.naturalWidth === 0)
-        out.push(["img-broken", img.getAttribute("src")]);
+      if (
+        vis(img) &&
+        ((img.getAttribute("src") && img.complete && img.naturalWidth === 0) ||
+          (window.PATH_DEMO.PHOTOS[img.dataset.photo] || {}).state === "failed")
+      )
+        out.push(["img-broken", img.dataset.photo || img.getAttribute("src")]); // a photo without src is still on its way: the app fetches photos itself
     return out;
   });
 const sig = () =>

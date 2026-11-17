@@ -1,4 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- the demo is plain browser JS; its test hook (window.PATH_DEMO) has no types. */
+import { readFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import { extname, join, normalize } from "node:path";
+
 import { expect, type Page } from "@playwright/test";
 
 import { DEMO } from "../../helpers/demo";
@@ -109,3 +113,46 @@ export const layoutProblems = (page: Page) =>
   });
 /** Words that must never reach a screen. */
 export const BROKEN_TEXT = /NaN|undefined|Invalid Date|\[object|Infinity/;
+
+/** Serves the demo over http on a free port, the way it is hosted (the other tests open it as a file). */
+export async function serveDemo() {
+  const root = join(process.cwd(), "prototype"),
+    types: Record<string, string> = {
+      ".html": "text/html",
+      ".js": "text/javascript",
+      ".css": "text/css",
+      ".jpg": "image/jpeg",
+      ".svg": "image/svg+xml",
+      ".woff2": "font/woff2",
+    };
+  const server = createServer(async (req, res) => {
+    const path = normalize(decodeURIComponent((req.url || "/").split("?")[0] || "/")).replace(
+      /^(\.\.[/\\])+/,
+      "",
+    );
+    if (path === "/framed") {
+      // The demo inside a frame with the same restrictions as the page that hosts the published demo.
+      res.writeHead(200, { "content-type": "text/html" });
+      return res.end(
+        '<!doctype html><title>host</title><iframe id="f" sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock" src="/" style="width:390px;height:844px;border:0"></iframe>',
+      );
+    }
+    try {
+      const file = join(root, path === "/" ? "index.html" : path);
+      if (!file.startsWith(root)) throw new Error("outside");
+      res.writeHead(200, {
+        "content-type": types[extname(file)] || "application/octet-stream",
+        "cache-control": "no-store", // the hardest case for photos: nothing may rely on the browser's cache
+      });
+      res.end(await readFile(file));
+    } catch {
+      res.writeHead(404).end("not found");
+    }
+  });
+  await new Promise<void>((ok) => server.listen(0, "127.0.0.1", ok));
+  const port = (server.address() as { port: number }).port;
+  return {
+    url: `http://127.0.0.1:${port}/`,
+    close: () => new Promise<void>((ok) => server.close(() => ok())),
+  };
+}

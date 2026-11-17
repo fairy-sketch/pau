@@ -445,7 +445,7 @@ test("the athlete's Path shows the plan they follow, and it mirrors what the coa
   await monday.click();
   const day = page.getByRole("dialog", { name: "Monday, week 1" });
   await expect(day.locator(".h1")).toHaveText("Track: 4 × 1 km at 10K pace, 2 min jog");
-  await expect(day).toContainText("Base block · from Coach Sara");
+  await expect(day).toContainText("From Coach Sara · Base block");
   await expect(day).toContainText("Track session, 18:30");
   await day.getByRole("button", { name: "Book this session" }).click();
   await expect(page.locator(".sheet")).toContainText("Track session");

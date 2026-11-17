@@ -21,7 +21,7 @@ test.describe("Athlete Jonas: a regular's week at PAU (played on the demo athlet
     }));
     expect(st).toEqual({ b: true, pass: "4 of 4 used in November" });
     expect(await screen(page, "athlete", "path")).toMatch(
-      /Tempo run: 20 min steady Booked · 18:30/,
+      /Tempo run: 20 min steady From Coach Sara · Booked · 18:30/,
     );
     await sim(page, (d) => {
       d.state.day = "2026-11-19";
@@ -260,8 +260,10 @@ test.describe("Athlete Jonas: a regular's week at PAU (played on the demo athlet
     await say(page, "I need an easy week");
     await sim(page, (d) => d.book("pau-track-2026-11-19", "t"));
     const before = await screen(page, "athlete", "path");
-    expect(before).toMatch(/Mon Track: 4 × 1 km at 10K pace, 2 min jog Club session · 18:30/);
-    expect(before).toMatch(/Thu Tempo run: 20 min steady Booked · 18:30/);
+    expect(before).toMatch(
+      /Mon Track: 4 × 1 km at 10K pace, 2 min jog From Coach Sara · Club session · 18:30/,
+    );
+    expect(before).toMatch(/Thu Tempo run: 20 min steady From Coach Sara · Booked · 18:30/);
     expect(before).toMatch(/Tue Easy run 40 min @ RPE 4 Your own day/);
     await screen(page, "athlete", "coach");
     await say(page, "I need an easy week");

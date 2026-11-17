@@ -14,7 +14,8 @@ function render() {
   for (const v of ["--bg", "--surface", "--soft"]) document.documentElement.style.setProperty(v, (GROUNDS[S.ground] || GROUNDS.stone)[1]);
   const tc = document.querySelector('meta[name="theme-color"]'); if (tc) tc.content = (GROUNDS[S.ground] || GROUNDS.stone)[1]; // the phone's status bar takes the ground colour
   ensureSessions(); syncPlan(); sweepCancelled(); sweep(); sweepProposals(); sweepOffers(); runSeries();
-  const had = focusKey(document.activeElement), hadSheet = !!document.querySelector(".sheet"); // where the keyboard was, before the screen is redrawn
+  const had = focusKey(document.activeElement), hadSheet = !!document.querySelector(".sheet");
+  const oldView = document.getElementById("view"), oldH = oldView ? oldView.clientHeight : 0, oldGap = oldView ? oldView.scrollHeight - oldView.scrollTop - oldH : 0; // where the keyboard was, before the screen is redrawn
   const app = document.getElementById("app"), tab = S.tab[S.role], key = S.role + tab + S.org + (S.rosterSid || "") + ((S.dash && (S.dash.athlete || S.dash.planView || S.dash.sess)) || "") + (tab === "explore" ? S.explore.open || "" : ""), old = document.getElementById("view"), top = old && key === lastKey ? old.scrollTop : 0;
   const body = S.role === "athlete" ? { path: vPath, coach: vCoachChat, log: vLog, week: vWeek, me: vMe, explore: vExplore }[tab]() : S.role === "coach" ? vCoach() : vAdmin();
   const badge = S.role === "coach" ? coachAlerts().filter((a) => a.status === "open").length : 0;
@@ -25,7 +26,10 @@ function render() {
     <main id="view" tabindex="0" ${behind}>${body}</main>
     ${UI.toast ? `<div class="toast" role="status"><span>${esc(UI.toast)}</span>${UI.undo ? `<button class="btn sm" data-a="undo">Undo</button>` : ""}${xBtn("hide-toast", "Dismiss message")}</div>` : ""}
     <nav class="tabs" aria-label="Sections" ${behind}>${TABS[S.role].map(([v, l, ic]) => `<button data-a="tab" data-v="${v}" aria-label="${l}${v === "alerts" && badge ? ` (${badge}), ${badge} open` : ""}" ${tab === v ? 'aria-current="page"' : ""}><span class="ic">${I(P[ic])}</span>${l}${v === "alerts" && badge ? ` (${badge})` : ""}</button>`).join("")}</nav>${vSheet()}`;
-  const view = document.getElementById("view"); view.scrollTop = tab === "coach" && S.role === "athlete" ? view.scrollHeight : top; lastKey = key;
+  /* A toast sits in its own row between the page and the tab bar, so it never lies on top of anything. That makes the page a little
+     shorter. If the person was at the end of the page, the page stays at its end: the last line is still readable, above the toast. */
+  const view = document.getElementById("view"), shrunk = key === lastKey && oldH ? Math.max(0, oldH - view.clientHeight) : 0;
+  view.scrollTop = tab === "coach" && S.role === "athlete" ? view.scrollHeight : shrunk && oldGap < shrunk ? view.scrollHeight : top; lastKey = key;
   app.querySelectorAll("textarea.stext").forEach((t) => { t.style.height = "auto"; t.style.height = t.scrollHeight + "px"; }); // a session line grows with its text, never cut off
   let placed = false; // a screen that asks for the focus itself (a new line in a plan draft) gets it
   if (UI.focus != null) { const el = app.querySelector(`.srow[data-i="${UI.focus}"] .stext`); UI.focus = null; if (el) { el.focus(); placed = true; } }
@@ -44,7 +48,7 @@ function render() {
   }
   /* One accent per screen (D-7): only the first primary button in the page, and in a sheet, keeps the accent. */
   for (const box of [view, app.querySelector(".sheet")]) if (box) [...box.querySelectorAll(".btn.acc")].slice(1).forEach((el) => el.classList.add("demoted"));
-  flowLine(); syncHistory(); save();
+  loadPhotos(); flowLine(); syncHistory(); save();
 }
 /* Which control has the focus, in a form that survives a redraw: its id, or its action and value and which one of those it is. */
 function focusKey(el) {
@@ -118,7 +122,7 @@ const ACT = {
   "series-pause": (v) => { UI.toast = pauseSeries(Number(v)).msg; }, "series-end": (v) => { UI.toast = endSeries(Number(v)).msg; },
   "wl-mode": (v) => { const set = S.settings[v]; set.waitlistMode = set.waitlistMode === "offer" ? "auto" : "offer"; S.audit.unshift({ what: `Waitlist at ${ORGS[v].name}: ${set.waitlistMode === "offer" ? `freed spots are offered with a ${set.offerHoldMin / 60} h hold` : "the next person is booked automatically"}`, at: now() }); UI.toast = set.waitlistMode === "offer" ? `From now on a freed spot is held for the next person for ${set.offerHoldMin / 60} h.` : "From now on the next person on the waitlist is booked automatically."; },
   sheet: (v) => { UI.sheet = { type: "session", sid: v }; }, "close-btn": () => { UI.sheet = null; },
-  book: (v) => { UI.toast = book(v, "app").msg; UI.sheet = null; }, cancel: (v) => { UI.toast = cancel(Number(v)).msg; UI.sheet = null; }, leave: (v) => { UI.toast = leaveWait(v).msg; UI.sheet = null; },
+  book: (v) => { UI.toast = book(v, "app").msg; UI.sheet = null; }, cancel: (v) => { const r = cancel(Number(v)); UI.toast = r.msg; UI.sheet = null; if (r.ok && canUndoCancel(S.bookings.find((b) => b.id === r.bid))) return (UI.undo = { cancel: r.bid }), "undo"; }, leave: (v) => { UI.toast = leaveWait(v).msg; UI.sheet = null; },
   "go-invoices": () => { S.org = "pau"; S.tab.athlete = "me"; setTimeout(() => { const el = document.getElementById("invoices"); if (el) el.scrollIntoView(); }, 0); },
   /* A session the club cancelled: "Find another session" opens Week on that day, at that club. */
   "notice-ok": (v) => { const n = (S.notices || []).find((x) => x.id === Number(v)); if (!n) return; n.seen = true; const s = S.sessions[n.sid]; S.org = s.org; S.tab.athlete = "week"; S.filter = { cat: "all", mine: false }; if (s.start < addDays(monday(today()), 7 * WEEKS)) S.day = ymd(s.start); },
@@ -132,7 +136,7 @@ const ACT = {
   /* Edit or delete an entry. Both can be undone from the toast. */
   "log-edit": (v) => { const e = S.entries.find((x) => x.id === Number(v)); if (!e) return; S.form = { editId: e.id, sid: e.sid || null, title: e.title, dur: String(e.dur), rpe: e.rpe, dist: e.dist || "", notes: e.notes || "", pain: !!e.pain, painWhere: e.painWhere || undefined, painLevel: e.painLevel || 3 }; S.logTab = "log"; S.tab.athlete = "log"; lastKey = ""; },
   "log-delete": (v) => { const e = S.entries.find((x) => x.id === Number(v)); if (!e) return; const snap = logSnapshot(), form = structuredClone(S.form); S.entries = S.entries.filter((x) => x !== e); S.stageSessions = Math.max(0, S.stageSessions - 1); S.form = { rpe: 0, pain: false, title: "", dur: "" }; UI.toast = `Deleted: ${e.title}, ${fDay(e.at)}.`; return (UI.undo = { snap, form }), "undo"; },
-  undo: () => { const u = UI.undo; if (!u) return; Object.assign(S, u.snap); S.form = u.form; delete S.form.errors; S.tab.athlete = "log"; S.logTab = "log"; UI.toast = "Undone. Your entry is back in the form, nothing was lost."; },
+  undo: () => { const u = UI.undo; if (!u) return; if (u.cancel) { UI.toast = undoCancel(u.cancel).msg; return; } Object.assign(S, u.snap); S.form = u.form; delete S.form.errors; S.tab.athlete = "log"; S.logTab = "log"; UI.toast = "Undone. Your entry is back in the form, nothing was lost."; },
   ask: (v) => ask(v), "prop-yes": (v) => { confirmProposal(Number(v), true); }, "prop-no": (v) => { confirmProposal(Number(v), false); }, "prop-toggle": (v) => { const [id, i] = v.split("|").map(Number); toggleAct(id, i); },
   consent: (v) => { const [o, k] = v.split("|"); if (k !== "profile.basic") { S.consent[o][k] = !S.consent[o][k]; UI.toast = `${ORGS[o].name} ${S.consent[o][k] ? "can now see" : "no longer sees"} this. The change applies immediately.`; } },
   forget: (v) => { S.memory = S.memory.filter((m) => m.id !== Number(v)); UI.toast = "Deleted. Your coach no longer uses it."; },
@@ -218,7 +222,9 @@ function submitLog() {
   UI.toast = msg; UI.undo = { snap, form }; S.form = { rpe: 0, pain: false, title: "", dur: "", pristine: true };
 }
 document.addEventListener("submit", (e) => {
-  e.preventDefault(); const f = e.target.dataset.f; UI.toast = ""; UI.resetArmed = false; UI.undo = null;
+  e.preventDefault(); const f = e.target.dataset.f;
+  if (["cnote", "dcomment", "pgen", "ppaste", "predo"].includes(f)) return; // the coach dashboard's own forms (dash.js) answer for themselves; clearing here wiped their confirmation
+  UI.toast = ""; UI.resetArmed = false; UI.undo = null;
   if (f === "chat") { const v = document.getElementById("chat-input").value.trim(); if (v) ask(v); else UI.toast = "Type a message first, or tap one of the suggestions."; setTimeout(() => { const el = document.getElementById("chat-input"); if (el) el.focus(); }, 0); }
   if (f === "log") submitLog();
   if (f === "walkin") UI.toast = addWalkin(e.target.dataset.id, document.getElementById("walkin-name").value).msg;
@@ -246,7 +252,7 @@ for (const k of ["home", "tab"]) { const f = ACT[k]; ACT[k] = (v) => { const r =
 /* For the tests and for poking around in the console. */
 window.PATH_DEMO = {
   get state() { return S; }, disciplines, ACCENTS, GROUNDS, athletes, statusOf, roster, members, memberPass, ui: UI, ORGS, LOAD_LIMIT, CARD_TTL_MIN, STORE_KEY,
-  render, seed, save, load, resetDemo, syncPlan, planText, planName, coachAlerts, openPains, book, cancel, cancelSession, clashAt, passEnded, renewalOf, check, freeSpot, leaveWait, passState, passOf, stats, guard, guardDraft, currentDraft, RAW_DRAFT,
+  render, seed, save, load, resetDemo, undoCancel, canUndoCancel, ensurePlan, loadPhotos, PHOTOS, planWeekRows, planRowState, syncPlan, planText, planName, coachAlerts, openPains, book, cancel, cancelSession, clashAt, passEnded, renewalOf, check, freeSpot, leaveWait, passState, passOf, stats, guard, guardDraft, currentDraft, RAW_DRAFT,
   newForm, toLog, ask, confirmProposal, toggleAct, runAct, planLocked, nextChangeable, applyDraft, shiftWeek, weekIndex,
   parseClub, agenda, openPain, OFFERS, openOffers, exploreList, tryPlan, dropPlan, tryToday, providerOf, signUp, dropSignup, signedUp, offerStart, offerKm, offersFor, purchase, acceptOffer, declineOffer, sweepOffers, waitTotal, createSeries, previewSeries, pauseSeries, endSeries, runSeries, seriesRows, seriesSummary, findSeries, sweepProposals, parseWhen, parseOffering, rosterRows, rosterNames, addWalkin, markAttendance, memoryFor, upcomingBookings, sessList, attendance, myBooking, myWait, spots, nextStep, offerById, packOf, ticketOf, myInvoices,
 };

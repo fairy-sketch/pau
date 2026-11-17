@@ -10,7 +10,40 @@ const SPORT_IMAGE = {
 const FALLBACK_IMAGE = ["texture-chalk-hands", "50% 60%"]; // sports without a photo
 const HERO_IMAGE = ["hero-desert-run", "42% 38%"], TEXTURE_IMAGE = ["texture-foam-roller", "45% 55%"];
 const sportPhoto = (sport) => SPORT_IMAGE[sport] || FALLBACK_IMAGE;
-const photo = ([file, focus], lazy) => `<img class="ph" src="images/${file}.jpg" alt="" ${lazy ? 'loading="lazy" decoding="async"' : ""} style="object-position:${focus}">`;
+/* Photos (step 0). Every photo is loaded once and kept, so a redraw or coming back from a detail never shows a blank tile.
+   A photo that is ready is drawn at once; one that is not shows a calm placeholder and fades in when it arrives. Photos further
+   down a long page (`lazy`) are fetched when they come near the screen. A photo that fails is tried again. No browser-native lazy
+   loading: it is unreliable inside a scrolling pane, and it was why tiles stayed blank. */
+const PHOTOS = {}; // file -> { state: "loading" | "ready" | "failed", url, tries, at }
+const photo = ([file, focus], lazy) => { const p = PHOTOS[file], ready = p && p.state === "ready"; return `<img class="ph ${ready ? "on" : ""}" data-photo="${file}" ${lazy ? "data-lazy" : ""} ${ready ? `src="${p.url}"` : ""} alt="" style="object-position:${focus}">`; };
+function showPhoto(file) {
+  const p = PHOTOS[file]; if (!p || p.state !== "ready") return;
+  for (const el of document.querySelectorAll(`img[data-photo="${file}"]:not([src])`)) { el.src = p.url; el.classList.add("on"); }
+}
+function loadPhoto(file) {
+  const p = PHOTOS[file], direct = `images/${file}.jpg`;
+  if (p && (p.state !== "failed" || p.tries >= 4 || Date.now() - p.at < 1500 * p.tries)) return;
+  const rec = (PHOTOS[file] = { state: "loading", tries: ((p && p.tries) || 0) + 1, at: Date.now() });
+  const done = (url) => { rec.state = "ready"; rec.url = url; showPhoto(file); };
+  const fail = () => { rec.state = "failed"; rec.at = Date.now(); setTimeout(loadPhotos, 1600 * rec.tries); };
+  const plain = () => { const im = new Image(); im.onload = () => done(direct); im.onerror = fail; im.src = direct; };
+  /* Over http the bytes are kept in memory (a blob), so nothing is fetched twice whatever the server says about caching. Opened as a file, the browser loads it directly. */
+  if (location.protocol.startsWith("http") && window.fetch && window.URL && URL.createObjectURL) fetch(direct).then((r) => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status))))).then((b) => done(URL.createObjectURL(b)), plain);
+  else plain();
+}
+/* After every draw and on every scroll: fetch what is on or near the screen. */
+function loadPhotos() {
+  const h = window.innerHeight || 800;
+  for (const el of document.querySelectorAll("img[data-photo]:not([src])")) {
+    const file = el.dataset.photo, p = PHOTOS[file];
+    if (p && p.state === "ready") { showPhoto(file); continue; }
+    if (el.hasAttribute("data-lazy")) { const r = el.getBoundingClientRect(); if (r.top > h + 700 || r.bottom < -700) continue; }
+    loadPhoto(file);
+  }
+}
+let photoTick = 0;
+document.addEventListener("scroll", () => { if (photoTick) return; photoTick = setTimeout(() => { photoTick = 0; loadPhotos(); }, 80); }, true);
+window.addEventListener("resize", () => loadPhotos());
 const texture = (inner) => `<div class="tex"><img src="images/${TEXTURE_IMAGE[0]}.jpg" alt="">${inner}</div>`;
 
 /* ---------- small pieces ---------- */

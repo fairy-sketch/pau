@@ -9,6 +9,7 @@ import { lastCard, say } from "../../helpers/demo";
 import {
   ALL_SCREENS,
   BROKEN_TEXT,
+  MONDAY_NOON,
   ZURICH,
   clock,
   layoutProblems,
@@ -826,16 +827,317 @@ test.describe("The device", () => {
     });
     for (const [k, v] of Object.entries(ms)) expect(v, k).toBeLessThan(16);
   });
-  test("Explore loads its photos as they come into view", async ({ page }) => {
+  test("Explore's photos: only what is near the screen is fetched, every tile gets its photo, and nothing is blank on the way back", async ({
+    page,
+  }) => {
     await start(page);
     await screen(page, "athlete", "explore");
-    const lazy = await page.evaluate(
-      () =>
-        [...document.querySelectorAll<HTMLImageElement>("#xgrid img")].filter(
-          (i) => i.loading === "lazy",
-        ).length,
+    const tiles = page.locator("#xgrid img");
+    const loaded = () =>
+      tiles.evaluateAll(
+        (els) => els.filter((e) => (e as HTMLImageElement).naturalWidth > 0).length,
+      );
+    await expect.poll(loaded).toBeGreaterThan(3);
+    await page.waitForTimeout(300);
+    const first = await loaded(),
+      all = await tiles.count();
+    expect(first, "tiles far down are not fetched yet").toBeLessThan(all);
+    // No browser-native lazy loading, and a calm placeholder behind every tile.
+    expect(
+      await tiles.evaluateAll((els) => els.filter((e) => e.hasAttribute("loading")).length),
+    ).toBe(0);
+    expect(
+      await page
+        .locator("#xgrid .pic")
+        .first()
+        .evaluate((el) => getComputedStyle(el).backgroundColor),
+    ).not.toBe("rgba(0, 0, 0, 0)");
+    // Scrolling brings the rest.
+    for (let y = 0; y < 12; y++) {
+      await page.locator("#view").evaluate((v) => v.scrollBy(0, 700));
+      await page.waitForTimeout(120);
+    }
+    await expect.poll(loaded).toBe(all);
+    // Open a detail and come back: every tile on the screen has its photo in the same moment the page is drawn.
+    await page.locator("#view").evaluate((v) => (v.scrollTop = 0));
+    await page.locator("#xgrid .tile").nth(2).click();
+    await expect(page.locator("#xgrid")).toHaveCount(0);
+    const blank = await page.evaluate(() => {
+      const d = window.PATH_DEMO;
+      d.state.explore.open = null;
+      d.render();
+      return [...document.querySelectorAll<HTMLImageElement>("#xgrid img")].filter(
+        (i) => !i.getAttribute("src") || !i.classList.contains("on"),
+      ).length;
+    });
+    expect(blank).toBe(0);
+  });
+});
+
+test.describe("Step 0: what Ramon's own test found", () => {
+  test("cancel can be undone: the booking and the pass count come back, if the spot is still free", async ({
+    page,
+  }) => {
+    await start(page);
+    await sim(page, (d) => {
+      d.book("pau-track-2026-11-19", "t");
+      d.state.day = "2026-11-19";
+    });
+    await screen(page, "athlete", "week");
+    expect(await sim(page, (d) => d.passState(d.passOf("pau")).text)).toBe(
+      "4 of 4 used in November",
     );
-    expect(lazy).toBeGreaterThan(20);
+    await page.locator('#mybookings [data-v="pau-track-2026-11-19"]').click();
+    await page.getByRole("dialog").getByRole("button", { name: "Cancel booking" }).click();
+    await expect(page.locator(".toast")).toContainText("Cancelled: Track session, Thu 19 Nov.");
+    expect(await sim(page, (d) => d.passState(d.passOf("pau")).text)).toBe(
+      "3 of 4 used in November",
+    );
+    await page.locator(".toast").getByRole("button", { name: "Undo" }).click();
+    await expect(page.locator(".toast")).toContainText(
+      "Undone. You are booked again: Track session, Thu 19 Nov 18:30. Drop-in season pass: 4 of 4 used in November.",
+    );
+    await expect(page.locator(".toast").getByRole("button", { name: "Undo" })).toHaveCount(0);
+    const r = await sim(page, (d) => {
+      const S = d.state,
+        mine = S.bookings.filter((b: any) => b.sid === "pau-track-2026-11-19");
+      return {
+        rows: mine.length,
+        status: mine[0].status,
+        net: S.ledger
+          .filter((l: any) => l.bid === mine[0].id)
+          .reduce((n: number, l: any) => n + l.delta, 0),
+        again: d.undoCancel(mine[0].id).code,
+      };
+    });
+    expect(r).toEqual({ rows: 1, status: "confirmed", net: -1, again: "NOT_FOUND" });
+    await expect(page.locator("#mybookings")).toContainText("Track session");
+  });
+  test("no Undo when the spot went to the waitlist, and a late cancel at the studio comes back without a second charge", async ({
+    page,
+  }) => {
+    await start(page);
+    // The spot goes to the next person: Undo is not offered, and the engine refuses it too.
+    const gone = await sim(page, (d) => {
+      const S = d.state,
+        s = S.sessions["pau-track-2026-11-19"];
+      s.others = s.cap - 1;
+      s.waitOthers = 2;
+      const b = d.book(s.id, "t");
+      S.day = "2026-11-19";
+      return b.bid;
+    });
+    await screen(page, "athlete", "week");
+    await page.locator('#mybookings [data-v="pau-track-2026-11-19"]').click();
+    await page.getByRole("dialog").getByRole("button", { name: "Cancel booking" }).click();
+    await expect(page.locator(".toast")).toContainText(
+      "Your spot went to the next person on the waitlist.",
+    );
+    await expect(page.locator(".toast").getByRole("button", { name: "Undo" })).toHaveCount(0);
+    expect(await sim(page, (d, bid) => d.undoCancel(bid).code, gone)).toBe("SESSION_FULL");
+    // Studio, inside the cancel deadline: the credit was not returned, so Undo does not take another.
+    const r = await sim(page, (d) => {
+      const S = d.state,
+        s = S.sessions["studio-hiit-2026-11-16"];
+      s.others = 3;
+      const before = d.passState(d.passOf("studio")).left,
+        b = d.book(s.id, "t"),
+        c = d.cancel(b.bid),
+        afterCancel = d.passState(d.passOf("studio")).left,
+        u = d.undoCancel(b.bid);
+      return {
+        before,
+        status: c.status,
+        afterCancel,
+        undone: u.ok,
+        after: d.passState(d.passOf("studio")).left,
+      };
+    });
+    expect(r).toEqual({
+      before: 6,
+      status: "late_cancelled",
+      afterCancel: 5,
+      undone: true,
+      after: 5,
+    });
+  });
+  test("Your plan: every week shows all seven days, each with where it comes from, in one wording", async ({
+    page,
+  }) => {
+    await start(page);
+    await screen(page, "athlete", "path");
+    const ORIGIN =
+      /^(From Coach Sara|Your own day|Eased by you|Changed by Coach Sara)( · (Club session · \d\d:\d\d|Booked · \d\d:\d\d|Done|Missed|any day))?$/;
+    for (let n = 1; n <= 4; n++) {
+      await expect(page.locator("#plan-week")).toContainText(`Week ${n} of 4`);
+      const rows = await page.locator("#plan-days .row").evaluateAll((els) =>
+        els.map((el) => ({
+          day: (el.querySelector(".lead") as HTMLElement).innerText,
+          text: (el.querySelector(".mid span") as HTMLElement).innerText,
+          label: (el.querySelector(".mid .sub") as HTMLElement)?.innerText ?? "",
+        })),
+      );
+      expect(
+        rows.map((r) => r.day),
+        `week ${n}`,
+      ).toEqual(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
+      for (const r of rows) expect(r.label, `week ${n} ${r.day}: ${r.text}`).toMatch(ORIGIN);
+      expect(rows.find((r) => r.day === "Wed")).toMatchObject({
+        text: "Rest day",
+        label: "Your own day",
+      });
+      expect(rows.find((r) => r.day === "Sun")!.label).toBe("From Coach Sara");
+      if (n < 4) await page.getByRole("button", { name: "Next week of the plan" }).click();
+    }
+    expect(await screen(page, "athlete", "path")).not.toMatch(/On your own/);
+    // The plan does not run out as the days go by, and a day far out opens like any other.
+    await clock(page, ZURICH("2026-12-07T09:00"));
+    await sim(page, (d) => {
+      d.state.dash.myWeek = 1;
+    });
+    await screen(page, "athlete", "path");
+    await page.getByRole("button", { name: "Next week of the plan" }).click();
+    await page.getByRole("button", { name: "Next week of the plan" }).click();
+    await page.getByRole("button", { name: "Next week of the plan" }).click();
+    await expect(page.locator("#plan-days .row")).toHaveCount(7);
+    await page.locator("#plan-days .row").nth(1).click();
+    await expect(page.locator("#planday-source")).toHaveText(
+      "Your own day. Your coach has not set anything for it.",
+    );
+  });
+  test("a toast never lies on content: it has its own row, and at the end of a page the last line stays readable", async ({
+    page,
+  }) => {
+    await start(page);
+    const check = async (what: string) => {
+      await expect(page.locator(".toast"), what).toBeVisible();
+      const r = await page.evaluate(() => {
+        const box = (el: Element) => el.getBoundingClientRect(),
+          view = document.getElementById("view")!,
+          t = box(document.querySelector(".toast")!),
+          v = box(view),
+          nav = box(document.querySelector("nav.tabs")!),
+          kids = [...view.querySelectorAll("section > *, .chatwrap > *")].filter(
+            (e) => box(e).height > 0,
+          ),
+          last = kids[kids.length - 1];
+        return {
+          overView: t.top < v.bottom - 0.5,
+          overNav: t.bottom > nav.top + 0.5,
+          lastHidden: last ? box(last).bottom > v.bottom + 1 : false,
+          atEnd: view.scrollHeight - view.scrollTop - view.clientHeight < 2,
+        };
+      });
+      expect(r, what).toEqual({ overView: false, overNav: false, lastHidden: false, atEnd: true });
+    };
+    const toEnd = () => page.locator("#view").evaluate((v) => (v.scrollTop = v.scrollHeight));
+    // Athlete, end of Me: a consent switch.
+    await screen(page, "athlete", "me");
+    await toEnd();
+    await page.getByRole("button", { name: "Reset demo" }).click();
+    await check("Me, reset armed");
+    // Coach, end of an athlete's page: a note.
+    await sim(page, (d) => {
+      const S = d.state;
+      S.role = "coach";
+      S.tab.coach = "athletes";
+      d.render();
+      S.dash.athlete = "mia";
+      d.render();
+    });
+    await toEnd();
+    await page.getByRole("button", { name: "Save note" }).click();
+    await check("coach note");
+    // Admin, end of Money: mark paid on the last open invoice.
+    await screen(page, "admin", "sched");
+    await toEnd();
+    await page
+      .getByRole("button", { name: /Free a spot/ })
+      .last()
+      .click();
+    await check("admin schedule");
+    // A long message on a narrow phone still has its own row.
+    await page.setViewportSize({ width: 360, height: 640 });
+    await screen(page, "athlete", "week");
+    await sim(page, (d) => {
+      d.ui.toast =
+        "Cancelled: Saturday community session, Sat 21 Nov. Your spot is held for the next person on the waitlist, until 14:00. If they pass, it goes to the person after them.";
+      d.render();
+    });
+    await toEnd();
+    await sim(page, (d) => d.render());
+    await check("long toast at 360");
+  });
+  test("hosted the way it is published: no console errors, no failed requests, on every screen, also inside the host's frame", async ({
+    page,
+  }) => {
+    const { serveDemo } = await import("./harness");
+    const site = await serveDemo();
+    try {
+      for (const path of ["", "framed"]) {
+        const seen: string[] = [];
+        page.removeAllListeners("console");
+        page.on("console", (m) => {
+          // The page that hosts a frame logs one warning of its own about the frame's sandbox. It is not the demo's.
+          if (/can escape its sandboxing/.test(m.text())) return;
+          if (m.type() === "error" || m.type() === "warning") seen.push(`${m.type()}: ${m.text()}`);
+        });
+        page.on("pageerror", (e) => seen.push(`pageerror: ${e.message}`));
+        page.on("requestfailed", (r) => seen.push(`failed: ${r.url()} ${r.failure()?.errorText}`));
+        page.on("response", (r) => {
+          if (r.status() >= 400) seen.push(`http ${r.status()}: ${r.url()}`);
+        });
+        await page.clock.setFixedTime(MONDAY_NOON);
+        await page.goto(site.url + path);
+        const frame = path ? page.frameLocator("#f") : page;
+        const run = (fn: string) => (path ? page.frames()[1]! : page).evaluate(fn);
+        await expect(frame.locator("nav.tabs")).toBeVisible();
+        for (const org of ["pau", "studio"])
+          for (const [role, tab] of ALL_SCREENS) {
+            await run(
+              `(() => { const d = window.PATH_DEMO, S = d.state; S.role = "${role}"; S.org = "${org}"; S.tab["${role}"] = "${tab}"; d.ui.sheet = null; if (S.dash) Object.assign(S.dash, { athlete: null, sess: null, planView: null }); S.rosterSid = null; d.render(); })()`,
+            );
+            await page.waitForTimeout(40);
+          }
+        // The flows that touch the network or the history: Explore's photos, a detail and back, a sheet, the chat.
+        await run(
+          `(() => { const d = window.PATH_DEMO, S = d.state; S.role = "athlete"; S.org = "pau"; S.tab.athlete = "explore"; d.render(); document.getElementById("view").scrollTop = 99999; })()`,
+        );
+        await page.waitForTimeout(600);
+        await frame.locator("#xgrid .tile").first().click({ force: true });
+        await run(`(() => { history.back(); })()`);
+        await page.waitForTimeout(300);
+        await run(
+          `(() => { const d = window.PATH_DEMO; d.state.tab.athlete = "coach"; d.ask("book my usual"); d.render(); d.ui.sheet = { type: "clubs" }; d.render(); d.ui.sheet = null; d.render(); })()`,
+        );
+        await page.waitForTimeout(300);
+        expect(seen, path || "top level").toEqual([]);
+        // Over http every photo is kept in memory: a redraw never goes back to the network.
+        const srcs = await run(
+          `[...document.querySelectorAll("#app img[src]")].map((i) => i.getAttribute("src").slice(0, 5))`,
+        );
+        expect((srcs as string[]).every((x) => x === "blob:")).toBe(true);
+      }
+    } finally {
+      await site.close();
+    }
+  });
+  test("a photo that fails to arrive is tried again and then appears", async ({ page }) => {
+    const { serveDemo } = await import("./harness");
+    const site = await serveDemo();
+    try {
+      let dropped = 0;
+      await page.route("**/images/hero-desert-run.jpg", (route) =>
+        dropped++ < 2 ? route.abort() : route.continue(),
+      );
+      await page.goto(site.url);
+      const hero = page.locator(".hero img");
+      await expect(hero).toHaveClass(/\bon\b/, { timeout: 8000 });
+      expect(await hero.evaluate((e) => (e as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+      expect(dropped).toBeGreaterThan(2);
+    } finally {
+      await site.close();
+    }
   });
 });
 
