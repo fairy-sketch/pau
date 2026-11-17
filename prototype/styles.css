@@ -296,3 +296,8 @@ svg text { font-family: var(--body); font-size: 11px; fill: var(--text-2); }
 .swatch { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; }
 .swatch i { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: var(--text); box-shadow: 4px 5px 10px rgba(0,0,0,.14), -4px -4px 10px rgba(255,255,255,.95), inset 1px 1.5px 1px rgba(255,255,255,.38), inset -2px -3px 5px rgba(0,0,0,.10); }
 .swatch[aria-pressed="true"] { box-shadow: var(--press); }
+/* Fine accents in your colour (S-10): the phase you are in, the days you trained, today's point in the chart and switches
+   that are on. Each keeps a black edge or a black neighbour, so none of them depends on the colour to be read. */
+.phases b.cur { background: var(--accent); }
+.dot.done { background: var(--accent); border-color: var(--text); }
+.sw[aria-checked="true"] .t { background: var(--accent); box-shadow: inset 1px 1px 3px rgba(0,0,0,.18); }

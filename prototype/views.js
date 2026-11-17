@@ -66,7 +66,7 @@ const logItBtn = (s, cls = "btn sm") => (loggedFor(s.id) ? `<span class="sub">Lo
 function lineChart(points, hi) {
   const W = 420, H = 140, L = 34, B = 18, max = Math.max(...points.map((p) => p.v), 1) * 1.1, x = (i) => L + (i * (W - L - 8)) / (points.length - 1), y = (v) => H - B - (v / max) * (H - B - 8);
   const grid = [0, 0.5, 1].map((f) => `<line x1="${L}" x2="${W}" y1="${y((max * f) / 1.1)}" y2="${y((max * f) / 1.1)}" stroke="var(--hairline)"/><text x="0" y="${y((max * f) / 1.1) + 3}">${Math.round((max * f) / 1.1)}</text>`).join("");
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(points.map((p) => p.l + " " + p.v).join(", "))}">${grid}<polyline fill="none" stroke="var(--text)" stroke-width="1.5" stroke-linejoin="round" points="${points.map((p, i) => x(i) + "," + y(p.v)).join(" ")}"/><circle cx="${x(hi)}" cy="${y(points[hi].v)}" r="4" fill="var(--text)"/>${points.map((p, i) => (i % 3 === 0 || i === points.length - 1 ? `<text x="${x(i) - 8}" y="${H - 4}">${p.l}</text>` : "")).join("")}</svg>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(points.map((p) => p.l + " " + p.v).join(", "))}">${grid}<polyline fill="none" stroke="var(--text)" stroke-width="1.5" stroke-linejoin="round" points="${points.map((p, i) => x(i) + "," + y(p.v)).join(" ")}"/><circle cx="${x(hi)}" cy="${y(points[hi].v)}" r="4.5" fill="var(--accent)" stroke="var(--text)" stroke-width="1.5"/>${points.map((p, i) => (i % 3 === 0 || i === points.length - 1 ? `<text x="${x(i) - 8}" y="${H - 4}">${p.l}</text>` : "")).join("")}</svg>`;
 }
 const isoWeek = (d) => { const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7)); return Math.ceil(((t - Date.UTC(t.getUTCFullYear(), 0, 1)) / 864e5 + 1) / 7); };
 const loadPts = (st) => st.wl.map((w) => ({ l: "W" + isoWeek(w.start), v: w.load }));
@@ -75,7 +75,7 @@ const loadPts = (st) => st.wl.map((w) => ({ l: "W" + isoWeek(w.start), v: w.load
 const segPct = (k, at) => (k < at.stage ? 100 : k === at.stage ? Math.round((at.inSt / PER) * 100) : 0);
 function pathLine() {
   const at = UI.lineFrom ?? { stage: S.stage, inSt: S.stageSessions }, n = S.stages.length;
-  return `<div id="phases" role="img" aria-label="Stage ${at.stage + 1} of ${n}: ${S.stages[at.stage]}. ${at.inSt} of ${PER} sessions done."><div class="phases">${S.stages.map((name, k) => `<i title="${name}"><b data-k="${k}" style="width:${segPct(k, at)}%"></b></i>`).join("")}</div>
+  return `<div id="phases" role="img" aria-label="Stage ${at.stage + 1} of ${n}: ${S.stages[at.stage]}. ${at.inSt} of ${PER} sessions done."><div class="phases">${S.stages.map((name, k) => `<i title="${name}"><b data-k="${k}" class="${k === at.stage ? "cur" : ""}" style="width:${segPct(k, at)}%"></b></i>`).join("")}</div>
     <p class="sub" style="margin-top:12px"><span class="strong" style="color:var(--text)">${S.stages[at.stage]}</span> · session ${at.inSt} of ${PER}</p></div>`;
 }
 /* After a log: the bar grows to the new position. */
