@@ -16,7 +16,7 @@ function render() {
   ensureSessions(); syncPlan(); sweepCancelled(); sweep(); sweepProposals(); sweepOffers(); runSeries();
   const had = focusKey(document.activeElement), hadSheet = !!document.querySelector(".sheet");
   const oldView = document.getElementById("view"), oldH = oldView ? oldView.clientHeight : 0, oldGap = oldView ? oldView.scrollHeight - oldView.scrollTop - oldH : 0; // where the keyboard was, before the screen is redrawn
-  const app = document.getElementById("app"), tab = S.tab[S.role], key = S.role + tab + S.org + (S.rosterSid || "") + ((S.dash && (S.dash.athlete || S.dash.planView || S.dash.sess)) || "") + (tab === "explore" ? S.explore.open || "" : ""), old = document.getElementById("view"), top = old && key === lastKey ? old.scrollTop : 0;
+  const app = document.getElementById("app"), tab = S.tab[S.role], key = S.role + tab + S.org + (S.rosterSid || "") + ((S.dash && (S.dash.athlete || S.dash.planView || S.dash.sess)) || "") + ((S.role === "admin" && S.adm && S.adm.view) || "") + (tab === "explore" ? S.explore.open || "" : ""), old = document.getElementById("view"), top = old && key === lastKey ? old.scrollTop : 0;
   const body = S.role === "athlete" ? { path: vPath, coach: vCoachChat, log: vLog, week: vWeek, me: vMe, explore: vExplore }[tab]() : S.role === "coach" ? vCoach() : vAdmin();
   const badge = S.role === "coach" ? coachAlerts().filter((a) => a.status === "open").length : 0;
   app.className = S.role === "admin" ? "wide" : "";
@@ -76,8 +76,8 @@ document.addEventListener("keydown", (e) => {
 
 /* ---------- Back (QA-10): the phone's Back button closes a sheet, then goes one screen back. ----------
    Every place you can be (role, club, tab, an open athlete, plan, session, provider or sheet) is one entry in the browser's history. */
-const navSnap = () => ({ role: S.role, org: S.org, tab: S.tab[S.role], roster: S.rosterSid || null, ath: (S.dash && S.dash.athlete) || null, plan: (S.dash && S.dash.planView) || null, sess: (S.dash && S.dash.sess) || null, open: S.explore.open || null,
-  sheet: !UI.sheet ? null : ["session", "clubs", "offer", "planday", "series"].includes(UI.sheet.type) ? UI.sheet : { type: "other" } }); // a checkout is never reopened by Back or Forward
+const navSnap = () => ({ role: S.role, org: S.org, tab: S.tab[S.role], roster: S.rosterSid || null, ath: (S.dash && S.dash.athlete) || null, plan: (S.dash && S.dash.planView) || null, sess: (S.dash && S.dash.sess) || null, open: S.explore.open || null, adm: (S.adm && S.adm.view) || null,
+  sheet: !UI.sheet ? null : ["session", "clubs", "offer", "planday", "series", "asess", "aadd", "amsg"].includes(UI.sheet.type) ? UI.sheet : { type: "other" } }); // a checkout is never reopened by Back or Forward
 let navKey = null, navFromPop = false;
 function syncHistory() {
   const snap = navSnap(), key = JSON.stringify(snap); if (key === navKey) return;
@@ -88,6 +88,7 @@ window.addEventListener("popstate", (e) => {
   const n = e.state; if (!n || !n.role) return;
   S.role = n.role; S.org = n.org; S.tab[n.role] = n.tab; S.rosterSid = n.roster && S.sessions[n.roster] ? n.roster : null; S.explore.open = n.open;
   if (S.dash || n.ath || n.plan || n.sess) Object.assign(dash(), { athlete: n.ath, planView: n.plan, sess: n.sess });
+  if (S.adm || n.adm) adm().view = n.adm || null;
   UI.sheet = n.sheet && n.sheet.type !== "other" && (!n.sheet.sid || S.sessions[n.sheet.sid]) ? n.sheet : null; UI.toast = ""; UI.undo = null;
   navFromPop = true; lastKey = ""; render();
 });
@@ -223,7 +224,7 @@ function submitLog() {
 }
 document.addEventListener("submit", (e) => {
   e.preventDefault(); const f = e.target.dataset.f;
-  if (["cnote", "dcomment", "pgen", "ppaste", "predo"].includes(f)) return; // the coach dashboard's own forms (dash.js) answer for themselves; clearing here wiped their confirmation
+  if (["cnote", "dcomment", "pgen", "ppaste", "predo"].includes(f) || ADMIN_FORMS.includes(f)) return; // the coach dashboard's own forms (dash.js) answer for themselves; clearing here wiped their confirmation
   UI.toast = ""; UI.resetArmed = false; UI.undo = null;
   if (f === "chat") { const v = document.getElementById("chat-input").value.trim(); if (v) ask(v); else UI.toast = "Type a message first, or tap one of the suggestions."; setTimeout(() => { const el = document.getElementById("chat-input"); if (el) el.focus(); }, 0); }
   if (f === "log") submitLog();
@@ -247,12 +248,12 @@ document.addEventListener("pointerup", (e) => {
 document.addEventListener("pointercancel", () => { swipe = null; });
 
 /* The coach and club dashboard brings its own actions (dash.js). Leaving a tab or going home also leaves an open athlete. */
-Object.assign(ACT, DASH_ACT);
-for (const k of ["home", "tab"]) { const f = ACT[k]; ACT[k] = (v) => { const r = f(v); if (S.dash) Object.assign(S.dash, { athlete: null, planView: null, pdraft: null, sess: null, myWeek: 1 }); return r; }; }
+Object.assign(ACT, DASH_ACT, ADMIN_ACT);
+for (const k of ["home", "tab"]) { const f = ACT[k]; ACT[k] = (v) => { const r = f(v); if (S.dash) Object.assign(S.dash, { athlete: null, planView: null, pdraft: null, sess: null, myWeek: 1 }); if (S.adm) Object.assign(S.adm, { view: null, error: "", form: null, rows: null }); return r; }; }
 /* For the tests and for poking around in the console. */
 window.PATH_DEMO = {
   get state() { return S; }, disciplines, ACCENTS, GROUNDS, athletes, statusOf, roster, members, memberPass, ui: UI, ORGS, LOAD_LIMIT, CARD_TTL_MIN, STORE_KEY,
-  render, seed, save, load, resetDemo, undoCancel, canUndoCancel, ensurePlan, loadPhotos, PHOTOS, planWeekRows, planRowState, syncPlan, planText, planName, coachAlerts, openPains, book, cancel, cancelSession, clashAt, passEnded, renewalOf, check, freeSpot, leaveWait, passState, passOf, stats, guard, guardDraft, currentDraft, RAW_DRAFT,
+  render, seed, save, load, resetDemo, undoCancel, canUndoCancel, ensurePlan, clubStats, clubSentence, atRisk, riskOf, sentTo, draftCheckin, draftReminder, sendApproved, editSession, addSession, setRules, policyOf, policyText, parseMembersCsv, importMembers, baseMembers, coachOf, loadPhotos, PHOTOS, planWeekRows, planRowState, syncPlan, planText, planName, coachAlerts, openPains, book, cancel, cancelSession, clashAt, passEnded, renewalOf, check, freeSpot, leaveWait, passState, passOf, stats, guard, guardDraft, currentDraft, RAW_DRAFT,
   newForm, toLog, ask, confirmProposal, toggleAct, runAct, planLocked, nextChangeable, applyDraft, shiftWeek, weekIndex,
   parseClub, agenda, openPain, OFFERS, openOffers, exploreList, tryPlan, dropPlan, tryToday, providerOf, signUp, dropSignup, signedUp, offerStart, offerKm, offersFor, purchase, acceptOffer, declineOffer, sweepOffers, waitTotal, createSeries, previewSeries, pauseSeries, endSeries, runSeries, seriesRows, seriesSummary, findSeries, sweepProposals, parseWhen, parseOffering, rosterRows, rosterNames, addWalkin, markAttendance, memoryFor, upcomingBookings, sessList, attendance, myBooking, myWait, spots, nextStep, offerById, packOf, ticketOf, myInvoices,
 };

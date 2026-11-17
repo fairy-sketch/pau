@@ -123,7 +123,7 @@ function confirmProposal(id, yes) {
 function toggleAct(id, i) { const p = S.props[id]; if (p && p.status === "pending" && p.acts[i]) p.acts[i].on = p.acts[i].on === false; }
 
 /* ---------- replies ---------- */
-const cancelLine = (b, s) => { const forfeit = now() > deadline(s) && ORGS[s.org].policy.lateCancel === "forfeit"; return `${offOf(s).name}, ${fDay(s.start)} ${fTime(s.start)}, ${ORGS[s.org].name}${forfeit ? " (inside the deadline: credit not returned)" : ""}`; };
+const cancelLine = (b, s) => { const forfeit = now() > deadline(s) && policyOf(s.org).lateCancel === "forfeit"; return `${offOf(s).name}, ${fDay(s.start)} ${fTime(s.start)}, ${ORGS[s.org].name}${forfeit ? " (inside the deadline: credit not returned)" : ""}`; };
 function memoryFor(org) { return S.memory.filter((m) => m.org === org || m.org == null); }
 const memoryLabel = (m) => (m.org ? ORGS[m.org].name : "General");
 
@@ -158,7 +158,7 @@ function replyCancel(text) {
   const r = all.find(fits);
   if (!r) return say(`You have no booking${named ? " for " + offName(named.org, named.off).toLowerCase() : ""}${when.label ? " on " + when.label : ""} at ${scopeName(scope)}. Your next one is ${all[0].label}.${also}`);
   if (r.type === "explore") return propose("Found it on your Explore list.", { intent: r.intent, title: "Take your name off?", lines: [r.label, r.o.price ? "This is a test booking: no money moves either way." : "Nothing was charged."], acts: [r.act] });
-  const forfeit = now() > deadline(r.s) && ORGS[r.s.org].policy.lateCancel === "forfeit";
+  const forfeit = now() > deadline(r.s) && policyOf(r.s.org).lateCancel === "forfeit";
   return propose((when.label || named ? "Found it." : `Here is your next booking at ${scopeName(scope)}.`) + also, {
     intent: r.intent, title: "Cancel this booking?",
     lines: [`${offOf(r.s).name}, ${fDay(r.s.start)} ${fTime(r.s.start)}, ${ORGS[r.s.org].name}`, forfeit ? "Inside the cancel deadline: the credit is not returned." : `Free cancel until ${fDay(deadline(r.s))} ${fTime(deadline(r.s))}.`],

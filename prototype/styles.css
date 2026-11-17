@@ -328,3 +328,7 @@ textarea.inp.big { min-height: 248px; padding: 16px; }
 
 /* While a photo is on its way its frame is a calm, slightly darker tone of the ground: no spinner, no flash (step 0). Last in the file so it holds for every frame. */
 .hero, .ccard .pic, .offerpic, .tile .pic { background: color-mix(in srgb, var(--text) 8%, var(--bg)); }
+
+/* The office (N-04). Existing pieces only; these lines place them. */
+.sub.demo .tag, p .tag { margin-left: 4px; }
+.delta { font-size: 13px; line-height: 18px; }

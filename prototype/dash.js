@@ -30,7 +30,7 @@ function roster(org = S.org) {
   if (ROSTERS[org]) return ROSTERS[org];
   const F = FLAVOUR[org], r = rng(F.seed), pick = (a) => a[Math.floor(r() * a.length)], T = today();
   /* A few fixed stories on top, so the screen always has something worth a coach's time; the rest is quiet. */
-  ROSTERS[org] = members(org).map((m, i) => {
+  ROSTERS[org] = baseMembers(org).map((m, i) => {
     const st = F.story[i] || {}, g = pick(F.goals), stage = Math.floor(r() * 4), inSt = 1 + Math.floor(r() * 11), away = st.away ?? Math.floor(r() * 5), load = st.load ?? 0.82 + r() * 0.28;
     const shareLog = i % 9 !== 8, sharePain = st.sharePain ?? (!!st.pain || r() > 0.5);
     const logs = [0, 1, 2].map((k) => ({ id: `${org === "pau" ? "r" : "q"}${i}-${k}`, title: pick(F.logs), at: addDays(T, -(away + k * 2 + (k ? 1 : 0))), dur: 40 + Math.floor(r() * 6) * 10, rpe: 4 + Math.floor(r() * 5), ask: k === 0 ? st.ask : null }));
@@ -71,14 +71,14 @@ const lastLogText = (a) => (!a.shares.log ? "Log not shared" : a.away === 0 ? "L
 const pbar = (a) => `<span class="pline" role="img" aria-label="Stage ${a.stage + 1} of 5, session ${a.inSt} of ${PER}"><b style="width:${Math.round(((a.stage * PER + a.inSt) / (5 * PER)) * 100)}%"></b></span>`;
 
 /* The sessions this coach runs. Colleagues' sessions are the admin's to see, not "yours" (QA-19). */
-const mySessions = () => sessList(S.org).filter((s) => offOf(s).coach === coachMe());
+const mySessions = () => sessList(S.org).filter((s) => coachOf(s) === coachMe());
 /* ---------- Today ---------- */
 function vCoachToday() {
   const T = today(), all = mySessions(), todays = all.filter((s) => ymd(s.start) === ymd(T)), next = all.filter((s) => s.start > addDays(T, 1)).slice(0, 5);
   const list = athletes().map((a) => ({ a, st: statusOf(a) })), needs = list.filter((x) => x.st.level === 2).sort((x, y) => y.st.kinds.length - x.st.kinds.length || (x.a.live ? -1 : 1));
   const back = list.find((x) => x.a.back), pain = list.find((x) => x.st.kinds.includes("pain"));
   const brief = [`${todays.length} ${todays.length === 1 ? "session" : "sessions"} today, ${todays.reduce((n, s) => n + booked(s), 0)} booked.`, back ? `${back.a.first} is back after ${Math.round(back.a.away / 7)} weeks off.` : "", pain ? `${pain.a.first} shared a ${pain.a.pain.where.toLowerCase()} flag, so a lighter option is ready for the next hard session.` : needs.length ? `${needs.length} ${needs.length === 1 ? "athlete needs" : "athletes need"} you.` : "Nobody needs you right now."].filter(Boolean).join(" ");
-  const card = (s) => `<div class="card stack" data-today="${s.id}" style="gap:12px"><div class="between" style="align-items:flex-start"><span><span class="h2" style="display:block">${fTime(s.start)} · ${offOf(s).name}</span><span class="sub">${offOf(s).loc} · ${offOf(s).coach}</span></span><span class="end"><span class="num">${booked(s)}<span class="sub" style="font-weight:400"> / ${s.cap}</span></span>${waitTotal(s) ? `<span class="sub" style="display:block">${waitTotal(s)} waiting</span>` : ""}</span></div><button class="btn acc full" data-a="roster" data-v="${s.id}">Check in</button></div>`;
+  const card = (s) => `<div class="card stack" data-today="${s.id}" style="gap:12px"><div class="between" style="align-items:flex-start"><span><span class="h2" style="display:block">${fTime(s.start)} · ${offOf(s).name}</span><span class="sub">${offOf(s).loc} · ${coachOf(s)}</span></span><span class="end"><span class="num">${booked(s)}<span class="sub" style="font-weight:400"> / ${s.cap}</span></span>${waitTotal(s) ? `<span class="sub" style="display:block">${waitTotal(s)} waiting</span>` : ""}</span></div><button class="btn acc full" data-a="roster" data-v="${s.id}">Check in</button></div>`;
   return `<section class="pad stack-l" id="coach-today"><div><div class="eyebrow">${esc(coachMe())} · ${esc(ORGS[S.org].name)}</div><h1 class="h1">${["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][T.getDay()]}, ${T.getDate()} ${MOL[T.getMonth()]}</h1></div>
     <div class="stack" style="gap:8px"><p id="briefing" style="font-size:18px;line-height:28px">${esc(brief)}</p><p class="sub">Drafted by PATH from bookings and from what athletes share with this club.</p></div>
     <div class="stack"><div class="eyebrow">Today</div>${todays.length ? todays.map(card).join("") : `<p class="sub">No sessions today.</p>`}</div>
@@ -312,7 +312,7 @@ function vPlanDaySheet() {
   const next = st.done ? `<p class="sub">Logged. Well done.</p>` : s && st.mineB ? `<button class="btn acc full" data-a="sheet" data-v="${s.id}">Manage booking</button>` : upcoming ? `<button class="btn acc full" data-a="sheet" data-v="${s.id}">Book this session</button>` : it && it.kind !== "rest" && r.n === 1 ? `<button class="btn acc full" data-a="tab" data-v="log">Log it</button>` : "";
   const still = st.was && myBooking(st.was.id) && st.was.start > now() ? `<div class="card stack" style="gap:8px"><p class="sub">You are still booked for ${offOf(st.was).name} at ${fTime(st.was.start)}.</p><button class="btn full" data-a="sheet" data-v="${st.was.id}">Manage booking</button></div>` : "";
   return `<div class="sheetbg" data-a="close"><div class="sheet stack-l" id="planday" role="dialog" aria-modal="true" aria-label="${full}, week ${r.n}"><div><div class="eyebrow">${full} · week ${r.n} of ${N}</div><p class="h1" style="margin-top:8px">${esc(r.text)}</p><p class="sub" style="margin-top:8px" id="planday-source">${source}</p></div>
-    ${s ? `<div class="card stack" style="gap:4px"><p class="h2">${offOf(s).name}, ${fTime(s.start)}</p><p class="sub">${fDay(s.start)} · ${offOf(s).loc} · ${offOf(s).coach}</p><p class="sub">${st.stands}</p></div>` : still || (it && it.kind === "rest" ? "" : r.n === 1 ? `<p class="sub">The club has no session for this one. Do it on your own, then log it.</p>` : `<p class="sub">Comes up in week ${r.n}.</p>`)}
+    ${s ? `<div class="card stack" style="gap:4px"><p class="h2">${offOf(s).name}, ${fTime(s.start)}</p><p class="sub">${fDay(s.start)} · ${offOf(s).loc} · ${coachOf(s)}</p><p class="sub">${st.stands}</p></div>` : still || (it && it.kind === "rest" ? "" : r.n === 1 ? `<p class="sub">The club has no session for this one. Do it on your own, then log it.</p>` : `<p class="sub">Comes up in week ${r.n}.</p>`)}
     <div class="stack" style="gap:8px">${next}<button class="btn full ghost" data-a="planday-close">Close</button></div></div></div>`;
 }
 /* On a session in the athlete's Week: what the plan says for it, changes included. */

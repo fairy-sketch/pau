@@ -2,7 +2,7 @@
 import { expect, test } from "@playwright/test";
 
 import { lastCard, say } from "../../helpers/demo";
-import { ZURICH, clock, screen, sim, start } from "./harness";
+import { MONDAY_NOON, ZURICH, clock, screen, sim, start } from "./harness";
 
 /** Persona simulations: each one is a person's week, end to end, checked on every screen where it must show. */
 
@@ -30,7 +30,9 @@ test.describe("Athlete Jonas: a regular's week at PAU (played on the demo athlet
       /THU 19 NOV · 18:30 Track session .{0,80}? Booked/i,
     );
     expect(await screen(page, "athlete", "me")).toMatch(/4 \/ 4 used in November/);
-    expect(await screen(page, "admin", "sched")).toMatch(/Thu 19 Nov 18:30 Track session 26 \/ 30/);
+    expect(await screen(page, "admin", "sched")).toMatch(
+      /Thu 19 Nov 18:30 Track session Coach Sara[^]*? 26 \/ 30/,
+    );
     // The coach finds him on that session.
     await sim(page, (d) => {
       const S = d.state;
@@ -853,11 +855,11 @@ test.describe("Admin: running the club", () => {
   }) => {
     await start(page);
     await screen(page, "admin", "money");
-    expect(await screen(page, "admin", "dash")).toMatch(/7 Open invoices, 3 overdue/);
+    expect(await screen(page, "admin", "dash")).toMatch(/Open invoices 7, 3 overdue/);
     await screen(page, "admin", "money");
     await page.getByRole("button", { name: "Mark paid: CHF 300.00, Mia Keller" }).click();
     expect(await screen(page, "athlete", "me")).toMatch(/INVOICES CHF 300.00 [^]*? Paid/);
-    expect(await screen(page, "admin", "dash")).toMatch(/6 Open invoices, 3 overdue/);
+    expect(await screen(page, "admin", "dash")).toMatch(/Open invoices 6, 3 overdue/);
     expect(await screen(page, "admin", "money")).toMatch(
       /AUDIT LOG [^]*(paid|Paid)[^]*Mia Keller|AUDIT LOG [^]*PAU-2026-0042/,
     );
@@ -872,25 +874,432 @@ test.describe("Admin: running the club", () => {
     await expect(page.locator(".toast")).toContainText("went to the next person on the waitlist");
     await expect(page.locator("tr", { hasText: "Wed 18 Nov" })).toContainText("20 / 20");
   });
-  test.fixme("edits the schedule and adds a slot", () => {
-    // Not built: Schedule is a read-only table with the demo control "Free a spot".
+  test("reads club health: one sentence, the numbers against last month, and what needs the admin", async ({
+    page,
+  }) => {
+    await start(page);
+    for (const org of ["pau", "studio"] as const) {
+      const home = await screen(page, "admin", "dash", org),
+        c = await sim(
+          page,
+          (d, org) => {
+            const c = d.clubStats(org);
+            return {
+              active: c.active,
+              visits: c.visits,
+              od: c.od.length,
+              todo: c.todo,
+              quiet: c.quiet.length,
+              pct: c.visitsPct,
+              delta: c.activeDelta,
+            };
+          },
+          org,
+        );
+      // The sentence says what the numbers say.
+      const health = await page.locator("#health").innerText();
+      expect(health).toContain(`${c.active} active members`);
+      expect(health).toContain(`${c.visits} visits so far in November`);
+      expect(health).toContain(`${c.od} invoices are overdue`);
+      expect(health).toContain(`${c.todo} members are drifting away`);
+      expect(health).toMatch(
+        c.delta >= 0 && c.pct >= 0
+          ? /doing well/
+          : c.delta < 0 && c.pct < 0
+            ? /slipping/
+            : /holding steady/,
+      );
+      // Four numbers, each against last month, and the demo data is labelled.
+      expect(await page.locator("#health-tiles [data-tile]").count()).toBe(4);
+      for (const t of await page.locator("#health-tiles .delta").allInnerTexts())
+        expect(t).toMatch(/October|same days/);
+      expect(home).toContain("DEMO DATA");
+      expect(home).toMatch(
+        new RegExp(`NEEDS YOU · ${[c.todo, c.od, c.quiet].filter(Boolean).length}`),
+      );
+    }
+    // The two clubs do not tell the same story, and neither shows the other's numbers.
+    const a = await sim(page, (d) => [d.clubSentence("pau"), d.clubSentence("studio")]);
+    expect(a[0]).not.toBe(a[1]);
+    expect(a[0]).not.toContain("Studio Demo");
+    // "Needs you" leads to the place where it is dealt with.
+    await screen(page, "admin", "dash", "pau");
+    await page.locator("#admin-needs .row", { hasText: "drifting away" }).click();
+    await expect(page.locator("#at-risk")).toBeVisible();
   });
-  test.fixme("cancels a session: booked members are told and get their credit back", () => {
-    // Not built: nobody can cancel a session. See QA-03 for what happens to bookings if one is.
+  test("a member who is drifting away: the reason comes from bookings only, PATH drafts, and nothing is sent until the admin approves", async ({
+    page,
+  }) => {
+    await start(page);
+    const text = await screen(page, "admin", "members");
+    expect(text).toContain(
+      "From bookings and check-ins only. PATH never reads a training log for this.",
+    );
+    expect(text).not.toMatch(/RPE|pain|knee|load|Sub-\d/i);
+    const first = page.locator("#at-risk .row").first(),
+      name = await first.locator(".strong").innerText();
+    await expect(first).toContainText(
+      /No visit in \d+ days|Came \d times in October, once so far in November/,
+    );
+    await expect(first).toContainText("Message drafted");
+    await first.click();
+    const sheet = page.getByRole("dialog", { name: `Message to ${name}` });
+    await expect(sheet.locator("#msg-text")).toHaveValue(
+      new RegExp(`^Hi ${name.split(" ")[0]}, we haven't seen you`),
+    );
+    await expect(sheet).toContainText("Nothing is sent until you approve it.");
+    expect(await sim(page, (d) => d.state.outbox.length)).toBe(0);
+    // "Not now" sends nothing.
+    await sheet.getByRole("button", { name: "Not now" }).click();
+    expect(await sim(page, (d) => d.state.outbox.length)).toBe(0);
+    // The admin changes the words; exactly those words are sent, once.
+    await first.click();
+    await sheet
+      .locator("#msg-text")
+      .fill(`Hi ${name.split(" ")[0]}, coffee after track on Thursday? No pressure.`);
+    await sheet.getByRole("button", { name: "Approve and send" }).click();
+    await expect(page.locator(".toast")).toContainText(
+      `Sent to ${name}. Demo: no real message leaves PATH.`,
+    );
+    const out = await sim(page, (d) => d.state.outbox);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({
+      org: "pau",
+      to: name,
+      kind: "checkin",
+      text: `Hi ${name.split(" ")[0]}, coffee after track on Thursday? No pressure.`,
+    });
+    await expect(page.locator("#at-risk .row", { hasText: name })).toContainText("Sent Mon 16 Nov");
+    await page.locator("#at-risk .row", { hasText: name }).click();
+    await expect(page.locator("#msg-sent")).toContainText("approved by you");
+    await expect(page.getByRole("button", { name: "Approve and send" })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    // An empty message is not sent. The other club knows nothing of any of this.
+    await page.locator("#at-risk .row").nth(1).click();
+    await page.locator("#msg-text").fill("   ");
+    await page.getByRole("button", { name: "Approve and send" }).click();
+    await expect(page.getByRole("dialog")).toContainText("Write the message first.");
+    expect(await sim(page, (d) => d.state.outbox.length)).toBe(1);
+    await page.keyboard.press("Escape");
+    expect(await screen(page, "admin", "money")).toMatch(
+      new RegExp(`AUDIT LOG Message to ${name}, approved by the admin`),
+    );
+    const studio = await screen(page, "admin", "members", "studio");
+    expect(studio).not.toContain(name);
+    expect(studio).not.toMatch(/Sent Mon 16 Nov/);
+    expect(await sim(page, (d) => d.clubStats("pau").todo)).toBe(
+      (await sim(page, (d) => d.atRisk("pau").length)) - 1,
+    );
   });
-  test.fixme("changes the club's booking rules (booking window, cancel deadline, late-cancel rule, limits)", () => {
-    // Not built: only the waitlist rule can be changed. The other rules are shown, not editable.
+  test("sends payment reminders for overdue invoices: drafted, readable, changeable, approved, written down", async ({
+    page,
+  }) => {
+    await start(page);
+    await screen(page, "admin", "money");
+    // One at a time, from the invoice.
+    const row = page.locator("#invoice-list .row").first();
+    await expect(row).toContainText("overdue by 31 days");
+    await row.getByRole("button", { name: /^Remind/ }).click();
+    await expect(page.locator("#msg-text")).toHaveValue(
+      /a friendly reminder: invoice PAU-2026-0048 .* was due on Fri 16 Oct/,
+    );
+    await page.getByRole("button", { name: "Approve and send" }).click();
+    await expect(row).toContainText("Reminder sent Mon 16 Nov");
+    await expect(row.getByRole("button", { name: /^See the reminder/ })).toBeVisible();
+    // The rest together: every draft is on the screen; one is changed, one is held back.
+    await page.getByRole("button", { name: "Review 2 drafted reminders" }).click();
+    await expect(page.locator("#admin-reminders h1")).toHaveText("2 drafted, none sent");
+    const cards = page.locator("[data-remind]");
+    await expect(cards).toHaveCount(2);
+    await cards
+      .nth(0)
+      .locator("textarea")
+      .fill("Short note: the October invoice is still open. Thanks!");
+    await cards.nth(1).getByRole("switch").click();
+    await expect(cards.nth(0).locator("textarea")).toHaveValue(
+      "Short note: the October invoice is still open. Thanks!",
+    );
+    await page.getByRole("button", { name: "Approve and send 1 reminder" }).click();
+    await expect(page.locator(".toast")).toContainText("1 reminder sent, each as you approved it.");
+    const out = await sim(page, (d) =>
+      d.state.outbox.map((x: any) => [x.kind, x.text.slice(0, 22), !!x.ref]),
+    );
+    expect(out).toEqual([
+      ["reminder", "Hi Jonas, a friendly r", true],
+      ["reminder", "Short note: the Octobe", true],
+    ]);
+    await expect(page.getByRole("button", { name: "Review 1 drafted reminder" })).toBeVisible();
+    expect(await screen(page, "admin", "money")).toMatch(
+      /AUDIT LOG Payment reminder to .+?, approved by the admin \(PAU-2026-00\d\d\)/,
+    );
+    // Open invoices that are not overdue have no reminder; paid ones neither.
+    expect(await page.locator('#invoice-list [data-a="adm-sheet"]').count()).toBe(3);
+    // A reminder to the member you play reaches her chat.
+    await clock(page, ZURICH("2026-12-01T09:00"));
+    await screen(page, "admin", "money");
+    await page.getByRole("button", { name: "Remind: CHF 300.00, Mia Keller" }).click();
+    await page.getByRole("button", { name: "Approve and send" }).click();
+    expect(await screen(page, "athlete", "coach")).toContain(
+      "From PAU Trackrunning: Hi Mia, a friendly reminder: invoice PAU-2026-0042",
+    );
   });
-  test.fixme("handles a member at risk with a drafted message", () => {
-    // Not built (dashboard milestone C, retention radar).
+  test("edits the schedule: one session, every later one, a new one; booked members are told when the time moves", async ({
+    page,
+  }) => {
+    await start(page);
+    await sim(page, (d) => d.book("pau-track-2026-11-19", "t"));
+    await screen(page, "admin", "sched");
+    await page.locator('[data-v="asess|pau-track-2026-11-19"]').click();
+    const sheet = page.getByRole("dialog", { name: "Track session" });
+    // Capacity can't go below who is booked.
+    await sheet.locator("#e-cap").fill("5");
+    await sheet.getByRole("button", { name: "Save changes" }).click();
+    await expect(page.locator("#sess-error")).toContainText(
+      /already has \d+ booked\. Capacity can't go below that\./,
+    );
+    // Move it, make it bigger, give it to another coach.
+    await sheet.locator("#e-cap").fill("32");
+    await sheet.locator("#e-time").fill("19:00");
+    await sheet.locator("#e-coach").selectOption("Coach Nina");
+    await sheet.getByRole("button", { name: "Save changes" }).click();
+    await expect(page.locator(".toast")).toContainText(
+      /Saved\. \d+ booked members were told about the new time\./,
+    );
+    await expect(page.locator('tr[data-sid="pau-track-2026-11-19"]')).toContainText(
+      "Thu 19 Nov 19:00",
+    );
+    await expect(page.locator('tr[data-sid="pau-track-2026-11-19"]')).toContainText("Coach Nina");
+    await expect(page.locator('tr[data-sid="pau-track-2026-11-19"]')).toContainText("/ 32");
+    // The member is told on Path and in the chat, and her booking stays. The coach's week follows.
+    const path = await screen(page, "athlete", "path");
+    expect(path).toMatch(
+      /Moved by the club: Track session Thu 19 Nov · PAU Trackrunning · Now 19:00, it was 18:30\. Your booking stays\./,
+    );
+    expect(await sim(page, (d) => d.myBooking("pau-track-2026-11-19").status)).toBe("confirmed");
+    expect(await screen(page, "athlete", "coach")).toContain(
+      "moved Track session on Thu 19 Nov from 18:30 to 19:00",
+    );
+    expect(await screen(page, "coach", "week")).not.toMatch(
+      /Thursday 19[^]*?Track session[^]*?Friday/,
+    );
+    // Every later Wednesday: the ones in the schedule now, and the ones that come into it later.
+    await screen(page, "admin", "sched");
+    await page.locator('[data-v="asess|pau-technique-2026-11-18"]').click();
+    await page.locator("#e-time").fill("19:15");
+    await page.locator("#e-scope").selectOption("following");
+    await page.getByRole("button", { name: "Save changes" }).click();
+    await expect(page.locator(".toast")).toContainText(/Saved for \d sessions\./);
+    await clock(page, ZURICH("2026-12-20T12:00"));
+    const later = await sim(page, (d) =>
+      d
+        .sessList("pau")
+        .filter((s: any) => s.off === "technique" && s.start > new Date())
+        .map((s: any) => `${s.start.getHours()}:${s.start.getMinutes()}`),
+    );
+    expect(later.length).toBeGreaterThan(2);
+    expect(new Set(later)).toEqual(new Set(["19:15"]));
+    await clock(page, MONDAY_NOON);
+    // A new session: refused in the past and when it doubles one, then added and bookable.
+    await screen(page, "admin", "sched");
+    await page.getByRole("button", { name: "Add a session" }).click();
+    await page.locator("#a-off").selectOption("community");
+    await page.locator("#a-date").fill("2026-11-15");
+    await page.getByRole("button", { name: "Add to the schedule" }).click();
+    await expect(page.locator("#add-error")).toContainText("That time is already over.");
+    await page.locator("#a-date").fill("2026-11-21");
+    await page.locator("#a-time").fill("10:00");
+    await page.getByRole("button", { name: "Add to the schedule" }).click();
+    await expect(page.locator("#add-error")).toContainText(
+      "There is already a saturday community session at that time.",
+    );
+    await page.locator("#a-date").fill("2026-11-18");
+    await page.locator("#a-time").fill("07:00");
+    await page.locator("#a-cap").fill("8");
+    await page.getByRole("button", { name: "Add to the schedule" }).click();
+    await expect(page.locator(".toast")).toContainText(
+      "Added: Saturday community session, Wed 18 Nov 07:00. Members can book it now.",
+    );
+    await expect(page.locator("tr", { hasText: "Wed 18 Nov 07:00" })).toContainText("added");
+    const b = await sim(page, (d) => {
+      const s: any = d.sessList("pau").find((x: any) => x.added);
+      return { r: d.book(s.id, "t").status, cap: s.cap };
+    });
+    expect(b).toEqual({ r: "confirmed", cap: 8 });
+    expect(await screen(page, "admin", "money")).toMatch(
+      /Added Saturday community session, Wed 18 Nov 07:00, 8 places/,
+    );
   });
-  test.fixme("sends payment reminders for open and overdue invoices", () => {
-    // Not built: open and overdue invoices are listed and can be marked paid. Sending a reminder is not built.
+  test("cancels a session from the schedule: the admin sees what it does first; booked members are told and get the session back", async ({
+    page,
+  }) => {
+    await start(page);
+    await sim(page, (d) => d.book("pau-track-2026-11-19", "t"));
+    expect(await sim(page, (d) => d.passState(d.passOf("pau")).text)).toBe(
+      "4 of 4 used in November",
+    );
+    await screen(page, "admin", "sched");
+    await page.locator('[data-v="asess|pau-track-2026-11-19"]').click();
+    await page.getByRole("button", { name: "Cancel this session" }).click();
+    const fx = page.locator("#cancel-effects");
+    await expect(fx).toContainText(/\d+ booked members are told at once, in the app\./);
+    await expect(fx).toContainText("Nobody loses a credit.");
+    await expect(fx).toContainText("It can't be undone.");
+    // "Keep it" keeps it.
+    await page.getByRole("button", { name: "Keep it" }).click();
+    expect(await sim(page, (d) => !!d.state.sessions["pau-track-2026-11-19"].cancelled)).toBe(
+      false,
+    );
+    await page.getByRole("button", { name: "Cancel this session" }).click();
+    await page.getByRole("button", { name: /^Cancel the session and tell \d+ members$/ }).click();
+    await expect(page.locator(".toast")).toContainText(
+      /Cancelled\. \d+ booked members were told and got the session back on their pass\./,
+    );
+    await expect(page.locator('tr[data-sid="pau-track-2026-11-19"]')).toContainText("Cancelled");
+    await expect(page.locator('tr[data-sid="pau-track-2026-11-19"] [data-a="free"]')).toHaveCount(
+      0,
+    );
+    // The member: told on Path, the session back on her pass, and it can't be booked.
+    expect(await screen(page, "athlete", "path")).toContain("Cancelled by the club: Track session");
+    expect(await sim(page, (d) => d.passState(d.passOf("pau")).text)).toBe(
+      "3 of 4 used in November",
+    );
+    expect(await sim(page, (d) => d.book("pau-track-2026-11-19", "t").code)).toBe("CANCELLED");
+    // The admin can open it again and sees that it is cancelled; it is in the audit log.
+    await screen(page, "admin", "sched");
+    await page.locator('[data-v="asess|pau-track-2026-11-19"]').click();
+    await expect(page.getByRole("dialog")).toContainText("This session is cancelled.");
+    await page.keyboard.press("Escape");
+    expect(await screen(page, "admin", "money")).toMatch(
+      /Cancelled Track session, Thu 19 Nov 18:30: \d+ booked members told/,
+    );
   });
-  test.fixme("imports members from a CSV file", () => {
-    // Not built.
+  test("changes the club's booking rules, and the engine follows: booking window, cancel deadline, late cancel, limits, waitlist", async ({
+    page,
+  }) => {
+    await start(page);
+    await screen(page, "admin", "dash");
+    await page.getByRole("button", { name: "Change the rules" }).click();
+    // A rule that makes no sense is refused, and what was typed stays.
+    await page.locator("#r-opens").fill("0");
+    await page.getByRole("button", { name: "Save rules" }).click();
+    await expect(page.locator("#rules-error")).toContainText(
+      "The booking window is a whole number of days, from 1 to 365.",
+    );
+    await expect(page.locator("#r-opens")).toHaveValue("0");
+    await page.locator("#r-opens").fill("3");
+    await page.locator("#r-cancel").fill("24");
+    await page.locator("#r-late").selectOption("forfeit");
+    await page.locator("#r-day").fill("1");
+    await page.locator("#r-week").fill("2");
+    await page.locator("#r-wl").selectOption("offer");
+    await page.locator("#r-hold").fill("1");
+    await page.getByRole("button", { name: "Save rules" }).click();
+    await expect(page.locator(".toast")).toContainText(
+      "Rules saved. They hold for every booking from now on",
+    );
+    const rules =
+      "Book up to 3 days ahead. Free cancel until 24 h before. Later than that, the credit is not returned. Max 2 bookings a week and 1 a day. Waitlist: a freed spot is held for the next person for 1 h, then offered on.";
+    await expect(page.locator("#rules")).toContainText(rules);
+    // Members read the same words, and the engine holds every one of them.
+    await screen(page, "athlete", "week");
+    await page.locator("summary", { hasText: "Club rules" }).click();
+    await expect(page.locator("#weekpane details")).toContainText(rules);
+    const r = await sim(page, (d) => {
+      const S = d.state,
+        far = d.check(S.sessions["pau-gym-2026-11-20"]).msg, // Friday is 4 days ahead
+        a = d.book("pau-track-2026-11-16", "t"); // today 18:30: inside the 24 h deadline
+      d.addSession("pau", "gym", "2026-11-16", "20:30", 10);
+      const second: any = d.sessList("pau").find((x: any) => x.added),
+        sameDay = d.check(second),
+        late = d.cancel(a.bid);
+      return {
+        far,
+        a: a.status,
+        sameDay: sameDay.msg,
+        late: late.status,
+        lateMsg: late.msg,
+        used: d.passState(d.passOf("pau")).text,
+      };
+    });
+    expect(r.far).toContain("Booking opens 3 days before.");
+    expect(r.sameDay).toBe("You already have 1 classes on Mon 16 Nov. The club allows 1 a day.");
+    expect(r).toMatchObject({
+      a: "confirmed",
+      late: "late_cancelled",
+      used: "4 of 4 used in November",
+    });
+    expect(r.lateMsg).toContain("the credit is not returned");
+    // The studio's rules did not move, and the change is written down.
+    expect(await sim(page, (d) => d.policyText("studio"))).toContain(
+      "Book up to 6 days ahead. Free cancel until 4 h before.",
+    );
+    expect(await screen(page, "admin", "money")).toMatch(
+      /AUDIT LOG [^]*Booking rules at PAU Trackrunning: Book up to 3 days ahead\./,
+    );
+    // Saving the same again changes nothing and says so.
+    await screen(page, "admin", "dash");
+    await page.getByRole("button", { name: "Change the rules" }).click();
+    await page.getByRole("button", { name: "Save rules" }).click();
+    await expect(page.locator(".toast")).toContainText("Nothing changed.");
   });
-  test.fixme("reads club health: active members, attendance, revenue against last month", () => {
-    // Not built (dashboard milestone C): Home shows four numbers and the rules.
+  test("imports members from a CSV file: every row is shown first, bad rows are left out, names are text, nobody is written to", async ({
+    page,
+  }) => {
+    await start(page);
+    await screen(page, "admin", "members");
+    await page.getByRole("button", { name: "Import members" }).click();
+    await page.getByRole("button", { name: "Read the list" }).click();
+    await expect(page.locator("#import-note")).toContainText("PATH found nobody in that.");
+    const csv = [
+      "Name;E-Mail;Pass",
+      "Lena Vogt;lena.vogt@example.com;Regular season pass",
+      "Tom Iten;tom.iten@example.com;Gold card",
+      "Lea Brunner;lea.b@example.com;Drop-in season pass",
+      ";nobody@example.com;",
+      "Ada <img src=x onerror=window.__hit=1>;not-an-email;",
+      "Lena Vogt;lena2@example.com;",
+      "Ruth Keel;;10-session pack",
+    ].join("\n");
+    await page
+      .locator("#mfile")
+      .setInputFiles({ name: "members.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
+    await expect(page.locator("#import-note")).toContainText('Read "members.csv".');
+    await page.getByRole("button", { name: "Read the list" }).click();
+    await expect(page.locator("#admin-import h1")).toHaveText("3 of 7 can be added");
+    const rows = page.locator("#import-rows .row");
+    await expect(rows.nth(1)).toContainText(
+      '"Gold card" is not one of your passes: added without a pass',
+    );
+    await expect(rows.nth(2)).toContainText("Already a member");
+    await expect(rows.nth(3)).toContainText("No name");
+    await expect(rows.nth(4)).toContainText("The email address looks wrong");
+    await expect(rows.nth(5)).toContainText("Twice in this file");
+    await expect(rows.nth(6)).toContainText("No email: they can't be invited yet");
+    expect(await page.locator("img[src='x']").count()).toBe(0);
+    expect(await sim(page, (d) => d.members("pau").length)).toBe(120); // nothing is added by looking
+    await page.getByRole("button", { name: "Add 3 members" }).click();
+    await expect(page.locator(".toast")).toContainText(
+      "3 members added. 4 left out. Nobody has been written to",
+    );
+    await expect(page.locator("#member-count")).toHaveText(/^124 members: .* 3 new\.$/);
+    await expect(page.locator("#member-table")).toContainText("Lena Vogt");
+    await expect(page.locator("#member-table")).toContainText("Ruth Keel");
+    await expect(page.locator("#member-table tbody tr", { hasText: "Ruth Keel" })).toContainText(
+      "10-session pack",
+    );
+    // Nothing went out, the other club is untouched, new members are not "drifting away", and it survives a reload.
+    expect(
+      await sim(page, (d) => [
+        d.state.outbox.length,
+        d.members("studio").length,
+        d.atRisk("pau").some((x: any) => x.m.status === "New"),
+      ]),
+    ).toEqual([0, 120, false]);
+    expect(await page.evaluate(() => (window as any).__hit)).toBeUndefined();
+    await page.reload();
+    expect(await sim(page, (d) => d.members("pau").length)).toBe(123);
+    expect(await screen(page, "admin", "money")).toMatch(
+      /Imported 3 members from a file, 4 left out/,
+    );
   });
 });

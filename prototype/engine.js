@@ -53,6 +53,7 @@ const ORGS = {
     single: { name: "Drop-in", price: 33 },
     policy: { opensDays: 6, cancelMin: 240, lateCancel: "forfeit", waitlist: true, maxDay: 2, maxWeek: 7 },
     me: { coach: "Noor", groups: ["Yoga"], myGroup: "Yoga" },
+    demo: { lastMonthVisits: 1.2 }, // invented: October was a busier month here, so the two clubs do not tell the same story
     coaches: [["Lena", "Strength and Ride"], ["Marco", "HIIT"], ["Aylin", "Mobility"], ["Noor", "Yoga flow"]],
     offerings: [
       { id: "strength", group: "Strength", sport: "gym", name: "Strength", days: [1, 2, 3, 4, 5], time: [7, 0], dur: 50, cap: 14, loc: "Studio One", coach: "Lena", intensity: "high" },
@@ -72,10 +73,14 @@ const ORGS = {
 };
 /* The filter chips in Week: every offering belongs to one kind of training. */
 const CAT = { track: "Running", technique: "Running", community: "Running", gym: "Strength", strength: "Strength", hiit: "HIIT", mobility: "Mobility", yoga: "Yoga", ride: "Cycling" };
+/* The booking rules of a club: what the club started with, and on top of it whatever its admin changed (S.settings[club].rules).
+   The booking engine, the screens and the coach all read the rules here and nowhere else. */
+const policyOf = (org) => ({ ...ORGS[org].policy, ...((S.settings[org] && S.settings[org].rules) || {}) });
 const policyText = (org) => {
-  const o = ORGS[org], set = S.settings[org], p = o.policy, out = [`Book up to ${p.opensDays} days ahead.`, `Free cancel until ${p.cancelMin / 60} h before.`];
+  const set = S.settings[org], p = policyOf(org), out = [`Book up to ${p.opensDays} days ahead.`, `Free cancel until ${p.cancelMin / 60} h before.`];
   out.push(p.lateCancel === "forfeit" ? "Later than that, the credit is not returned." : "No penalty for late cancels.");
-  if (p.maxDay) out.push(`Max ${p.maxWeek} bookings a week and ${p.maxDay} a day.`);
+  if (p.maxDay) out.push(`Max ${p.maxWeek ? p.maxWeek + " bookings a week and " : ""}${p.maxDay} a day.`);
+  else if (p.maxWeek) out.push(`Max ${p.maxWeek} bookings a week.`);
   out.push(set.waitlistMode === "offer" ? `Waitlist: a freed spot is held for the next person for ${set.offerHoldMin / 60} h, then offered on.` : "Waitlist: the next person is booked automatically.");
   return out.join(" ");
 };
@@ -94,23 +99,29 @@ const PASS_MIX = {
 /* PAU members who also hold a PT 10-pack, with the sessions they have left: personal training is in use, not only on the price list. */
 const PT_LEFT = { 0: 6, 9: 3, 27: 8, 50: 10, 61: 1, 73: 7, 88: 4, 97: 9, 104: 2, 115: 5 };
 const MEMBER_CACHE = {};
-function members(org) {
+/* The invented members a club starts with. Rosters, the coach's athletes and the seeded invoices are built from these. */
+function baseMembers(org) {
   if (MEMBER_CACHE[org]) return MEMBER_CACHE[org];
   const [lasts, firsts] = NAME_PARTS[org], out = [], studioGroups = ["Strength", "HIIT", "Mobility", "Yoga", "Ride"];
   for (const last of lasts) for (const first of firsts) {
     const i = out.length, name = `${first} ${last}`, h = hash(name + org), h2 = hash(org + name + "s");
     let acc = 0; const mix = PASS_MIX[org].find((m) => (acc += m[1]) > h) || PASS_MIX[org][0];
-    const trial = /trial|starter/i.test(mix[0]);
-    out.push({ id: `${org}-m${i}`, i, name, first,
+    const trial = /trial|starter/i.test(mix[0]), paused = !trial && h2 > 0.9;
+    /* How often they came: last month, and this month so far. About one in eleven is drifting away. Club data only: bookings and check-ins. */
+    const hp = hash(name + "p" + org), hv = hash(name + "v" + org), hl = hash(name + "l" + org), prev = 1 + Math.floor(hp * 9), drift = !paused && hv < 0.09;
+    const cur = paused ? 0 : drift ? (hv < 0.045 ? 0 : 1) : Math.max(1, Math.round(prev * (0.45 + hl * 0.6)));
+    out.push({ id: `${org}-m${i}`, i, name, first, prev, cur, last: paused ? 40 + Math.floor(hl * 40) : cur === 0 ? 21 + Math.floor(hl * 20) : drift ? 12 + Math.floor(hl * 8) : Math.floor(hl * 7), joined: hash(name + "j" + org) < 0.06,
       group: org === "pau" ? (i < 48 ? (i % 3 === 2 ? "Technique" : "Track") : i < 96 ? "Gym" : "Community") : studioGroups[i % 5],
-      status: trial ? "Trial" : h2 > 0.9 ? "Paused" : "Active", product: mix[0], left: mix[2] ? 1 + Math.floor(h2 * (mix[2] - 1)) : null,
+      status: trial ? "Trial" : paused ? "Paused" : "Active", product: mix[0], left: mix[2] ? 1 + Math.floor(h2 * (mix[2] - 1)) : null,
       pt: org === "pau" && PT_LEFT[i] != null ? { left: PT_LEFT[i], of: 10 } : null });
   }
   return (MEMBER_CACHE[org] = out);
 }
+/* Everyone at the club: the members it started with, and the ones an admin imported since. */
+const members = (org) => [...baseMembers(org), ...((S.extra && S.extra[org]) || [])];
 const memberPass = (m) => `${m.product}${m.left != null ? ` · ${m.left} left` : ""}${m.pt ? ` · PT 10-pack, ${m.pt.left} of ${m.pt.of} left` : ""}`;
 /* Who can be on the roster of a session: the groups that train in it, or the whole club. */
-function poolOf(s) { const off = offOf(s), all = members(s.org); return (off.only ? all.filter((m) => off.only.includes(m.group)) : all).map((m) => m.name); }
+function poolOf(s) { const off = offOf(s), all = baseMembers(s.org); return (off.only ? all.filter((m) => off.only.includes(m.group)) : all).map((m) => m.name); }
 
 /* ---------- state ---------- */
 const STORE_KEY = "path-demo-v5", WEEKS = 4, PER = 12, LOAD_LIMIT = 1.1, CARD_TTL_MIN = 15;
@@ -138,14 +149,17 @@ function ensureSessions() {
     const h = hash(id), h2 = hash(id + "w");
     let others = oid === "pau" ? (off.id === "track" ? 17 + Math.floor(h * 10) : off.id === "gym" ? 11 + Math.floor(h * 5) : 12 + Math.floor(h * 15)) : Math.min(off.cap, Math.floor(off.cap * (0.55 + h * 0.5)));
     others = Math.min(others, off.cap);
-    S.sessions[id] = { id, org: oid, off: off.id, start: new Date(d.getFullYear(), d.getMonth(), d.getDate(), off.time[0], off.time[1]), cap: off.cap, others, waitOthers: others >= off.cap ? 1 + Math.floor(h2 * 3) : 0, left: 0 };
+    /* A change the admin made "for this and all later ones" also holds for sessions that come into the schedule later. */
+    const ov = (S.settings[oid].sched || {})[`${off.id}:${d.getDay()}`] || {}, cap = ov.cap || off.cap, t = ov.time || off.time;
+    others = Math.min(others, cap);
+    S.sessions[id] = { id, org: oid, off: off.id, start: new Date(d.getFullYear(), d.getMonth(), d.getDate(), t[0], t[1]), cap, others, waitOthers: others >= cap ? 1 + Math.floor(h2 * 3) : 0, left: 0, ...(ov.coach ? { coach: ov.coach } : {}) };
   }
 }
 /* The other members' invoices: per club a few open, a few overdue and a few paid, each for the pass that member holds. */
 function seedInvoices(T) {
   const out = [], plan = { pau: [[9, 6, "open"], [11, 12, "open"], [22, 3, "open"], [40, -6, "open"], [57, -13, "open"], [73, -31, "open"], [84, -20, "paid"], [99, -9, "paid"], [112, -2, "paid"]], studio: [[5, 5, "open"], [18, 10, "open"], [39, -4, "open"], [57, -18, "open"], [3, -12, "paid"], [66, -3, "paid"]] };
   for (const org of Object.keys(plan)) plan[org].forEach(([i, due, status], k) => {
-    const m = members(org)[i], prod = ORGS[org].products.find((p) => p.name === m.product), pt = m.pt && k % 2 === 0;
+    const m = baseMembers(org)[i], prod = ORGS[org].products.find((p) => p.name === m.product), pt = m.pt && k % 2 === 0;
     out.push({ id: `${org === "pau" ? "PAU" : "STU"}-2026-${String(org === "pau" ? 43 + k : 18 + k).padStart(4, "0")}`, org, member: m.name, what: pt ? "PT 10-pack" : `${m.product}${org === "pau" ? ", winter season" : ""}`, amount: pt ? 900 : prod.price || ORGS[org].single.price, due: addDays(T, due), status });
   });
   return out;
@@ -159,7 +173,7 @@ function seed() {
     me: { name: "Mia Keller", sports: "Running · Strength" },
     goal: { title: "Sub‑40 10K", date: new Date(2027, 4, 9), why: "Because I want to race the Zurich 10K with my club." },
     stages: ["Foundation", "Build", "Sharpen", "Test", "Recover"], stage: 1, stageSessions: 5,
-    sessions: {}, bookings: [], waitlist: [], ledger: [], notices: [], entries: [], pbs: [], chat: [], props: {}, audit: [], alerts: [], attendance: {}, walkins: {}, idem: {}, series: [],
+    sessions: {}, bookings: [], waitlist: [], ledger: [], notices: [], outbox: [], extra: { pau: [], studio: [] }, entries: [], pbs: [], chat: [], props: {}, audit: [], alerts: [], attendance: {}, walkins: {}, idem: {}, series: [],
     /* What a club admin can change. PAU books the next person automatically; Studio Demo offers the spot with a 2 h hold. */
     settings: { pau: { waitlistMode: "auto", offerHoldMin: 120 }, studio: { waitlistMode: "offer", offerHoldMin: 120 } },
     filter: { cat: "all", mine: false },
@@ -236,19 +250,20 @@ function resetDemo() { try { localStorage.removeItem(STORE_KEY); } catch (e) { /
 /* ---------- queries ---------- */
 const sessList = (org) => Object.values(S.sessions).filter((s) => s.org === org).sort((a, b) => a.start - b.start);
 const offOf = (s) => ORGS[s.org].offerings.find((o) => o.id === s.off);
+const coachOf = (s) => s.coach || offOf(s).coach; // the schedule can give one session to another coach
 const endOf = (s) => new Date(s.start.getTime() + offOf(s).dur * 60000);
 const HELD = ["confirmed", "attended", "no_show"];
 const myBooking = (sid) => S.bookings.find((b) => b.sid === sid && HELD.includes(b.status));
 const myWait = (sid) => S.waitlist.find((w) => w.sid === sid);
 const booked = (s) => s.others + (myBooking(s.id) ? 1 : 0);
 const spots = (s) => Math.max(0, s.cap - booked(s) - (s.held || 0)); // a spot held for a waitlist offer is not free
-const deadline = (s) => new Date(s.start.getTime() - ORGS[s.org].policy.cancelMin * 60000);
+const deadline = (s) => new Date(s.start.getTime() - policyOf(s.org).cancelMin * 60000);
 const passOf = (org) => S.passes.find((p) => p.org === org && !p.single && !p.pack);
 const ticketOf = (org) => S.passes.find((p) => p.org === org && p.single); // single sessions bought one at a time
 const packOf = (org) => S.passes.find((p) => p.org === org && p.pack); // a pack of sessions bought on top of a season pass
 /* Credits the member holds next to her main pass. A single ticket is used before a pack. */
 const sparePass = (s) => [ticketOf(s.org), packOf(s.org)].find((p) => p && !passEnded(p, s.start) && passState(p).left > 0) || null;
-const opensAt = (s) => addDays(sod(s.start), -ORGS[s.org].policy.opensDays);
+const opensAt = (s) => addDays(sod(s.start), -policyOf(s.org).opensDays);
 const coveredByMe = (s) => { const p = passOf(s.org); return !!offOf(s).free || (!!p && (!p.covers || p.covers.includes(s.off))); };
 const heldIn = (org) => S.bookings.filter((b) => HELD.includes(b.status) && S.sessions[b.sid].org === org);
 const upcomingBookings = () => S.bookings.filter((b) => b.status === "confirmed").map((b) => ({ b, s: S.sessions[b.sid] })).filter((r) => r.s.start > now()).sort((a, c) => a.s.start - c.s.start);
@@ -329,7 +344,7 @@ const pastLabel = (b, s) => (b.status === "attended" ? "Attended" : endOf(s) <= 
 
 /* ---------- booking engine: one path for the app, the coach chat and the waitlist ---------- */
 function check(s, opts = {}) {
-  const o = ORGS[s.org], p = o.policy, off = offOf(s);
+  const o = ORGS[s.org], p = policyOf(s.org), off = offOf(s);
   if (s.cancelled) return err("CANCELLED", "The club cancelled this session.");
   if (s.start <= now()) return err("WINDOW_CLOSED", endOf(s) <= now() ? "This session is over. It can't be booked any more." : "This session has already started.");
   if (myBooking(s.id)) return err("ALREADY_BOOKED", "You are already booked for this session.");
@@ -337,9 +352,11 @@ function check(s, opts = {}) {
   if (now() < opensAt(s)) return err("WINDOW_CLOSED", `Booking opens ${p.opensDays} days before. This one opens on ${fDay(opensAt(s))}.`);
   if (p.maxDay) {
     const sameDay = heldIn(s.org).filter((b) => ymd(S.sessions[b.sid].start) === ymd(s.start)).length;
-    if (sameDay >= p.maxDay) return err("LIMIT_REACHED", `You already have ${sameDay} classes on ${fDay(s.start)}. The studio allows ${p.maxDay} a day.`);
+    if (sameDay >= p.maxDay) return err("LIMIT_REACHED", `You already have ${sameDay} classes on ${fDay(s.start)}. The club allows ${p.maxDay} a day.`);
+  }
+  if (p.maxWeek) {
     const wk = ymd(monday(s.start)), inWeek = heldIn(s.org).filter((b) => ymd(monday(S.sessions[b.sid].start)) === wk).length;
-    if (inWeek >= p.maxWeek) return err("LIMIT_REACHED", `You already have ${inWeek} classes that week. The studio allows ${p.maxWeek} a week.`);
+    if (inWeek >= p.maxWeek) return err("LIMIT_REACHED", `You already have ${inWeek} classes that week. The club allows ${p.maxWeek} a week.`);
   }
   /* A yes always says whether it overlaps with something else of the member's (QA-02). She decides; it is never silent. */
   const fine = (pass, note) => ({ ok: true, pass, note, clash: clashAt(s.start, endOf(s), s.id) });
@@ -366,7 +383,7 @@ function offersFor(s) {
   if (c.ok || !c.blocked) return [];
   const o = ORGS[s.org], pass = passOf(s.org), full = spots(s) === 0 && !held, out = [], pack = o.products.find((x) => x.buy);
   const renew = c.code === "PASS_EXPIRED" && pass ? renewalOf(pass) : null;
-  if (full && o.policy.waitlist && !w) out.push({ kind: "waitlist", label: "Join waitlist" });
+  if (full && policyOf(s.org).waitlist && !w) out.push({ kind: "waitlist", label: "Join waitlist" });
   if (renew) out.push({ kind: "renew", label: `Renew for ${renew.season.name} · ${chf(renew.price)}`, what: `${pass.name}, ${renew.season.name}`, amount: renew.price, note: `Valid until ${fDate(renew.season.end)}.` });
   if (!full && o.single) out.push({ kind: "dropin", label: `Buy 1 drop-in · ${chf(o.single.price)}`, what: `${o.single.name}: ${offOf(s).name}, ${fDay(s.start)}`, amount: o.single.price });
   if (o.upgrade && pass && pass.kind !== "unlimited" && !renew) out.push({ kind: "upgrade", label: `Upgrade to Regular · ${chf(o.upgrade.price)}`, what: `Upgrade to ${o.upgrade.name}`, amount: o.upgrade.price, note: o.upgrade.note });
@@ -400,7 +417,7 @@ function book(sid, source, key, opts = {}) {
   const c = check(s);
   if (!c.ok) {
     // Out of credits on a full session: the waitlist is still open if the member asks for it, because nothing is charged until a spot comes up.
-    if (c.blocked && opts.wait && spots(s) === 0 && ORGS[s.org].policy.waitlist) return remember(key, joinWait(s, true));
+    if (c.blocked && opts.wait && spots(s) === 0 && policyOf(s.org).waitlist) return remember(key, joinWait(s, true));
     return remember(key, c);
   }
   if (spots(s) > 0) {
@@ -408,7 +425,7 @@ function book(sid, source, key, opts = {}) {
     S.bookings.push(b); if (c.pass) debit(c.pass, s, b);
     return remember(key, { ok: true, status: "confirmed", bid: b.id, msg: `Booked: ${offOf(s).name}, ${fDay(s.start)} ${fTime(s.start)}. Free cancel until ${fDay(deadline(s))} ${fTime(deadline(s))}.${c.clash ? ` Heads up: it overlaps with ${c.clash}.` : ""}` });
   }
-  if (!ORGS[s.org].policy.waitlist) return remember(key, err("SESSION_FULL", "This session is full."));
+  if (!policyOf(s.org).waitlist) return remember(key, err("SESSION_FULL", "This session is full."));
   return remember(key, joinWait(s, false));
 }
 /* `behind` stands for the people who join after the member: in a full class, one more does. */
@@ -422,7 +439,7 @@ function cancel(bid, key) {
   const b = S.bookings.find((x) => x.id === bid);
   if (!b || b.status !== "confirmed") return remember(key, err("NOT_FOUND", "That booking is not active any more."));
   if (S.sessions[b.sid].start <= now()) return remember(key, err("WINDOW_CLOSED", "That session has already started, so it can't be cancelled."));
-  const s = S.sessions[b.sid], pass = S.passes.find((p) => p.id === b.pass), late = now() > deadline(s), forfeit = late && ORGS[s.org].policy.lateCancel === "forfeit";
+  const s = S.sessions[b.sid], pass = S.passes.find((p) => p.id === b.pass), late = now() > deadline(s), forfeit = late && policyOf(s.org).lateCancel === "forfeit";
   b.status = late ? "late_cancelled" : "cancelled";
   if (pass) S.ledger.push({ pass: pass.id, delta: forfeit ? 0 : 1, kind: forfeit ? "forfeit_late_cancel" : "refund_cancel", reason: `${forfeit ? "Late cancel" : "Cancelled"}: ${offOf(s).name}, ${fDay(s.start)}`, at: now(), period: ym(s.start), bid: b.id });
   const tail = forfeit ? " This was inside the cancel deadline, so the credit is not returned." : !pass ? "" : pass.kind === "credits" ? " Your credit is back." : ` It no longer counts towards ${MOL[s.start.getMonth()]}.`;
@@ -597,6 +614,149 @@ function pauseSeries(id, paused) {
 }
 function endSeries(id) { const se = S.series.find((x) => x.id === id); S.series = S.series.filter((x) => x.id !== id); return { ok: true, msg: se ? `${seriesLabel(se)} ended. Your existing bookings stay.` : "Ended." }; }
 
+/* ---------- the club's side (N-04): health, members at risk, messages, schedule, rules, import ----------
+   Everything here reads the club's own data only: who is a member, what they booked and attended, what they paid.
+   Nothing reads a training log, a goal or a pain flag: those belong to the athlete and are shared with a coach, never with the office.
+   PATH drafts; a person approves every message before it is sent. In the demo "sent" means written to the outbox: no real message leaves PATH. */
+const monthName = (k = 0) => MOL[(now().getMonth() + 12 + k) % 12];
+/* Why a member may be drifting away, in plain words. Paused members are not at risk: they said so themselves. */
+function riskOf(m) {
+  const out = [];
+  if (m.status === "Paused" || m.status === "New") return out;
+  if (m.cur === 0) out.push([2, `No visit in ${m.last} days`]);
+  else if (m.cur === 1 && m.prev >= 4) out.push([2, `Came ${m.prev} times in ${monthName(-1)}, once so far in ${monthName()}`]);
+  if (m.left != null && m.left <= 1 && hash(m.name + "k") < 0.5) out.push([1, `${m.left} ${m.left === 1 ? "session" : "sessions"} left on the ${m.product.replace(/^(\d+)/, "$1")} pack`.replace(" pack pack", " pack")]);
+  if (m.status === "Trial" && hash(m.name + "t") > 0.62) out.push([1, "On a trial that ends this week, no pass yet"]);
+  return out;
+}
+const atRisk = (org) => members(org).map((m) => ({ m, why: riskOf(m) })).filter((x) => x.why.length).sort((a, b) => b.why[0][0] - a.why[0][0] || b.why.length - a.why.length || b.m.last - a.m.last);
+const sentTo = (org, name, kind) => (S.outbox || []).find((x) => x.org === org && x.to === name && x.kind === kind) || null;
+/* PATH's drafts. Short, kind, no pressure, no guesses about why. The admin can change every word before approving. */
+function draftCheckin(org, m) {
+  const o = ORGS[org], why = riskOf(m)[0], next = sessList(org).find((s) => s.start > addDays(now(), 1) && spots(s) > 3 && !s.cancelled);
+  const open = next ? ` ${offOf(next).name} on ${WDL[next.start.getDay()]} at ${fTime(next.start)} has room.` : "";
+  if (why && /trial/.test(why[1])) return `Hi ${m.first}, your trial at ${o.name} ends this week. How did you like it? If you want to keep coming, tell us and we'll find the pass that fits.${open}`;
+  if (why && /left on/.test(why[1])) return `Hi ${m.first}, a heads-up: you have ${m.left} ${m.left === 1 ? "session" : "sessions"} left on your ${m.product}. You can top it up in the app under Me whenever you like.${open}`;
+  return `Hi ${m.first}, we haven't seen you at ${o.name} for a while and wanted to say hello. No pressure at all.${open} If something about the times or the sessions doesn't work for you, tell us: we'd like to know.`;
+}
+const draftReminder = (i) => `Hi ${i.member.split(" ")[0]}, a friendly reminder: invoice ${i.id} for ${i.what} (${chf(i.amount)}) was due on ${fDay(i.due)}. You can pay it in the app under Me, or by bank transfer. If it is already on its way, please ignore this. Thank you, ${ORGS[i.org].name}`;
+/* The one way a message to a member leaves the office: an admin approved exactly this text. */
+function sendApproved(org, to, kind, text, ref) {
+  const body = String(text || "").trim(); if (!body) return err("EMPTY", "Write the message first.");
+  (S.outbox ||= []).push({ id: S.seq++, org, to, kind, text: body, at: now(), ref: ref || null });
+  if (kind === "reminder") { const i = S.invoices.find((x) => x.id === ref); if (i) i.reminded = now(); }
+  if (to === S.me.name) S.chat.push({ who: "coach", text: `From ${ORGS[org].name}: ${body}` });
+  S.audit.unshift({ what: `${kind === "reminder" ? "Payment reminder" : "Message"} to ${to}, approved by the admin${ref ? ` (${ref})` : ""}`, at: now() });
+  return { ok: true, msg: `Sent to ${to}. Demo: no real message leaves PATH.` };
+}
+/* How the club is doing, against last month. Counted from the member list, the schedule and the invoices; "last month" is demo data. */
+function clubStats(org) {
+  const o = ORGS[org], ms = members(org), day = now().getDate(), live = (m) => m.status !== "Paused";
+  const active = ms.filter(live).length + 1, joined = ms.filter((m) => m.joined || m.status === "New").length, left = ms.filter((m) => m.status === "Paused" && hash(m.name + "q") < 0.35).length;
+  const visits = ms.reduce((n, m) => n + m.cur, 0) + S.bookings.filter((b) => S.sessions[b.sid].org === org && b.status === "attended" && ym(S.sessions[b.sid].start) === ym(now())).length;
+  const visitsLast = Math.round(ms.reduce((n, m) => n + m.prev, 0) * Math.min(1, day / 30) * ((o.demo && o.demo.lastMonthVisits) || 1));
+  const wk = sessList(org).filter((s) => s.start > now() && s.start < addDays(today(), 7) && !s.cancelled), fill = wk.reduce((n, s) => n + booked(s), 0) / Math.max(1, wk.reduce((n, s) => n + s.cap, 0)), fillLast = 0.62 + hash(org + "fill") * 0.14;
+  const inv = S.invoices.filter((i) => i.org === org), open = inv.filter((i) => i.status === "open"), od = open.filter(overdue);
+  const price = (name) => (o.products.find((p) => p.name === name) || { price: 0 }).price;
+  const sold = ms.filter((m) => m.joined).reduce((n, m) => n + price(m.product), 0), paid = inv.filter((i) => i.status === "paid").reduce((n, i) => n + i.amount, 0);
+  const bought = S.ledger.filter((l) => l.kind === "grant" && /^Bought/.test(l.reason) && now() - l.at < 864e5 * 2 && S.passes.some((p) => p.id === l.pass && p.org === org)).length * (o.products.find((p) => p.buy) || { price: 0 }).price;
+  const revenue = sold + paid + bought, revenueLast = Math.round((sold + seedInvoices(today()).filter((i) => i.org === org && i.status === "paid").reduce((n, i) => n + i.amount, 0)) * (0.9 + hash(org + "rev") * 0.25) / 10) * 10;
+  const quiet = wk.filter((s) => booked(s) / s.cap < 0.4), risk = atRisk(org);
+  return { active, activeDelta: joined - left, joined, left, visits, visitsLast, visitsPct: visitsLast ? Math.round(((visits - visitsLast) / visitsLast) * 100) : 0, fill, fillLast, revenue, revenueLast, open, od, odSum: od.reduce((n, i) => n + i.amount, 0), quiet, risk, todo: risk.filter((x) => !sentTo(org, x.m.name, "checkin")).length };
+}
+/* The one sentence on the admin's Home. It says what the numbers say, good or bad. */
+function clubSentence(org) {
+  const c = clubStats(org), up = c.activeDelta >= 0 && c.visitsPct >= 0, down = c.activeDelta < 0 && c.visitsPct < 0, sign = (n) => (n > 0 ? "+" + n : String(n));
+  const parts = [`${ORGS[org].name} is ${up ? "doing well" : down ? "slipping" : "holding steady"}: ${c.active} active members (${sign(c.activeDelta)} on ${monthName(-1)}) and ${c.visits} visits so far in ${monthName()} (${sign(c.visitsPct)}% on the same days last month).`];
+  const watch = [c.od.length ? `${c.od.length} ${c.od.length === 1 ? "invoice is" : "invoices are"} overdue (${chf(c.odSum)})` : "", c.todo ? `${c.todo} ${c.todo === 1 ? "member is" : "members are"} drifting away` : ""].filter(Boolean);
+  parts.push(watch.length ? `Two things to look at: ${watch.join(" and ")}.`.replace("Two things to look at: " + watch[0] + ".", `One thing to look at: ${watch[0]}.`) : "Nothing needs you right now.");
+  return parts.join(" ");
+}
+/* Changing the schedule. One session, or it and every later session of the same weekday. Booked members are told when the time moves. */
+function editSession(sid, ch, scope) {
+  const s = S.sessions[sid]; if (!s) return err("NOT_FOUND", "That session does not exist.");
+  if (s.cancelled) return err("CANCELLED", "That session is cancelled.");
+  if (s.start <= now()) return err("WINDOW_CLOSED", "That session has already started.");
+  const cap = Number(ch.cap), tm = /^(\d{1,2}):(\d{2})$/.exec(ch.time || ""), hh = tm ? Number(tm[1]) : -1, mm = tm ? Number(tm[2]) : -1;
+  if (!tm || hh > 23 || mm > 59) return err("BAD_TIME", "Give the time as hours and minutes, for example 18:30.");
+  if (!(cap >= 1 && cap <= 500 && Number.isInteger(cap))) return err("BAD_CAP", "Capacity is a whole number from 1 to 500.");
+  if (ch.coach && !ORGS[s.org].coaches.some((c) => c[0] === ch.coach)) return err("BAD_COACH", "That coach is not on this club's list.");
+  const wd = s.start.getDay(), list = scope === "following" ? sessList(s.org).filter((x) => x.off === s.off && x.start.getDay() === wd && x.start >= s.start && !x.cancelled) : [s];
+  const tight = list.find((x) => booked(x) + (x.held || 0) > cap);
+  if (tight) return err("TOO_SMALL", `${fDay(tight.start)} already has ${booked(tight)} booked. Capacity can't go below that.`);
+  let moved = 0, told = 0;
+  for (const x of list) {
+    const was = fTime(x.start), to = new Date(x.start.getFullYear(), x.start.getMonth(), x.start.getDate(), hh, mm);
+    if (to <= now()) continue;
+    if (to.getTime() !== x.start.getTime()) {
+      moved++; told += booked(x); x.start = to;
+      if (myBooking(x.id) || myWait(x.id)) { S.notices.push({ id: S.seq++, kind: "moved", sid: x.id, at: now(), seen: false, back: `Now ${fTime(to)}, it was ${was}. Your booking stays.` }); S.chat.push({ who: "coach", text: `${ORGS[x.org].name} moved ${offOf(x).name} on ${fDay(to)} from ${was} to ${fTime(to)}. Your booking stays. If the new time does not suit you, you can cancel it for free until ${fDay(deadline(x))} ${fTime(deadline(x))}.` }); }
+    }
+    x.cap = cap; if (ch.coach) x.coach = ch.coach === offOf(x).coach ? undefined : ch.coach;
+  }
+  if (scope === "following") ((S.settings[s.org].sched ||= {})[`${s.off}:${wd}`] = { time: [hh, mm], cap, ...(ch.coach && ch.coach !== offOf(s).coach ? { coach: ch.coach } : {}) });
+  S.audit.unshift({ what: `Changed ${offOf(s).name}, ${fDay(s.start)}${scope === "following" ? ` and every later ${WDL[wd]}` : ""}: ${fTime(s.start)}, ${cap} places, ${coachOf(s)}`, at: now() });
+  return { ok: true, msg: `Saved${list.length > 1 ? ` for ${list.length} sessions` : ""}.${moved ? ` ${told} booked ${told === 1 ? "member was" : "members were"} told about the new time.` : ""}` };
+}
+function addSession(org, offId, date, time, capIn) {
+  const off = ORGS[org].offerings.find((o) => o.id === offId), tm = /^(\d{1,2}):(\d{2})$/.exec(time || ""), d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date || ""), cap = Number(capIn);
+  if (!off) return err("NOT_FOUND", "Choose what kind of session it is.");
+  if (!d) return err("BAD_DATE", "Choose the day.");
+  if (!tm || Number(tm[1]) > 23 || Number(tm[2]) > 59) return err("BAD_TIME", "Give the time as hours and minutes, for example 18:30.");
+  if (!(cap >= 1 && cap <= 500 && Number.isInteger(cap))) return err("BAD_CAP", "Capacity is a whole number from 1 to 500.");
+  const start = new Date(Number(d[1]), Number(d[2]) - 1, Number(d[3]), Number(tm[1]), Number(tm[2]));
+  if (start <= now()) return err("WINDOW_CLOSED", "That time is already over. Choose a later one.");
+  if (start > ORGS[org].season.end && !ORGS[org].next) return err("AFTER_SEASON", `The ${ORGS[org].season.name.toLowerCase()} ends on ${fDate(ORGS[org].season.end)}.`);
+  if (sessList(org).some((x) => x.off === offId && !x.cancelled && x.start.getTime() === start.getTime())) return err("DUPLICATE", `There is already a ${off.name.toLowerCase()} at that time.`);
+  let id = `${org}-${offId}-${ymd(start)}`; for (let k = 2; S.sessions[id]; k++) id = `${org}-${offId}-${ymd(start)}-${k}`;
+  S.sessions[id] = { id, org, off: offId, start, cap, others: 0, waitOthers: 0, left: 0, added: true };
+  S.audit.unshift({ what: `Added ${off.name}, ${fDay(start)} ${fTime(start)}, ${cap} places`, at: now() });
+  return { ok: true, sid: id, msg: `Added: ${off.name}, ${fDay(start)} ${fTime(start)}. Members can book it now.` };
+}
+/* Booking rules. Each one is checked, then kept as the club's own change on top of what it started with. They hold for bookings made from now on. */
+function setRules(org, r) {
+  const n = (v) => Number(v), out = {};
+  if (!(n(r.opensDays) >= 1 && n(r.opensDays) <= 365 && Number.isInteger(n(r.opensDays)))) return err("BAD_RULE", "The booking window is a whole number of days, from 1 to 365.");
+  if (!(n(r.cancelHours) >= 0 && n(r.cancelHours) <= 168)) return err("BAD_RULE", "The cancel deadline is a number of hours, from 0 to 168.");
+  if (!["none", "forfeit"].includes(r.lateCancel)) return err("BAD_RULE", "Choose what a late cancel costs.");
+  for (const k of ["maxDay", "maxWeek"]) { const v = r[k] === "" || r[k] == null ? 0 : n(r[k]); if (!(v >= 0 && v <= 50 && Number.isInteger(v))) return err("BAD_RULE", "A limit is a whole number, or empty for no limit."); out[k] = v || undefined; }
+  if (out.maxDay && out.maxWeek && out.maxDay > out.maxWeek) return err("BAD_RULE", "The limit for a day can't be higher than the limit for a week.");
+  if (!(n(r.holdHours) >= 0.5 && n(r.holdHours) <= 48)) return err("BAD_RULE", "A held spot is kept for half an hour to 48 hours.");
+  Object.assign(out, { opensDays: n(r.opensDays), cancelMin: Math.round(n(r.cancelHours) * 60), lateCancel: r.lateCancel });
+  const before = policyText(org);
+  S.settings[org].rules = out; S.settings[org].waitlistMode = r.waitlistMode === "offer" ? "offer" : "auto"; S.settings[org].offerHoldMin = Math.round(n(r.holdHours) * 60);
+  if (policyText(org) === before) return { ok: true, msg: "Nothing changed." };
+  S.audit.unshift({ what: `Booking rules at ${ORGS[org].name}: ${policyText(org)}`, at: now() });
+  return { ok: true, msg: "Rules saved. They hold for every booking from now on; existing bookings keep what they were promised." };
+}
+/* A member list from a spreadsheet: name, email, pass. Every row is checked and shown before anything is added. */
+function parseMembersCsv(text, org) {
+  const lines = String(text || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(0, 501), sep = lines[0] && (lines[0].match(/;/g) || []).length > (lines[0].match(/,/g) || []).length ? ";" : /\t/.test(lines[0] || "") ? "\t" : ",";
+  const cells = (l) => l.split(sep).map((c) => c.trim().replace(/^"(.*)"$/, "$1").trim());
+  let cols = { name: 0, email: 1, pass: 2 }, start = 0;
+  if (lines.length && /name|email|e-mail|pass|abo/i.test(lines[0]) && !/@/.test(lines[0])) { const h = cells(lines[0]).map((c) => c.toLowerCase()); cols = { name: h.findIndex((c) => /name/.test(c)), email: h.findIndex((c) => /mail/.test(c)), pass: h.findIndex((c) => /pass|abo|product|membership/.test(c)) }; start = 1; }
+  const have = new Set([S.me.name, ...members(org).map((m) => m.name)].map((n) => n.toLowerCase())), seen = new Set(), prods = ORGS[org].products;
+  return lines.slice(start).map((l, k) => {
+    const c = cells(l), name = (cols.name >= 0 ? c[cols.name] || "" : "").replace(/\s+/g, " ").slice(0, 80), email = (cols.email >= 0 ? c[cols.email] || "" : "").slice(0, 120), passIn = cols.pass >= 0 ? c[cols.pass] || "" : "";
+    const prod = prods.find((p) => p.name.toLowerCase() === passIn.toLowerCase()), problems = [], notes = [];
+    if (name.length < 2) problems.push("No name");
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) problems.push("The email address looks wrong");
+    if (name && have.has(name.toLowerCase())) problems.push("Already a member");
+    if (name && seen.has(name.toLowerCase())) problems.push("Twice in this file");
+    if (passIn && !prod) notes.push(`"${passIn}" is not one of your passes: added without a pass`);
+    if (!email) notes.push("No email: they can't be invited yet");
+    seen.add(name.toLowerCase());
+    return { row: k + start + 1, name, email, pass: prod ? prod.name : "", problems, notes };
+  });
+}
+function importMembers(org, rows) {
+  const ok = rows.filter((r) => !r.problems.length); if (!ok.length) return err("EMPTY", "There is nobody to import in this file.");
+  const list = ((S.extra ||= { pau: [], studio: [] })[org] ||= []);
+  for (const r of ok) list.push({ id: `${org}-x${S.seq++}`, i: -1, name: r.name, first: r.name.split(" ")[0], email: r.email, group: "New", status: "New", product: r.pass || "No pass yet", left: null, pt: null, prev: 0, cur: 0, last: 0, joined: true });
+  S.audit.unshift({ what: `Imported ${ok.length} ${ok.length === 1 ? "member" : "members"} from a file${rows.length > ok.length ? `, ${rows.length - ok.length} left out` : ""}`, at: now() });
+  return { ok: true, msg: `${ok.length} ${ok.length === 1 ? "member" : "members"} added.${rows.length > ok.length ? ` ${rows.length - ok.length} left out.` : ""} Nobody has been written to: invitations are yours to send.` };
+}
+
 /* ---------- roster: confirmed bookings of that session, plus explicit walk-ins. Nothing else. ---------- */
 function rosterNames(s) {
   const pool = poolOf(s), off = Math.floor(hash(s.id + "n") * pool.length), base = pool.slice(off).concat(pool.slice(0, off)), left = (s.left || 0) % pool.length;
@@ -725,6 +885,7 @@ function nextStep() {
   const held = S.waitlist.find((w) => w.offer);
   if (held) { const s = S.sessions[held.sid], can = check(s, { ignoreWait: true }).ok; return { kind: "offer", title: `A spot is held for you: ${offOf(s).name}`, meta: `${fDay(s.start)} ${fTime(s.start)} · ${ORGS[s.org].name} · held until ${fTime(held.offer.expiresAt)}`, cta: can ? "Take the spot" : "See your options", a: can ? "offer-accept" : "sheet", v: s.id, reason: "You were next on the waitlist and a spot opened. It is yours until the hold runs out, then it goes to the next person.", factors: [`Held until ${fDay(held.offer.expiresAt)} ${fTime(held.offer.expiresAt)}`, can ? "Nothing is charged until you take it" : "Your pass is used up, so taking it needs a drop-in or an upgrade"] }; }
   const gone = openNotice();
+  if (gone && gone.kind === "moved") { const s = S.sessions[gone.sid]; return { kind: "notice", title: `Moved by the club: ${offOf(s).name}`, meta: `${fDay(s.start)} · ${ORGS[s.org].name} · ${gone.back}`, cta: "See the session", a: "notice-ok", v: gone.id, reason: "The club changed the time of a session you are booked for. Your booking stays; you can cancel it if the new time does not suit you.", factors: [gone.back, `Free cancel until ${fDay(deadline(s))} ${fTime(deadline(s))}`] }; }
   if (gone) { const s = S.sessions[gone.sid]; return { kind: "notice", title: `Cancelled by the club: ${offOf(s).name}`, meta: `${fDay(s.start)} ${fTime(s.start)} · ${ORGS[s.org].name} · ${gone.back}`, cta: "Find another session", a: "notice-ok", v: gone.id, reason: "The club cancelled a session you were booked for. Your booking is gone and you don't need to do anything.", factors: [gone.back, "It still shows under Your bookings in Week, marked Cancelled"] }; }
   const done = toLog();
   if (done) return { kind: "log", title: "How did it go?", meta: `${offOf(done.s).name}, ${fDay(done.s.start)} ${fTime(done.s.start)}`, cta: "Log it", a: "logit", v: done.s.id, reason: "Your session is over and you have not logged how it felt. It takes one tap.", factors: ["Your coach learns from how hard it felt", "Only the effort is needed; everything else is already filled in"] };
