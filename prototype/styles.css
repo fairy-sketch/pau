@@ -114,6 +114,7 @@ label.f { display: flex; flex-direction: column; gap: 6px; font-size: 13px; colo
 .sw[aria-checked="true"] .t { background: var(--text); }
 .sw[aria-checked="true"] .t::after { transform: translateX(18px); }
 .sw[disabled] { opacity: .55; cursor: default; }
+.btn:disabled { opacity: .45; cursor: default; }
 .sw .l { flex: 1; }
 .note { background: var(--soft); border-radius: var(--r-control); padding: 12px 14px; font-size: 13px; color: var(--text-2); }
 .toast { position: absolute; left: 16px; right: 16px; bottom: 84px; z-index: 5; display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-card); box-shadow: 0 8px 30px rgba(17,17,17,.12); padding: 12px 8px 12px 16px; font-size: 13px; }

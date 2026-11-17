@@ -232,6 +232,7 @@ function cancel(bid, key) {
   if (key && S.idem[key]) return S.idem[key];
   const b = S.bookings.find((x) => x.id === bid);
   if (!b || b.status !== "confirmed") return remember(key, err("NOT_FOUND", "That booking is not active any more."));
+  if (S.sessions[b.sid].start <= now()) return remember(key, err("WINDOW_CLOSED", "That session has already started, so it can't be cancelled."));
   const s = S.sessions[b.sid], pass = S.passes.find((p) => p.id === b.pass), late = now() > deadline(s), forfeit = late && ORGS[s.org].policy.lateCancel === "forfeit";
   b.status = late ? "late_cancelled" : "cancelled";
   if (pass) S.ledger.push({ pass: pass.id, delta: forfeit ? 0 : 1, kind: forfeit ? "forfeit_late_cancel" : "refund_cancel", reason: `${forfeit ? "Late cancel" : "Cancelled"}: ${offOf(s).name}, ${fDay(s.start)}`, at: now(), period: ym(s.start), bid: b.id });
@@ -292,12 +293,34 @@ const RAW_DRAFT = {
   title: "Sharpen block",
   rationale: "RPE on track sessions is falling, so the draft adds one race-pace session a week and a longer long run.",
   items: [
-    { day: "Mon", from: "Track session", to: "Track session, 6 × 400 m", intensity: "high", load: 0 },
-    { day: "Thu", from: "Track session", to: "5 × 1 km at 10K pace", intensity: "high", load: 1 },
-    { day: "Sun", from: "Long run 75 min", to: "Long run 85 min", intensity: "medium", load: 1 },
-    { day: "Wed", from: "Rest day", to: "Rest day", intensity: "none", load: 0 },
+    { wd: 1, from: "Track session", to: "Track session, 6 × 400 m", intensity: "high", load: 0 },
+    { wd: 4, from: "Track session", to: "5 × 1 km at 10K pace", intensity: "high", load: 1 },
+    { wd: 0, from: "Long run 75 min", to: "Long run 85 min", intensity: "medium", load: 1 },
+    { wd: 3, from: "Rest day", to: "Rest day", intensity: "none", load: 0 },
   ],
 };
+/* A plan day that may no longer be changed: it is in the past, its session has started, or it was attended or logged.
+   Every plan change (a coach-approved draft, the easy week, "make today easy") asks this first. */
+function planLocked(it) {
+  if (it.date < ymd(today())) return "it is in the past";
+  if (it.kind === "club") {
+    const s = S.sessions[`pau-${it.off}-${it.date}`];
+    if (s && s.start <= now()) return "the session has already started";
+    const b = s && myBooking(s.id);
+    if (b && b.status === "attended") return "you already attended it";
+    if (s && S.entries.some((e) => e.sid === s.id)) return "you already logged it";
+  } else if (it.kind === "workout" && S.entries.some((e) => ymd(e.at) === it.date && e.title.split(" ")[0] === it.title.split(" ")[0])) return "you already logged it";
+  return "";
+}
+/* The first date for a weekday that a plan change may still touch: today if nothing has happened yet, otherwise next week. */
+function nextChangeable(wd) {
+  for (let i = 0; i < 14; i++) {
+    const d = addDays(today(), i); if (d.getDay() !== wd) continue;
+    const it = S.plan.items.find((x) => x.date === ymd(d));
+    if (!it || !planLocked(it)) return d;
+  }
+  return addDays(today(), 14);
+}
 function guard() {
   const st = stats(), reasons = [];
   if (st.pain) reasons.push({ kind: "pain", text: `Pain flag from ${fDay(st.pain.at)} (${st.pain.painWhere}, level ${st.pain.painLevel}) is still open.` });
@@ -308,13 +331,27 @@ function guard() {
 function guardDraft(raw) {
   const g = guard();
   const items = raw.items.map((it) => {
-    if (!g.active || (it.intensity !== "high" && it.load <= 0)) return { ...it, changed: false };
+    const date = nextChangeable(it.wd), dated = { ...it, date, day: fDay(date) };
+    if (!g.active || (it.intensity !== "high" && it.load <= 0)) return { ...dated, changed: false };
     const to = it.intensity === "high" ? "Easy 30 min @ RPE 3" : it.from.replace(/(\d+) min/, (m, n) => `${Math.round((n * 0.8) / 5) * 5} min`) + " @ RPE 4";
-    return { ...it, was: it.to, to, intensity: "low", load: -1, changed: true };
+    return { ...dated, was: it.to, to, intensity: "low", load: -1, changed: true };
   });
   return { title: raw.title, rationale: g.active ? "Changed before anyone saw it: with these signals a plan may only reduce load." : raw.rationale, items, guard: g.active ? g : null };
 }
 const currentDraft = () => (S.draftStatus === "approved" && S.draftApproved ? S.draftApproved : guardDraft(RAW_DRAFT));
+/* The athlete accepts the approved plan. Locked days are checked again here and left exactly as they were. */
+function applyDraft(d) {
+  let applied = 0, skipped = 0;
+  for (const it of d.items) {
+    if (it.from === it.to) continue;
+    const pi = S.plan.items.find((x) => x.date === ymd(it.date)); if (!pi) continue;
+    if (planLocked(pi)) { skipped++; continue; }
+    pi.title = it.to; pi.status = "planned"; applied++;
+    if (!/^(Track|Gym) session/.test(it.to)) { pi.kind = /rest/i.test(it.to) ? "rest" : "workout"; pi.off = null; }
+  }
+  S.plan.title = d.title;
+  return { applied, skipped };
+}
 
 /* ---------- the rule-based next step ---------- */
 function nextStep() {

@@ -94,7 +94,8 @@ function vPath() {
 /* A confirm card. Its result is printed under the card itself, never further down the chat. */
 function propCard(p) {
   const live = p.status === "pending", chosen = p.acts.filter((a) => a.on !== false).length;
-  const head = live ? `Needs your OK · expires ${fTime(p.expiresAt)}` : { confirmed: "Confirmed", declined: "Declined", expired: "Expired" }[p.status];
+  const head = live ? `Needs your OK · expires ${fTime(p.expiresAt)}` : p.failed ? "Couldn't be done" : p.partial ? "Confirmed in part" : { confirmed: "Confirmed", declined: "Declined", expired: "Expired", replaced: "Replaced" }[p.status];
+  const off = p.status === "replaced" ? "disabled" : ""; // a replaced card keeps its buttons, switched off
   const body = p.batch
     ? live
       ? `<div class="rows">${p.acts.map((a, i) => sw(a.on !== false, "prop-toggle", `${p.id}|${i}`, esc(a.label), "", false)).join("")}</div>`
@@ -103,7 +104,7 @@ function propCard(p) {
   // A pass balance on a card is read from the ledger while the card is live, and dropped once it is decided, so no card ever shows a stale number.
   const yes = p.batch ? (chosen ? `Cancel ${chosen} ${chosen === 1 ? "booking" : "bookings"}` : "Nothing selected") : "Confirm";
   return `<div class="card stack pcard ${live ? "" : "off"}" data-prop="${p.id}" data-state="${p.status}"><div><div class="eyebrow">${head}</div><p class="h2" style="margin-top:4px">${esc(p.title)}</p></div>${body}
-    ${live ? `<div class="btns"><button class="btn acc" style="flex:1" data-a="prop-yes" data-v="${p.id}" ${chosen ? "" : "disabled"}>${yes}</button><button class="btn" data-a="prop-no" data-v="${p.id}">Not now</button></div>` : ""}
+    ${live || off ? `<div class="btns"><button class="btn acc" style="flex:1" data-a="prop-yes" data-v="${p.id}" ${chosen && !off ? "" : "disabled"}>${yes}</button><button class="btn" data-a="prop-no" data-v="${p.id}" ${off}>Not now</button></div>` : ""}
     ${p.results.length ? `<ul class="results">${p.results.map((r) => `<li data-ok="${r.ok}">${I(r.ok ? P.tick : P.x, 14)}<span>${esc(r.msg)}</span></li>`).join("")}</ul>` : ""}
     ${p.note ? `<p class="sub" style="font-size:13px">${esc(p.note)}</p>` : ""}</div>`;
 }
@@ -188,7 +189,7 @@ function vCoach() {
   const t = S.tab.coach;
   if (S.rosterSid && S.sessions[S.rosterSid]) {
     const s = S.sessions[S.rosterSid], rows = rosterRows(s), att = S.attendance[s.id] || {}, wait = rosterNames(s).waiting.concat(myWait(s.id) ? [S.me.name] : []);
-    return `<section class="pad stack-l"><div><button class="btn sm ghost" style="padding-left:0" data-a="roster" data-v="">${I(P.back, 16)}Sessions</button><div class="eyebrow" style="margin-top:8px">${fDay(s.start)} · ${fTime(s.start)} · <span id="roster-count">${rows.length}</span> on the roster</div><h1 class="h1">${offOf(s).name}</h1></div>
+    return `<section class="pad stack-l"><div><button class="btn sm ghost" style="padding-left:0" data-a="roster" data-v="" aria-label="Back to sessions">${I(P.back, 16)}Sessions</button><div class="eyebrow" style="margin-top:8px">${fDay(s.start)} · ${fTime(s.start)} · <span id="roster-count">${rows.length}</span> on the roster</div><h1 class="h1">${offOf(s).name}</h1></div>
       <div class="stack">${rows.length ? `<button class="btn acc full" data-a="all-present" data-v="${s.id}">Mark all present</button><div class="card rows flat" id="roster">${rows.map((r, i) => `<div class="row" data-row="${esc(r.name)}"><span class="mid"><span class="strong">${esc(r.name)}</span>${r.kind === "walkin" ? `<span class="sub">Walk-in</span>` : ""}</span><span class="btns">${["present", "late", "absent"].map((x) => `<button class="btn sm ${att[r.name] === x ? "on" : ""}" aria-pressed="${att[r.name] === x}" aria-label="${esc(r.name)}: ${x}" data-a="mark" data-v="${s.id}|${i}|${x}">${x[0].toUpperCase() + x.slice(1)}</button>`).join("")}</span></div>`).join("")}</div>` : `<p class="sub">Nobody is booked for this session.</p>`}
         <form class="stack" data-f="walkin" data-id="${s.id}" style="gap:8px"><label class="f">Add a walk-in<input id="walkin-name" placeholder="Name" autocomplete="off"></label><button class="btn full" type="submit">Add to roster</button></form>
         <p class="sub">${rows.filter((r) => r.kind === "booked").length} booked${rows.some((r) => r.kind === "walkin") ? ` and ${rows.filter((r) => r.kind === "walkin").length} walk-in` : ""}, capacity ${s.cap}. Only people with a confirmed booking or added here as a walk-in appear.</p>
@@ -207,7 +208,7 @@ function vCoach() {
       : `<div class="card stack" id="draft" data-guarded="${!!d.guard}"><div><div class="eyebrow">${S.me.name} · AI draft · waiting for you</div><p class="h2" style="font-size:22px;margin-top:6px">${d.title}</p></div>
         ${d.guard ? `<div class="guard" role="note" id="guard"><b>Guardrail applied: this draft can only reduce load</b><ul class="stack" style="gap:4px">${d.guard.reasons.map((r) => `<li>${esc(guardReasonForCoach(r))}</li>`).join("")}</ul></div>` : ""}
         <p class="sub">${d.rationale}</p>
-        <ul class="stack" style="gap:8px" id="draft-items">${d.items.map((it) => `<li data-intensity="${it.intensity}" data-load="${it.load}"><span class="eyebrow">${it.day}</span><br>${it.changed ? `<span class="was">${esc(it.was)}</span> <span class="strong">${esc(it.to)}</span>` : it.from === it.to ? `${esc(it.to)} <span class="sub">(unchanged)</span>` : `<span class="sub">${esc(it.from)} becomes</span> <span class="strong">${esc(it.to)}</span>`}</li>`).join("")}</ul>
+        <ul class="stack" style="gap:8px" id="draft-items">${d.items.map((it) => `<li data-intensity="${it.intensity}" data-load="${it.load}"><span class="eyebrow" data-date="${ymd(it.date)}">${it.day}</span><br>${it.changed ? `<span class="was">${esc(it.was)}</span> <span class="strong">${esc(it.to)}</span>` : it.from === it.to ? `${esc(it.to)} <span class="sub">(unchanged)</span>` : `<span class="sub">${esc(it.from)} becomes</span> <span class="strong">${esc(it.to)}</span>`}</li>`).join("")}</ul>
         <div class="btns"><button class="btn acc" style="flex:1" data-a="draft" data-v="approved">Approve</button><button class="btn" data-a="draft" data-v="rejected">Reject</button></div><p class="sub">A drafted plan never reaches the athlete until a coach approves it. Guardrails are applied in code before you see it, and again on approval.</p></div>`;
     return `<section class="pad stack-l"><h1 class="h1">Review queue</h1>${body}</section>`;
   }

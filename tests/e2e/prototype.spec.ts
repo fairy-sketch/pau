@@ -138,6 +138,126 @@ test.describe("B1 guardrails", () => {
   });
 });
 
+test("B1 plan changes never touch a session that is in the past, has started or was attended", async ({
+  page,
+}) => {
+  await open(page);
+  const draftDays = () =>
+    page.evaluate(() =>
+      window.PATH_DEMO.currentDraft().items.map((i: any) => `${i.wd}:${i.date.getDate()}`),
+    );
+  // Nothing has happened yet today: Monday's change may still apply to tonight.
+  expect(await draftDays()).toEqual(["1:16", "4:19", "0:22", "3:18"]);
+
+  // Mia books tonight's track session and is marked present.
+  await page.evaluate(() => {
+    const d = window.PATH_DEMO;
+    d.book("pau-track-2026-11-16", "app");
+    d.markAttendance("pau-track-2026-11-16", "Mia Keller", "present");
+    d.render();
+  });
+  // The draft moves Monday's change to next Monday, and the coach sees that date.
+  expect(await draftDays()).toEqual(["1:23", "4:19", "0:22", "3:18"]);
+  await asRole(page, "coach");
+  await tab(page, "Review");
+  await expect(page.locator("#draft-items [data-date]").first()).toHaveAttribute(
+    "data-date",
+    "2026-11-23",
+  );
+  await expect(page.locator('#draft-items [data-date="2026-11-16"]')).toHaveCount(0);
+
+  // The easy week leaves the attended session out, and confirming it changes nothing on that day.
+  await asRole(page, "athlete");
+  await tab(page, "Coach");
+  await say(page, "I need an easy week");
+  await expect(lastCard(page)).toContainText("Thu 19 Nov");
+  await expect(lastCard(page)).toContainText("Sun 22 Nov");
+  await expect(lastCard(page)).not.toContainText("Mon 16 Nov");
+  await lastCard(page).getByRole("button", { name: "Confirm" }).click();
+  const monday = await page.evaluate(() => {
+    const d = window.PATH_DEMO,
+      s = d.state;
+    return {
+      plan: s.plan.items.find((i: any) => i.date === "2026-11-16"),
+      booking: d.myBooking("pau-track-2026-11-16").status,
+    };
+  });
+  expect(monday.plan).toMatchObject({ title: "Track session", kind: "club", status: "planned" });
+  expect(monday.booking).toBe("attended");
+
+  // Thursday 19:00: the track session started at 18:30. Past and started days are locked in the engine itself.
+  await page.clock.setFixedTime(new Date("2026-11-19T19:00:00+01:00"));
+  const locked = await page.evaluate(() => {
+    const d = window.PATH_DEMO;
+    // Put Thursday's track session back into the plan (the easy week swapped it) to test the lock on a started session.
+    Object.assign(
+      d.state.plan.items.find((i: any) => i.date === "2026-11-19"),
+      { kind: "club", off: "track", title: "Track session", status: "planned" },
+    );
+    return ["2026-11-17", "2026-11-19"].map(
+      (date, n) => d.runAct({ t: "swap", date }, `test-${n}`).code,
+    );
+  });
+  expect(locked).toEqual(["PLAN_LOCKED", "PLAN_LOCKED"]);
+  expect(await draftDays()).toEqual(["1:23", "4:26", "0:22", "3:25"]);
+
+  // The coach approves and Mia accepts: every day up to and including today is exactly as before.
+  const upToToday = () =>
+    page.evaluate(() =>
+      JSON.stringify(window.PATH_DEMO.state.plan.items.filter((i: any) => i.date <= "2026-11-19")),
+    );
+  const before = await upToToday();
+  await asRole(page, "coach");
+  await tab(page, "Review");
+  await page.getByRole("button", { name: "Approve" }).click();
+  await asRole(page, "athlete");
+  await tab(page, "Path");
+  await page.getByRole("button", { name: "Review plan" }).click();
+  await expect(page.getByRole("status")).toContainText("Nothing in the past was touched");
+  expect(await upToToday()).toBe(before);
+});
+
+test("Pain reply: offers to make today easy, and only cancels when the athlete asks", async ({
+  page,
+}) => {
+  await open(page);
+  await page.evaluate(() => void window.PATH_DEMO.book("pau-track-2026-11-16", "app"));
+  await tab(page, "Coach");
+  await say(page, "My knee hurts");
+  await expect(page.locator(".msg.coach").last()).toContainText("Want me to make today easy?");
+  await expect(cards(page)).toHaveCount(1);
+  await expect(lastCard(page).locator(".h2")).toHaveText("Make today easy?");
+  await expect(lastCard(page)).toContainText(
+    "Your booking for Track session at 18:30 stays as it is",
+  );
+  await expect(
+    cards(page)
+      .locator(".h2")
+      .filter({ hasText: /cancel/i }),
+  ).toHaveCount(0);
+
+  await lastCard(page).getByRole("button", { name: "Confirm" }).click();
+  await expect(lastCard(page).locator(".results li")).toHaveText([/Plan: today is now rest/]);
+  const after = await page.evaluate(() => {
+    const d = window.PATH_DEMO;
+    return {
+      today: d.state.plan.items.find((i: any) => i.date === "2026-11-16").kind,
+      booked: d.myBooking("pau-track-2026-11-16").status,
+    };
+  });
+  expect(after).toEqual({ today: "rest", booked: "confirmed" });
+
+  // Today is easy now: no second card.
+  await say(page, "it still hurts");
+  await expect(page.locator(".msg.coach").last()).toContainText("Today is already easy");
+  await expect(cards(page)).toHaveCount(1);
+
+  // She asks for the cancel herself: now there is a cancel card.
+  await say(page, "My knee hurts, please cancel tonight's session");
+  await expect(lastCard(page).locator(".h2")).toHaveText("Cancel this booking?");
+  await expect(lastCard(page)).toContainText("Track session, Mon 16 Nov 18:30");
+});
+
 test("B2 one pass balance: Path, Coach and Me agree before a booking, after it, and after a cancel", async ({
   page,
 }) => {
@@ -351,9 +471,13 @@ test.describe("B5 confirm cards", () => {
     await say(page, "Book my usual Thursday");
     await say(page, "Book my usual Thursday");
     await expect(cards(page)).toHaveCount(2);
-    await expect(cards(page).nth(0)).toHaveAttribute("data-state", "expired");
+    await expect(cards(page).nth(0)).toHaveAttribute("data-state", "replaced");
+    await expect(cards(page).nth(0).locator(".eyebrow")).toHaveText("Replaced");
     await expect(cards(page).nth(0)).toContainText("Replaced by a newer card");
-    await expect(cards(page).nth(0).getByRole("button")).toHaveCount(0);
+    // The replaced card keeps its buttons, switched off.
+    await expect(cards(page).nth(0).getByRole("button")).toHaveCount(2);
+    for (const b of await cards(page).nth(0).getByRole("button").all())
+      await expect(b).toBeDisabled();
     await expect(cards(page).nth(1)).toHaveAttribute("data-state", "pending");
     await expect(cards(page).nth(1)).toContainText("expires 12:15");
 
@@ -395,6 +519,48 @@ test.describe("B5 confirm cards", () => {
       return { status: s.props[id].status, added: s.bookings.length - n };
     });
     expect(late).toEqual({ status: "expired", added: 0 });
+  });
+
+  test("Confirm checks again: an action that is no longer possible gives a declined card, never Confirmed", async ({
+    page,
+  }) => {
+    await open(page);
+    await tab(page, "Coach");
+    const notConfirmed = async (reason: RegExp) => {
+      const card = lastCard(page);
+      await card.getByRole("button", { name: "Confirm" }).click();
+      await expect(card).toHaveAttribute("data-state", "declined");
+      await expect(card.locator(".results li")).toHaveText([reason]);
+      await expect(card.locator(".results li")).toHaveAttribute("data-ok", "false");
+      await expect(card).not.toContainText("Confirmed");
+      await expect(card).toContainText("Nothing was changed");
+      await expect(card.getByRole("button")).toHaveCount(0);
+    };
+
+    // The pass fills up between the card and the confirm (4 of 4).
+    await say(page, "Book my usual Thursday");
+    await page.evaluate(() => void window.PATH_DEMO.book("pau-gym-2026-11-20", "app"));
+    await notConfirmed(/^Couldn't book: You've used 4 of 4 drop-in sessions in November/);
+    expect(await page.evaluate(() => !!window.PATH_DEMO.myBooking("pau-track-2026-11-19"))).toBe(
+      false,
+    );
+
+    // The session fills up meanwhile: no silent switch to the waitlist.
+    await say(page, "book the community session on Saturday");
+    await page.evaluate(() => {
+      const s = window.PATH_DEMO.state.sessions["pau-community-2026-11-21"];
+      s.others = s.cap;
+    });
+    await notConfirmed(/^Couldn't book: It filled up since I asked/);
+    expect(await page.evaluate(() => window.PATH_DEMO.state.waitlist.length)).toBe(0);
+
+    // The booking was already cancelled somewhere else.
+    await say(page, "Cancel my yoga class");
+    await page.evaluate(() => {
+      const d = window.PATH_DEMO;
+      d.cancel(d.myBooking("studio-yoga-2026-11-17").id);
+    });
+    await notConfirmed(/^Couldn't cancel: That booking is not active any more/);
   });
 
   test("a double confirm books once: one idempotency key per proposal", async ({ page }) => {
@@ -761,7 +927,7 @@ test.describe("B11 and B12 accessibility", () => {
     expect(problems).toEqual([]);
   });
 
-  test("every control is at least 44 by 44 px, and every icon button has a name", async ({
+  test("every control is at least 44 by 44 px, and all nav and icon buttons have an aria-label, in all three roles", async ({
     page,
   }) => {
     test.setTimeout(120_000);
@@ -794,6 +960,14 @@ test.describe("B11 and B12 accessibility", () => {
             !el.getAttribute("aria-label")
           )
             out.push(`unnamed button ${el.outerHTML.slice(0, 60)}`);
+          // Navigation buttons and every button that carries an icon have an explicit aria-label
+          // (the tick inside a "Booked" status pill is decoration on a text row, not an icon button).
+          if (
+            el.tagName === "BUTTON" &&
+            (el.closest("nav") || el.querySelector("svg:not(.pill svg)")) &&
+            !el.getAttribute("aria-label")
+          )
+            out.push(`no aria-label: ${el.outerHTML.slice(0, 80)}`);
         }
         return out;
       });

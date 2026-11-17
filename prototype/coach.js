@@ -33,33 +33,42 @@ const offName = (org, off) => ORGS[org].offerings.find((o) => o.id === off).name
 /* "the Thursday track session", "the Saturday community session" */
 const usualName = (org, off, wd) => { const n = offName(org, off); return "the " + (n.startsWith(WDL[wd]) ? WDL[wd] + n.slice(WDL[wd].length).toLowerCase() : `${WDL[wd]} ${n.toLowerCase()}`); };
 
-/* ---------- confirm cards: pending -> confirmed | declined | expired ---------- */
+/* ---------- confirm cards: pending -> confirmed | declined | expired | replaced ---------- */
 function say(text, prop) { S.chat.push({ who: "coach", text, prop: prop || null }); }
 function sweepProposals() {
   let changed = false;
   for (const p of Object.values(S.props)) if (p.status === "pending" && now() >= p.expiresAt) { p.status = "expired"; p.note = `Expired after ${CARD_TTL_MIN} minutes. Nothing was changed.`; changed = true; }
   return changed;
 }
-/* Only the newest pending card for the same intent is live: an older one is closed when a new one is made. */
+/* Only the newest pending card for the same intent is live: an older one is switched off as "Replaced" when a new one is made. */
 function propose(text, p) {
   sweepProposals();
-  for (const old of Object.values(S.props)) if (old.status === "pending" && old.intent === p.intent) { old.status = "expired"; old.note = "Replaced by a newer card. Nothing was changed."; }
+  for (const old of Object.values(S.props)) if (old.status === "pending" && old.intent === p.intent) { old.status = "replaced"; old.note = "Replaced by a newer card. Nothing was changed."; }
   const id = S.seq++;
   S.props[id] = { id, key: `prop-${id}`, status: "pending", createdAt: now(), expiresAt: new Date(now().getTime() + CARD_TTL_MIN * 60000), results: [], note: "", lines: [], ...p };
   say(text, id);
   return S.props[id];
 }
+/* Every action is checked again at the moment of the confirm: the world may have changed since the card was made. */
 function runAct(a, key) {
-  if (a.t === "book") return book(a.sid, "ai_coach", key);
+  if (a.t === "book") {
+    const s = S.sessions[a.sid];
+    // The card promised a booking. If the session filled up meanwhile, do not quietly turn it into a waitlist entry.
+    if (s && !a.wait && !S.idem[key] && check(s).ok && spots(s) === 0) return remember(key, err("SESSION_FULL", "It filled up since I asked. Ask me to join the waitlist if you want."));
+    return book(a.sid, "ai_coach", key);
+  }
   if (a.t === "cancel") return cancel(a.bid, key);
-  if (a.t === "swap") {
+  if (a.t === "swap" || a.t === "ease") {
     if (S.idem[key]) return S.idem[key];
     const it = S.plan.items.find((i) => i.date === a.date); if (!it) return remember(key, err("NOT_FOUND", "That plan day no longer exists."));
+    const locked = planLocked(it); if (locked) return remember(key, err("PLAN_LOCKED", `${fDay(new Date(a.date + "T12:00"))} can't be changed any more: ${locked}.`));
+    if (a.t === "ease") { it.kind = "rest"; it.title = "Rest, or an easy 20 min walk"; it.off = null; it.status = "eased"; return remember(key, { ok: true, msg: `Plan: today is now rest, or an easy 20 min walk.` }); }
     it.kind = "workout"; it.title = "Easy 30 min @ RPE 3"; it.off = null; it.status = "swapped";
     return remember(key, { ok: true, msg: `Plan: ${fDay(new Date(a.date + "T12:00"))} is now an easy 30 min at RPE 3.` });
   }
   return err("UNKNOWN", "Unknown action.");
 }
+const FAIL = { book: "Couldn't book", cancel: "Couldn't cancel", swap: "Couldn't change the plan", ease: "Couldn't change the plan" };
 /* The only way the coach changes anything. A card can be decided once; each action carries the card's idempotency key. */
 function confirmProposal(id, yes) {
   sweepProposals();
@@ -67,9 +76,16 @@ function confirmProposal(id, yes) {
   if (!yes) { p.status = "declined"; p.note = "Declined. Nothing was changed."; return p; }
   const chosen = p.acts.map((a, i) => ({ a, i })).filter((r) => r.a.on !== false);
   if (!chosen.length) return p;
-  p.status = "confirmed";
-  for (const { a, i } of chosen) { const r = runAct(a, `${p.key}:${i}`); p.results.push({ ok: !!r.ok, msg: r.msg }); }
-  if (chosen.some((r) => r.a.t === "swap")) S.alerts.push({ id: S.seq++, kind: "Athlete eased this week's plan (load reduced)", at: now(), status: "open", info: true });
+  const done = [];
+  for (const { a, i } of chosen) {
+    const r = runAct(a, `${p.key}:${i}`);
+    p.results.push({ ok: !!r.ok, msg: r.ok ? r.msg : `${FAIL[a.t] || "Couldn't do it"}: ${r.msg}` });
+    if (r.ok) done.push(a);
+  }
+  // A card only reads "Confirmed" if something actually happened. If nothing could be done, it is declined, with the reason.
+  if (!done.length) { p.status = "declined"; p.failed = true; p.note = "Nothing was changed."; return p; }
+  p.status = "confirmed"; p.partial = done.length < chosen.length;
+  if (done.some((a) => a.t === "swap" || a.t === "ease")) S.alerts.push({ id: S.seq++, kind: done.some((a) => a.t === "ease") ? "Athlete made today easy (load reduced)" : "Athlete eased this week's plan (load reduced)", at: now(), status: "open", info: true });
   return p;
 }
 function toggleAct(id, i) { const p = S.props[id]; if (p && p.status === "pending" && p.acts[i]) p.acts[i].on = p.acts[i].on === false; }
@@ -134,27 +150,36 @@ function replyBook(text) {
     return propose(`${msg}\nAn alternative: ${offOf(alt).name}, ${fDay(alt.start)} ${fTime(alt.start)}, is free and has ${spots(alt)} spots.`, { intent: `book:${alt.id}`, title: "Book the alternative?", lines: [`${offOf(alt).name}, ${fDay(alt.start)} ${fTime(alt.start)}, ${offOf(alt).loc}`, "Free session. No pass needed."], acts: [{ t: "book", sid: alt.id }] });
   }
   const full = spots(s) === 0;
-  return propose(why, { intent: `book:${s.id}`, title: full ? "Join the waitlist?" : "Book this session?", lines: [`${offOf(s).name}, ${fDay(s.start)} ${fTime(s.start)}, ${offOf(s).loc}`, full ? `Full. You would be #${s.waitOthers + 1} on the waitlist.` : c.pass ? { pass: c.pass.id, sid: s.id } : c.note, `Free cancel until ${fDay(deadline(s))} ${fTime(deadline(s))}.`], acts: [{ t: "book", sid: s.id }] });
+  return propose(why, { intent: `book:${s.id}`, title: full ? "Join the waitlist?" : "Book this session?", lines: [`${offOf(s).name}, ${fDay(s.start)} ${fTime(s.start)}, ${offOf(s).loc}`, full ? `Full. You would be #${s.waitOthers + 1} on the waitlist.` : c.pass ? { pass: c.pass.id, sid: s.id } : c.note, `Free cancel until ${fDay(deadline(s))} ${fTime(deadline(s))}.`], acts: [{ t: "book", sid: s.id, wait: full }] });
 }
 
 const AREA_WORDS = [["Foot or ankle", /foot|feet|ankle|achilles|heel/], ["Calf or shin", /calf|calves|shin/], ["Knee", /knee/], ["Thigh or hamstring", /thigh|hamstring|quad/], ["Hip or groin", /hip|groin|glute/], ["Back", /back|spine/], ["Shoulder or arm", /shoulder|arm|elbow|wrist/]];
 function coachReply(q) {
   const t = q.toLowerCase(), st = stats();
   if (/pain|hurt|sore|injur|ache/.test(t)) {
-    const r = upcomingBookings().find((x) => x.s.org === "pau"), alert = S.consent.pau["alerts.pain"], area = (AREA_WORDS.find(([, re]) => re.test(t)) || [])[0];
+    const alert = S.consent.pau["alerts.pain"], area = (AREA_WORDS.find(([, re]) => re.test(t)) || [])[0];
     if (alert) S.alerts.push({ id: S.seq++, kind: "Pain mentioned in coach chat", at: now(), status: "open" });
     S.form.pain = true; if (area) S.form.painWhere = area;
-    const text = "Sorry to hear that. I can't tell you what it is, and I won't guess. Rest today, and if it persists or is severe, please see a doctor or physio.\n" + (alert ? "Coach Sara has been told, because you share pain alerts with PAU." : "Coach Sara has not been told, because you don't share pain alerts with PAU. You can change that under Me.") + `\nTo pause hard sessions, save it as a pain flag in Log. I have switched "Something hurt" on there${area ? ` with "${area}"` : ""}; nothing is saved until you log it.`;
-    return r ? propose(text, { intent: `cancel:${r.b.id}`, title: "Cancel your next session?", lines: [`${offOf(r.s).name}, ${fDay(r.s.start)} ${fTime(r.s.start)}`], acts: [{ t: "cancel", bid: r.b.id }] }) : say(text);
+    const text = "Sorry to hear that. I can't tell you what it is, and I won't guess. If it persists or is severe, please see a doctor or physio.\n" + (alert ? "Coach Sara has been told, because you share pain alerts with PAU." : "Coach Sara has not been told, because you don't share pain alerts with PAU. You can change that under Me.") + `\nTo pause hard sessions, save it as a pain flag in Log. I have switched "Something hurt" on there${area ? ` with "${area}"` : ""}; nothing is saved until you log it.`;
+    // Only the athlete decides about cancelling. If she asks for it in the same breath, that is what she gets.
+    if (/cancel/.test(t)) { say(text); return replyCancel(q); }
+    const it = S.plan.items.find((i) => i.date === ymd(today())), locked = it ? planLocked(it) : "", s = it && it.kind === "club" ? S.sessions[`pau-${it.off}-${it.date}`] : null, b = s && myBooking(s.id);
+    if (!it || it.kind === "rest" || /RPE [1-4]\b|easy/i.test(it.title)) return say(`${text}\nToday is already easy${it ? ` (${it.title})` : ""}, so keep it that way.`);
+    if (locked) return say(`${text}\nToday's ${it.title.toLowerCase()} can't be changed any more, because ${locked}. Take the rest of the day easy.`);
+    return propose(`${text}\nWant me to make today easy?`, {
+      intent: "ease-today", title: "Make today easy?",
+      lines: [`Today's plan, "${it.title}", becomes rest or an easy 20 min walk.`, b ? `Your booking for ${offOf(s).name} at ${fTime(s.start)} stays as it is. Tell me if you want it cancelled.` : "Nothing is booked or cancelled.", "It only reduces load, so you can accept it yourself; Coach Sara gets a note."],
+      acts: [{ t: "ease", date: it.date }],
+    });
   }
   if (/easy week|easier|too hard|tired/.test(t)) {
-    const T = today(), end = addDays(monday(T), 7), items = S.plan.items.filter((i) => i.date >= ymd(T) && i.date < ymd(end) && i.status === "planned" && (i.off === "track" || /long run/i.test(i.title)));
+    const T = today(), end = addDays(monday(T), 7), items = S.plan.items.filter((i) => i.date >= ymd(T) && i.date < ymd(end) && i.status === "planned" && (i.off === "track" || /long run/i.test(i.title)) && !planLocked(i));
     if (!items.length) return say("There is nothing hard left in your plan this week, so there is nothing to ease. Rest well.");
     const acts = [];
     for (const it of items) {
       const d = fDay(new Date(it.date + "T12:00"));
       acts.push({ t: "swap", date: it.date, label: `${d}: swap "${it.title}" for an easy 30 min at RPE 3` });
-      const b = S.bookings.find((x) => x.status === "confirmed" && x.sid === `pau-${it.off}-${it.date}`);
+      const b = S.bookings.find((x) => x.status === "confirmed" && x.sid === `pau-${it.off}-${it.date}` && S.sessions[x.sid].start > now());
       if (b) acts.push({ t: "cancel", bid: b.id, label: `${d}: cancel your ${it.title} booking` });
     }
     return propose(`Your last 7 days are at ${Math.round(st.ratio * 100)}% of your 4-week average${st.hard ? ` and you logged ${st.hard} session(s) at RPE 9+` : ""}. Here is an easier week. It only reduces load, so you can accept it yourself; Coach Sara gets a note.`, { intent: "ease-week", title: "Easy week: plan change", lines: acts.map((a) => a.label), acts });

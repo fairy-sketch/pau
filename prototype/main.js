@@ -15,7 +15,7 @@ function render() {
     ${S.banner ? `<div class="banner"><span>Made-up data, saved on this device.</span><button class="resetbtn ${UI.resetArmed ? "armed" : ""}" data-a="reset">${UI.resetArmed ? "Tap again" : "Reset demo"}</button>${xBtn("hide-banner", "Hide this notice. Reset demo stays under Me.")}</div>` : ""}
     <main id="view" tabindex="0">${body}</main>
     ${UI.toast ? `<div class="toast" role="status"><span>${esc(UI.toast)}</span>${xBtn("hide-toast", "Dismiss message")}</div>` : ""}
-    <nav class="tabs" aria-label="Sections">${TABS[S.role].map(([v, l, ic]) => `<button data-a="tab" data-v="${v}" ${tab === v ? 'aria-current="page"' : ""}><span class="ic">${I(P[ic])}</span>${l}${v === "alerts" && badge ? ` (${badge})` : ""}</button>`).join("")}</nav>${vSheet()}`;
+    <nav class="tabs" aria-label="Sections">${TABS[S.role].map(([v, l, ic]) => `<button data-a="tab" data-v="${v}" aria-label="${l}${v === "alerts" && badge ? ` (${badge}), ${badge} open` : ""}" ${tab === v ? 'aria-current="page"' : ""}><span class="ic">${I(P[ic])}</span>${l}${v === "alerts" && badge ? ` (${badge})` : ""}</button>`).join("")}</nav>${vSheet()}`;
   const view = document.getElementById("view"); view.scrollTop = tab === "coach" && S.role === "athlete" ? view.scrollHeight : top; lastKey = key;
   if (UI.sheet) { const b = app.querySelector(".sheet .btn"); if (b) b.focus(); }
   flowLine(); save();
@@ -26,7 +26,7 @@ const ACT = {
   sheet: (v) => { UI.sheet = { type: "session", sid: v }; }, "close-btn": () => { UI.sheet = null; },
   book: (v) => { UI.toast = book(v, "app").msg; UI.sheet = null; }, cancel: (v) => { UI.toast = cancel(Number(v)).msg; UI.sheet = null; }, leave: (v) => { UI.toast = leaveWait(v).msg; UI.sheet = null; },
   "go-invoices": () => { S.org = "pau"; S.tab.athlete = "me"; setTimeout(() => { const el = document.getElementById("invoices"); if (el) el.scrollIntoView(); }, 0); },
-  "review-plan": () => { S.planNews = false; S.plan.title = currentDraft().title; UI.toast = `Your plan is now "${S.plan.title}", approved by Coach Sara.`; },
+  "review-plan": () => { S.planNews = false; const r = applyDraft(currentDraft()); UI.toast = `Your plan is now "${S.plan.title}", approved by Coach Sara. ${r.applied} upcoming ${r.applied === 1 ? "day" : "days"} changed${r.skipped ? `, ${r.skipped} left alone because ${r.skipped === 1 ? "it was" : "they were"} already under way or done` : ""}. Nothing in the past was touched.`; },
   "clear-pain": () => { S.entries.forEach((e) => { if (e.pain) e.cleared = true; }); UI.toast = "Pain flag cleared. Hard sessions can be suggested again."; },
   logit: (v) => { const s = S.sessions[v], o = offOf(s); S.form = { rpe: 0, pain: false, sid: v, title: o.name, dur: o.dur }; S.logTab = "log"; S.tab.athlete = "log"; UI.sheet = null; },
   "log-clear": () => { S.form = { rpe: 0, pain: false }; },
@@ -117,7 +117,7 @@ setInterval(() => { if (sweepProposals()) render(); }, 20000);
 window.PATH_DEMO = {
   get state() { return S; }, ui: UI, ORGS, LOAD_LIMIT, CARD_TTL_MIN, STORE_KEY,
   render, seed, save, load, resetDemo, book, cancel, check, freeSpot, leaveWait, passState, passOf, stats, guard, guardDraft, currentDraft, RAW_DRAFT,
-  ask, confirmProposal, toggleAct, sweepProposals, parseWhen, parseOffering, rosterRows, rosterNames, addWalkin, markAttendance, memoryFor, upcomingBookings, sessList, myBooking, myWait, spots, nextStep,
+  ask, confirmProposal, toggleAct, runAct, planLocked, nextChangeable, applyDraft, sweepProposals, parseWhen, parseOffering, rosterRows, rosterNames, addWalkin, markAttendance, memoryFor, upcomingBookings, sessList, myBooking, myWait, spots, nextStep,
 };
 if (!load()) seed();
 render();
