@@ -283,3 +283,13 @@ svg text { font-family: var(--body); font-size: 11px; fill: var(--text-2); }
 .pline { display: block; height: 4px; margin: 8px 0; border-radius: 999px; background: var(--bg); box-shadow: inset 1px 1px 2px rgba(0,0,0,.14), inset -1px -1px 1px #fff; overflow: hidden; }
 .pline b { display: block; height: 100%; border-radius: 999px; background: var(--text); }
 .card .rows { margin: 0 0 -12px; }
+/* The sage button floats (S-6): a wide soft shadow underneath, light from the top left, and a faint rim of light and shade
+   on the button itself so it reads as a cushion, not a flat fill. Pressing it pushes it into the ground. No gradient. */
+.btn.acc:not(.demoted), .chatform button {
+  box-shadow: 10px 12px 24px rgba(72,82,60,.30), -8px -8px 18px rgba(255,255,255,.95), inset 1px 1.5px 1px rgba(255,255,255,.38), inset -2px -3px 6px rgba(40,48,30,.16);
+  transition: box-shadow .15s ease, transform .15s ease;
+}
+.btn.acc:not(.demoted):hover, .chatform button:hover { opacity: 1; transform: translateY(-1px); }
+.btn.acc:not(.demoted):active, .chatform button:active { transform: translateY(1px); box-shadow: 2px 3px 6px rgba(72,82,60,.22), -2px -2px 6px rgba(255,255,255,.9), inset 2px 3px 6px rgba(40,48,30,.22), inset -1px -1px 1px rgba(255,255,255,.25); }
+.btn.acc:disabled { transform: none; }
+.chatform { padding-bottom: 28px; }
