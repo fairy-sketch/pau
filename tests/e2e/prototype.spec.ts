@@ -1,55 +1,25 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- the demo is plain browser JS; its test hook (window.PATH_DEMO) has no types. */
-import path from "node:path";
-import { pathToFileURL } from "node:url";
-
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
+import {
+  asRole,
+  atClub,
+  cards,
+  lastCard,
+  logWithKeyboard,
+  minutesLater,
+  NOW,
+  open,
+  passOn,
+  say,
+  tab,
+} from "../helpers/demo";
+
 /**
- * Iteration 2, milestone I2-0: one test (or more) per bug from the test report on prototype v1.
- * The demo is opened from disk, on a phone profile, in Europe/Zurich, at a fixed time:
- * Monday 16 November 2026, 12:00.
+ * Iteration 2, milestone I2-0: one test (or more) per bug from the test report on prototype v1,
+ * plus the fixes from Ramon's review of it.
  */
-const DEMO = pathToFileURL(path.resolve(process.cwd(), "prototype/index.html")).href;
-const NOW = new Date("2026-11-16T12:00:00+01:00");
-const minutesLater = (n: number) => new Date(NOW.getTime() + n * 60_000);
-
-declare global {
-  interface Window {
-    PATH_DEMO: any;
-  }
-}
-
-async function open(page: Page) {
-  await page.clock.setFixedTime(NOW);
-  await page.goto(DEMO);
-  await expect(page.getByRole("navigation", { name: "Sections" })).toBeVisible();
-}
-const tab = (page: Page, name: string) =>
-  page.getByRole("navigation", { name: "Sections" }).getByRole("button", { name }).click();
-const asRole = (page: Page, role: "athlete" | "coach" | "admin") =>
-  page.getByLabel("View as").selectOption(role);
-const atClub = (page: Page, club: "pau" | "studio") => page.getByLabel("Club").selectOption(club);
-async function say(page: Page, text: string) {
-  await page.getByLabel("Message your coach").fill(text);
-  await page.getByRole("button", { name: "Send message" }).click();
-}
-const cards = (page: Page) => page.locator("[data-prop]");
-const lastCard = (page: Page) => cards(page).last();
-/** Pressing Enter on the hold button is the keyboard way to log (no hold needed). */
-async function logWithKeyboard(page: Page) {
-  await page.getByRole("button", { name: "Log this session" }).focus();
-  await page.keyboard.press("Enter");
-}
-/** The pass balance as each screen prints it. */
-async function passOn(page: Page, tabs: string[]) {
-  const out: Record<string, string | null> = {};
-  for (const t of tabs) {
-    await tab(page, t);
-    out[t] = await page.locator('#view [data-pass="p-pau"]').first().getAttribute("data-text");
-  }
-  return out;
-}
 
 test.describe("B1 guardrails", () => {
   test("122% load plus a pain flag: the draft only reduces, and the coach sees why", async ({
@@ -69,7 +39,7 @@ test.describe("B1 guardrails", () => {
     await page.getByRole("button", { name: "Knee" }).click();
     await page.getByLabel("Level, 0 to 10").fill("4");
     await logWithKeyboard(page);
-    await expect(page.getByRole("status")).toContainText("Saved: Easy jog");
+    await expect(page.locator(".toast")).toContainText("Saved: Easy jog");
     const ratio = await page.evaluate(() => Math.round(window.PATH_DEMO.stats().ratio * 100));
     expect(ratio).toBe(122);
 
@@ -213,7 +183,7 @@ test("B1 plan changes never touch a session that is in the past, has started or 
   await asRole(page, "athlete");
   await tab(page, "Path");
   await page.getByRole("button", { name: "Review plan" }).click();
-  await expect(page.getByRole("status")).toContainText("Nothing in the past was touched");
+  await expect(page.locator(".toast")).toContainText("Nothing in the past was touched");
   expect(await upToToday()).toBe(before);
 });
 
@@ -269,7 +239,7 @@ test("B2 one pass balance: Path, Coach and Me agree before a booking, after it, 
   await tab(page, "Week");
   await page.getByRole("button", { name: "Thu 19 Nov", exact: true }).click();
   await page.locator("#classcard").getByRole("button", { name: "Book", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("Booked: Track session, Thu 19 Nov");
+  await expect(page.locator(".toast")).toContainText("Booked: Track session, Thu 19 Nov");
   expect(await passOn(page, screens)).toEqual(same("4 of 4 used in November"));
 
   await tab(page, "Week");
@@ -432,13 +402,13 @@ test.describe("B4 roster", () => {
     await tab(page, "Week");
     await page.getByRole("button", { name: "Fri 20 Nov", exact: true }).click();
     await page.locator("#classcard").getByRole("button", { name: "Join waitlist" }).click();
-    await expect(page.getByRole("status")).toContainText("#2 on the waitlist");
+    await expect(page.locator(".toast")).toContainText("#2 on the waitlist");
 
     // Waiting is not being on the roster.
     await openRoster(page, FULL);
     expect(await headerEqualsRows(page)).toBe(15);
     await expect(page.locator('#roster [data-row="Mia Keller"]')).toHaveCount(0);
-    await expect(page.locator("#roster-wait li")).toHaveCount(2);
+    await expect(page.locator("#roster-wait li")).toHaveCount(3); // one ahead, Mia, one who joined behind her
     await expect(page.locator("#roster-wait")).toContainText("Mia Keller");
 
     // Two members cancel: the first spot goes to #1, the second to Mia.
@@ -446,14 +416,15 @@ test.describe("B4 roster", () => {
     await tab(page, "Schedule");
     const free = page.getByRole("button", { name: "Free a spot: Gym session, Fri 20 Nov" });
     await free.click();
-    await expect(page.getByRole("status")).toContainText("moved up to #1");
+    await expect(page.locator(".toast")).toContainText("moved up to #1");
     await free.click();
-    await expect(page.getByRole("status")).toContainText("promoted from the waitlist and booked");
+    await expect(page.locator(".toast")).toContainText("promoted from the waitlist and booked");
 
     await openRoster(page, FULL);
     expect(await headerEqualsRows(page)).toBe(15);
     await expect(page.locator('#roster [data-row="Mia Keller"]')).toHaveCount(1);
-    await expect(page.locator("#roster-wait")).toHaveCount(0);
+    await expect(page.locator("#roster-wait li")).toHaveCount(1); // the person behind her is still waiting
+    await expect(page.locator("#roster-wait")).not.toContainText("Mia Keller");
     expect(
       await page.evaluate(() => window.PATH_DEMO.passState(window.PATH_DEMO.passOf("pau")).text),
     ).toBe("4 of 4 used in November");
@@ -534,7 +505,7 @@ test.describe("B5 confirm cards", () => {
       await expect(card.locator(".results li")).toHaveAttribute("data-ok", "false");
       await expect(card).not.toContainText("Confirmed");
       await expect(card).toContainText("Nothing was changed");
-      await expect(card.getByRole("button")).toHaveCount(0);
+      await expect(card.getByRole("button", { name: /Confirm|Not now/ })).toHaveCount(0);
     };
 
     // The pass fills up between the card and the confirm (4 of 4).
@@ -754,7 +725,7 @@ test("B9 a pain flag needs a location", async ({ page }) => {
   // No location: nothing is saved.
   const before = await page.evaluate(() => window.PATH_DEMO.state.entries.length);
   await logWithKeyboard(page);
-  await expect(page.getByRole("status")).toContainText("A pain flag needs a location");
+  await expect(page.locator(".toast")).toContainText("A pain flag needs a location");
   expect(await page.evaluate(() => window.PATH_DEMO.state.entries.length)).toBe(before);
 
   // "Not sure" is a valid answer. This time with a real press-and-hold.
@@ -764,7 +735,7 @@ test("B9 a pain flag needs a location", async ({ page }) => {
     "true",
   );
   await page.getByRole("button", { name: "Log this session" }).dispatchEvent("pointerdown");
-  await expect(page.getByRole("status")).toContainText("Saved: Easy run");
+  await expect(page.locator(".toast")).toContainText("Saved: Easy run");
   const saved = await page.evaluate(() => {
     const e = window.PATH_DEMO.state.entries[0];
     return { pain: e.pain, where: e.painWhere, level: e.painLevel };
@@ -830,12 +801,12 @@ test("B13 the demo survives a reload, and Reset demo starts over", async ({ page
   // Reset takes two taps. One tap changes nothing.
   const reset = page.locator(".banner .resetbtn");
   await reset.click();
-  await expect(page.getByRole("status")).toContainText("Tap Reset again to confirm");
+  await expect(page.locator(".toast")).toContainText("Tap Reset again to confirm");
   expect(await page.evaluate(() => !!window.PATH_DEMO.myBooking("pau-track-2026-11-16"))).toBe(
     true,
   );
   await reset.click();
-  await expect(page.getByRole("status")).toContainText("Demo reset");
+  await expect(page.locator(".toast")).toContainText("Demo reset");
   expect(await page.evaluate(() => !!window.PATH_DEMO.myBooking("pau-track-2026-11-16"))).toBe(
     false,
   );

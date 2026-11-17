@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const PORT = 3100;
-const PROTOTYPE = /prototype\.spec\.ts$/;
+const PROTOTYPE = /prototype.*\.spec\.ts$/;
 
 /**
  * End-to-end tests run against a production build, because the service worker

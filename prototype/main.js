@@ -2,9 +2,9 @@
 /* PATH clickable demo, part 4 of 4: the shell. Top bar, tabs, actions, events, start-up. */
 
 const TABS = { athlete: [["path", "Path", "flag"], ["coach", "Coach", "chat"], ["log", "Log", "plus"], ["week", "Week", "cal"], ["me", "Me", "user"]], coach: [["today", "Today", "clock"], ["athletes", "Athletes", "users"], ["review", "Review", "check"], ["alerts", "Alerts", "bell"]], admin: [["dash", "Home", "home"], ["sched", "Schedule", "cal"], ["members", "Members", "users"], ["products", "Products", "tag"], ["money", "Money", "card"]] };
-let lastKey = "";
+let lastKey = "", swipeClickGuard = -1e9;
 function render() {
-  sweep(); sweepProposals();
+  ensureSessions(); sweep(); sweepProposals(); sweepOffers(); runSeries();
   const app = document.getElementById("app"), tab = S.tab[S.role], key = S.role + tab + S.org + (S.rosterSid || ""), old = document.getElementById("view"), top = old && key === lastKey ? old.scrollTop : 0;
   const body = S.role === "athlete" ? { path: vPath, coach: vCoachChat, log: vLog, week: vWeek, me: vMe }[tab]() : S.role === "coach" ? vCoach() : vAdmin();
   const badge = S.role === "coach" ? S.alerts.filter((a) => a.status === "open" && (a.info || shares("alerts.pain"))).length : 0;
@@ -23,6 +23,19 @@ function render() {
 
 const ACT = {
   tab: (v) => { S.tab[S.role] = v; S.rosterSid = null; }, day: (v) => { S.day = v; }, logtab: (v) => { S.logTab = v; },
+  week: (v) => { shiftWeek(Number(v)); }, fcat: (v) => { S.filter.cat = v; }, fmine: () => { S.filter.mine = !S.filter.mine; }, fclear: () => { S.filter = { cat: "all", mine: false }; },
+  /* Out of credits, in context: buying opens the test checkout and books the session when it goes through. */
+  offer: (v) => {
+    const [kind, sid] = v.split("|"), s = S.sessions[sid];
+    if (kind === "waitlist") { UI.toast = book(sid, "app", undefined, { wait: true }).msg; UI.sheet = null; return; }
+    const o = offersFor(s).find((x) => x.kind === kind); if (!o) { UI.toast = "That is no longer needed: your pass covers this session now."; return; }
+    UI.sheet = { type: "pay", what: o.what, amount: o.amount, note: o.note || "", buy: kind, org: s.org, then: sid };
+  },
+  "offer-accept": (v) => { UI.toast = acceptOffer(v).msg; UI.sheet = null; }, "offer-pass": (v) => { UI.toast = declineOffer(v).msg; UI.sheet = null; },
+  "series-preview": (v) => { UI.sheet = { type: "series", sid: v }; },
+  "series-start": (v) => { const s = S.sessions[v], se = createSeries(s.org, s.off, s.start.getDay(), "sheet"); UI.sheet = null; UI.toast = `${seriesLabel(se)} is on. ${seriesSummary(se)}. Pause it any time under Your bookings.`; },
+  "series-pause": (v) => { UI.toast = pauseSeries(Number(v)).msg; }, "series-end": (v) => { UI.toast = endSeries(Number(v)).msg; },
+  "wl-mode": (v) => { const set = S.settings[v]; set.waitlistMode = set.waitlistMode === "offer" ? "auto" : "offer"; S.audit.unshift({ what: `Waitlist at ${ORGS[v].name}: ${set.waitlistMode === "offer" ? `freed spots are offered with a ${set.offerHoldMin / 60} h hold` : "the next person is booked automatically"}`, at: now() }); UI.toast = set.waitlistMode === "offer" ? `From now on a freed spot is held for the next person for ${set.offerHoldMin / 60} h.` : "From now on the next person on the waitlist is booked automatically."; },
   sheet: (v) => { UI.sheet = { type: "session", sid: v }; }, "close-btn": () => { UI.sheet = null; },
   book: (v) => { UI.toast = book(v, "app").msg; UI.sheet = null; }, cancel: (v) => { UI.toast = cancel(Number(v)).msg; UI.sheet = null; }, leave: (v) => { UI.toast = leaveWait(v).msg; UI.sheet = null; },
   "go-invoices": () => { S.org = "pau"; S.tab.athlete = "me"; setTimeout(() => { const el = document.getElementById("invoices"); if (el) el.scrollIntoView(); }, 0); },
@@ -36,7 +49,13 @@ const ACT = {
   forget: (v) => { S.memory = S.memory.filter((m) => m.id !== Number(v)); UI.toast = "Deleted. Your coach no longer uses it."; },
   buy: () => { const p = ORGS[S.org].products.find((x) => x.buy); UI.sheet = { type: "pay", what: p.name, amount: p.price, credits: p.buy }; },
   "pay-inv": (v) => { const i = S.invoices.find((x) => x.id === v); UI.sheet = { type: "pay", what: i.what, amount: i.amount, inv: v }; },
-  "pay-do": (v) => { const p = UI.sheet; if (p.inv) S.invoices.find((x) => x.id === p.inv).status = "paid"; else S.ledger.push({ pass: passOf(S.org).id, delta: p.credits, kind: "grant", reason: `Bought ${p.what}`, at: now() }); UI.toast = `Test payment by ${v === "twint" ? "TWINT" : "card"} succeeded: ${chf(p.amount)}. No real money moved.`; UI.sheet = null; },
+  "pay-do": (v) => {
+    const p = UI.sheet; let after = "";
+    if (p.inv) S.invoices.find((x) => x.id === p.inv).status = "paid";
+    else if (p.buy) { purchase(p.buy, p.org); if (p.then) { const w = myWait(p.then); after = " " + (w && w.offer ? acceptOffer(p.then) : book(p.then, "app")).msg; } }
+    else S.ledger.push({ pass: passOf(S.org).id, delta: p.credits, kind: "grant", reason: `Bought ${p.what}`, at: now() });
+    UI.toast = `Test payment by ${v === "twint" ? "TWINT" : "card"} succeeded: ${chf(p.amount)}. No real money moved.${after}`; UI.sheet = null;
+  },
   "hide-banner": () => { S.banner = false; }, "hide-toast": () => { UI.toast = ""; },
   /* Two taps, so nobody wipes their demo by accident. */
   reset: () => { if (!UI.resetArmed) { UI.resetArmed = true; UI.toast = "This erases everything you did in the demo. Tap Reset again to confirm."; return "armed"; } resetDemo(); UI.sheet = null; UI.toast = "Demo reset. Everything is back to the start."; },
@@ -49,6 +68,7 @@ const ACT = {
 };
 document.addEventListener("click", (e) => {
   const bg = e.target.classList && e.target.classList.contains("sheetbg");
+  if (performance.now() - swipeClickGuard < 350) return; // the tap that ends a swipe is not a tap on what was under the finger
   const el = e.target.closest("[data-a]"); if (!el) return;
   if (el.dataset.a === "close") { if (!bg) return; UI.sheet = null; return render(); }
   if (el.disabled || !ACT[el.dataset.a]) return;
@@ -61,7 +81,7 @@ document.addEventListener("input", (e) => { const d = e.target.dataset && e.targ
 /* Switching club or role keeps the tab you are on. Only a roster closes, because it belongs to one club's session. */
 document.addEventListener("change", (e) => {
   if (e.target.id === "role") { S.role = e.target.value; S.rosterSid = null; UI.toast = ""; UI.sheet = null; render(); }
-  if (e.target.id === "org") { S.org = e.target.value; S.rosterSid = null; UI.toast = ""; UI.sheet = null; render(); }
+  if (e.target.id === "org") { S.org = e.target.value; S.rosterSid = null; S.filter.cat = "all"; UI.toast = ""; UI.sheet = null; render(); } // kinds of training differ per club; "My pass only" stays
 });
 function submitLog() {
   const d = S.form, title = (document.getElementById("log-title").value || "").trim(), dur = Number(document.getElementById("log-dur").value);
@@ -111,13 +131,25 @@ document.addEventListener("contextmenu", (e) => { if (e.target.closest("[data-ho
 document.addEventListener("click", (e) => { const btn = e.target.closest("[data-hold]"); if (btn && (e.detail === 0 || calm)) btn.closest("form").requestSubmit(); });
 
 /* A confirm card that runs out while you are looking at it closes by itself. */
-setInterval(() => { if (sweepProposals()) render(); }, 20000);
+setInterval(() => { const a = sweepProposals(), b = sweepOffers(); if (a || b) render(); }, 20000);
+
+/* Week: swipe left or right to change week. Vertical scrolling and the filter row keep working as usual. */
+let swipe = null;
+document.addEventListener("pointerdown", (e) => { swipe = e.target.closest("#weekpane") && !e.target.closest(".filters") ? { x: e.clientX, y: e.clientY } : null; });
+document.addEventListener("pointerup", (e) => {
+  if (!swipe) return;
+  const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y; swipe = null;
+  if (Math.abs(dx) < 60 || Math.abs(dx) < 1.5 * Math.abs(dy)) return;
+  if (shiftWeek(dx < 0 ? 1 : -1)) { swipeClickGuard = performance.now(); UI.toast = ""; render(); }
+});
+document.addEventListener("pointercancel", () => { swipe = null; });
 
 /* For the tests and for poking around in the console. */
 window.PATH_DEMO = {
   get state() { return S; }, ui: UI, ORGS, LOAD_LIMIT, CARD_TTL_MIN, STORE_KEY,
   render, seed, save, load, resetDemo, book, cancel, check, freeSpot, leaveWait, passState, passOf, stats, guard, guardDraft, currentDraft, RAW_DRAFT,
-  ask, confirmProposal, toggleAct, runAct, planLocked, nextChangeable, applyDraft, sweepProposals, parseWhen, parseOffering, rosterRows, rosterNames, addWalkin, markAttendance, memoryFor, upcomingBookings, sessList, myBooking, myWait, spots, nextStep,
+  ask, confirmProposal, toggleAct, runAct, planLocked, nextChangeable, applyDraft, shiftWeek, weekIndex,
+  offersFor, purchase, acceptOffer, declineOffer, sweepOffers, waitTotal, createSeries, previewSeries, pauseSeries, endSeries, runSeries, seriesRows, seriesSummary, findSeries, sweepProposals, parseWhen, parseOffering, rosterRows, rosterNames, addWalkin, markAttendance, memoryFor, upcomingBookings, sessList, myBooking, myWait, spots, nextStep,
 };
 if (!load()) seed();
 render();

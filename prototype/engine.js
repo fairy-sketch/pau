@@ -25,10 +25,14 @@ const err = (code, msg) => ({ ok: false, code, msg });
 const ORGS = {
   pau: {
     name: "PAU Trackrunning", kind: "Athletics club",
+    season: { name: "Winter season", end: new Date(2027, 2, 31) },
+    single: { name: "Single session", price: 25 },
+    upgrade: { name: "Regular season pass", price: 100, note: "Regular is CHF 400 for the season. Your drop-in pass (CHF 300) counts towards it, so the difference is CHF 100." },
     policy: { opensDays: 60, cancelMin: 120, lateCancel: "none", waitlist: true },
     offerings: [
       { id: "track", sport: "running", name: "Track session", days: [1, 4], time: [18, 30], dur: 90, cap: 30, loc: "Sportanlage Fronwald", coach: "Coach Sara", intensity: "high" },
       { id: "gym", sport: "gym", name: "Gym session", days: [2, 5], time: [18, 0], dur: 60, cap: 15, loc: "Balboa Underground", coach: "Coach Jonas", intensity: "medium" },
+      { id: "technique", sport: "running", name: "Technique session", days: [3], time: [18, 30], dur: 60, cap: 20, loc: "Sportanlage Fronwald", coach: "Coach Sara", intensity: "low" },
       { id: "community", sport: "running", name: "Saturday community session", days: [6], time: [10, 0], dur: 75, cap: 40, loc: "Sportanlage Fronwald", coach: "Open to everyone", intensity: "low", free: true },
     ],
     products: [
@@ -41,6 +45,8 @@ const ORGS = {
   },
   studio: {
     name: "Studio Demo", kind: "Boutique studio",
+    season: { name: "Winter term", end: new Date(2027, 1, 28) },
+    single: { name: "Drop-in", price: 33 },
     policy: { opensDays: 6, cancelMin: 240, lateCancel: "forfeit", waitlist: true, maxDay: 2, maxWeek: 7 },
     offerings: [
       { id: "strength", sport: "gym", name: "Strength", days: [1, 2, 3, 4, 5], time: [7, 0], dur: 50, cap: 14, loc: "Studio One", coach: "Lena", intensity: "high" },
@@ -58,10 +64,13 @@ const ORGS = {
     ],
   },
 };
-const policyText = (o) => {
-  const p = o.policy, out = [`Book up to ${p.opensDays} days ahead.`, `Free cancel until ${p.cancelMin / 60} h before.`];
+/* The filter chips in Week: every offering belongs to one kind of training. */
+const CAT = { track: "Running", technique: "Running", community: "Running", gym: "Strength", strength: "Strength", hiit: "HIIT", mobility: "Mobility", yoga: "Yoga", ride: "Cycling" };
+const policyText = (org) => {
+  const o = ORGS[org], set = S.settings[org], p = o.policy, out = [`Book up to ${p.opensDays} days ahead.`, `Free cancel until ${p.cancelMin / 60} h before.`];
   out.push(p.lateCancel === "forfeit" ? "Later than that, the credit is not returned." : "No penalty for late cancels.");
   if (p.maxDay) out.push(`Max ${p.maxWeek} bookings a week and ${p.maxDay} a day.`);
+  out.push(set.waitlistMode === "offer" ? `Waitlist: a freed spot is held for the next person for ${set.offerHoldMin / 60} h, then offered on.` : "Waitlist: the next person is booked automatically.");
   return out.join(" ");
 };
 /* Made-up members. Each session's roster is a deterministic slice of this list. */
@@ -69,14 +78,14 @@ const NAMES = [];
 for (const last of ["Brunner", "Meier", "Rossi", "Frei", "Sutter", "Aziz"]) for (const first of ["Jana", "Luca", "Sofia", "Noah", "Elin", "Tariq", "Mara", "Ben"]) NAMES.push(`${first} ${last}`);
 
 /* ---------- state ---------- */
-const STORE_KEY = "path-demo-v2", PER = 12, LOAD_LIMIT = 1.1, CARD_TTL_MIN = 15;
+const STORE_KEY = "path-demo-v3", WEEKS = 4, PER = 12, LOAD_LIMIT = 1.1, CARD_TTL_MIN = 15;
 let S;
 /* Things that belong to the open screen, not to the demo's data. Never saved. */
 const UI = { sheet: null, toast: "", lineFrom: null, justDone: null, resetArmed: false };
 
 function ensureSessions() {
   const T = today();
-  for (const [oid, o] of Object.entries(ORGS)) for (const off of o.offerings) for (let i = -21; i <= 27; i++) {
+  for (const [oid, o] of Object.entries(ORGS)) for (const off of o.offerings) for (let i = -21; i <= 7 * WEEKS; i++) {
     const d = addDays(T, i); if (!off.days.includes(d.getDay())) continue;
     const id = `${oid}-${off.id}-${ymd(d)}`; if (S.sessions[id]) continue;
     const h = hash(id), h2 = hash(id + "w");
@@ -88,13 +97,16 @@ function ensureSessions() {
 function seed() {
   const T = today();
   S = {
-    v: 2, role: "athlete", org: "pau", tab: { athlete: "path", coach: "today", admin: "dash" }, banner: true, day: ymd(T), logTab: "log", rosterSid: null,
+    v: 3, role: "athlete", org: "pau", tab: { athlete: "path", coach: "today", admin: "dash" }, banner: true, day: ymd(T), logTab: "log", rosterSid: null,
     me: { name: "Mia Keller", sports: "Running · Strength" },
     goal: { title: "Sub‑40 10K", date: new Date(2027, 4, 9), why: "Because I want to race the Zurich 10K with my club." },
     stages: ["Foundation", "Build", "Sharpen", "Test", "Recover"], stage: 1, stageSessions: 5,
-    sessions: {}, bookings: [], waitlist: [], ledger: [], entries: [], pbs: [], chat: [], props: {}, audit: [], alerts: [], attendance: {}, walkins: {}, idem: {},
+    sessions: {}, bookings: [], waitlist: [], ledger: [], entries: [], pbs: [], chat: [], props: {}, audit: [], alerts: [], attendance: {}, walkins: {}, idem: {}, series: [],
+    /* What a club admin can change. PAU books the next person automatically; Studio Demo offers the spot with a 2 h hold. */
+    settings: { pau: { waitlistMode: "auto", offerHoldMin: 120 }, studio: { waitlistMode: "offer", offerHoldMin: 120 } },
+    filter: { cat: "all", mine: false },
     passes: [
-      { id: "p-pau", org: "pau", name: "Drop-in season pass", kind: "limit", max: 4, valid: "Valid until 31 Mar 2027" },
+      { id: "p-pau", org: "pau", name: "Drop-in season pass", kind: "limit", max: 4, covers: ["track", "gym"], valid: "Valid until 31 Mar 2027" },
       { id: "p-studio", org: "studio", name: "10 classes", kind: "credits", valid: "No expiry in this demo" },
     ],
     invoices: [{ id: "PAU-2026-0042", org: "pau", what: "Drop-in season pass, winter season", amount: 300, due: addDays(T, 9), status: "open" }],
@@ -116,7 +128,7 @@ function seed() {
   };
   ensureSessions();
   // Mia's history: 3 PAU drop-ins this calendar month, and a studio pack with 6 of 10 left. Every one of them is a ledger row.
-  const paid = sessList("pau").filter((s) => !offOf(s).free && ym(s.start) === ym(T));
+  const paid = sessList("pau").filter((s) => !offOf(s).free && coveredByMe(s) && ym(s.start) === ym(T));
   const past = paid.filter((s) => s.start < now()).slice(-3), fut = paid.filter((s) => s.start > now() && s.off === "gym");
   for (const s of [...past, ...fut.slice(0, 3 - past.length)]) {
     s.others = Math.min(s.others, s.cap - 1);
@@ -153,7 +165,7 @@ function load() {
   try {
     const raw = localStorage.getItem(STORE_KEY); if (!raw) return false;
     const data = JSON.parse(raw, (k, v) => (v && typeof v === "object" && typeof v.$d === "number" ? new Date(v.$d) : v));
-    if (!data || data.v !== 2 || !data.sessions) return false;
+    if (!data || data.v !== 3 || !data.sessions) return false;
     S = data; ensureSessions();
     if (S.day < ymd(today())) S.day = ymd(today());
     return true;
@@ -169,15 +181,19 @@ const HELD = ["confirmed", "attended", "no_show"];
 const myBooking = (sid) => S.bookings.find((b) => b.sid === sid && HELD.includes(b.status));
 const myWait = (sid) => S.waitlist.find((w) => w.sid === sid);
 const booked = (s) => s.others + (myBooking(s.id) ? 1 : 0);
-const spots = (s) => Math.max(0, s.cap - booked(s));
+const spots = (s) => Math.max(0, s.cap - booked(s) - (s.held || 0)); // a spot held for a waitlist offer is not free
 const deadline = (s) => new Date(s.start.getTime() - ORGS[s.org].policy.cancelMin * 60000);
-const passOf = (org) => S.passes.find((p) => p.org === org);
+const passOf = (org) => S.passes.find((p) => p.org === org && !p.single);
+const ticketOf = (org) => S.passes.find((p) => p.org === org && p.single); // single sessions bought one at a time
+const opensAt = (s) => addDays(sod(s.start), -ORGS[s.org].policy.opensDays);
+const coveredByMe = (s) => { const p = passOf(s.org); return !!offOf(s).free || (!!p && (!p.covers || p.covers.includes(s.off))); };
 const heldIn = (org) => S.bookings.filter((b) => HELD.includes(b.status) && S.sessions[b.sid].org === org);
 const upcomingBookings = () => S.bookings.filter((b) => b.status === "confirmed").map((b) => ({ b, s: S.sessions[b.sid] })).filter((r) => r.s.start > now()).sort((a, c) => a.s.start - c.s.start);
 
 /* THE pass balance. Path, Me, Coach, the session sheet and the admin list all call this and nothing else.
    It is computed from the ledger: a booking writes -1, a refunded cancel writes +1. */
 function passState(pass, when = now()) {
+  if (pass.kind === "unlimited") return { left: 1e9, text: "Unlimited group sessions" };
   if (pass.kind === "limit") {
     const used = -S.ledger.filter((l) => l.pass === pass.id && l.period === ym(when)).reduce((n, l) => n + l.delta, 0);
     return { used, max: pass.max, left: pass.max - used, text: `${used} of ${pass.max} used in ${MOL[when.getMonth()]}` };
@@ -191,14 +207,13 @@ function sweep() { for (const b of S.bookings) if (b.status === "confirmed" && e
 const pastLabel = (b, s) => (b.status === "attended" ? "Attended" : endOf(s) <= now() ? "Missed" : "In progress");
 
 /* ---------- booking engine: one path for the app, the coach chat and the waitlist ---------- */
-function check(s) {
+function check(s, opts = {}) {
   const o = ORGS[s.org], p = o.policy, off = offOf(s);
   if (s.cancelled) return err("CANCELLED", "The club cancelled this session.");
   if (s.start <= now()) return err("WINDOW_CLOSED", endOf(s) <= now() ? "This session is over. It can't be booked any more." : "This session has already started.");
   if (myBooking(s.id)) return err("ALREADY_BOOKED", "You are already booked for this session.");
-  if (myWait(s.id)) return err("ALREADY_BOOKED", "You are already on the waitlist for this session.");
-  const opens = addDays(sod(s.start), -p.opensDays);
-  if (now() < opens) return err("WINDOW_CLOSED", `Booking opens ${p.opensDays} days before. This one opens on ${fDay(opens)}.`);
+  if (myWait(s.id) && !opts.ignoreWait) return err("ALREADY_BOOKED", "You are already on the waitlist for this session.");
+  if (now() < opensAt(s)) return err("WINDOW_CLOSED", `Booking opens ${p.opensDays} days before. This one opens on ${fDay(opensAt(s))}.`);
   if (p.maxDay) {
     const sameDay = heldIn(s.org).filter((b) => ymd(S.sessions[b.sid].start) === ymd(s.start)).length;
     if (sameDay >= p.maxDay) return err("LIMIT_REACHED", `You already have ${sameDay} classes on ${fDay(s.start)}. The studio allows ${p.maxDay} a day.`);
@@ -206,28 +221,68 @@ function check(s) {
     if (inWeek >= p.maxWeek) return err("LIMIT_REACHED", `You already have ${inWeek} classes that week. The studio allows ${p.maxWeek} a week.`);
   }
   if (off.free) return { ok: true, pass: null, note: "Free session. No pass needed." };
-  const pass = passOf(s.org);
-  if (!pass) return err("NO_VALID_PASS", "You have no pass for this club. Buy one under Me.");
-  const st = passState(pass, s.start);
-  if (pass.kind === "limit" && st.left <= 0) { const nx = new Date(s.start.getFullYear(), s.start.getMonth() + 1, 1); return err("LIMIT_REACHED", `You've used ${st.used} of ${st.max} drop-in sessions in ${MOL[s.start.getMonth()]}. Next one opens ${nx.getDate()} ${MOL[nx.getMonth()]}.`); }
-  if (pass.kind === "credits" && st.left <= 0) return err("NO_VALID_PASS", `No credits left on your ${pass.name} pack. Buy a new pack under Me.`);
-  return { ok: true, pass, note: `${pass.name}: ${st.text}.` };
+  // From here on, only the pass can say no. Those refusals are marked `blocked`: they can be solved by buying something.
+  const pass = passOf(s.org), ticket = ticketOf(s.org);
+  let block = null;
+  if (!pass) block = err("NO_VALID_PASS", "You have no pass for this club.");
+  else if (pass.covers && !pass.covers.includes(off.id)) block = err("NO_VALID_PASS", `Your ${pass.name} covers ${pass.covers.map((id) => o.offerings.find((x) => x.id === id).name.toLowerCase() + "s").join(" and ")} only.`);
+  else {
+    const st = passState(pass, s.start);
+    if (pass.kind === "limit" && st.left <= 0) { const nx = new Date(s.start.getFullYear(), s.start.getMonth() + 1, 1); block = err("LIMIT_REACHED", `You've used ${st.used} of ${st.max} drop-in sessions in ${MOL[s.start.getMonth()]}. Next one opens ${nx.getDate()} ${MOL[nx.getMonth()]}.`); }
+    else if (pass.kind === "credits" && st.left <= 0) block = err("NO_VALID_PASS", `No credits left on your ${pass.name} pack.`);
+    else return { ok: true, pass, note: `${pass.name}: ${st.text}.` };
+  }
+  if (ticket && passState(ticket).left > 0) return { ok: true, pass: ticket, note: `${ticket.name}: ${passState(ticket).text}.` };
+  block.blocked = true;
+  return block;
+}
+/* What the member can do right there when the pass says no: buy one session, upgrade, or (if the session is full) join the waitlist. */
+function offersFor(s) {
+  const w = myWait(s.id), held = !!(w && w.offer), c = check(s, { ignoreWait: held });
+  if (c.ok || !c.blocked) return [];
+  const o = ORGS[s.org], pass = passOf(s.org), full = spots(s) === 0 && !held, out = [], pack = o.products.find((x) => x.buy);
+  if (full && o.policy.waitlist && !w) out.push({ kind: "waitlist", label: "Join waitlist" });
+  if (!full && o.single) out.push({ kind: "dropin", label: `Buy 1 drop-in · ${chf(o.single.price)}`, what: `${o.single.name}: ${offOf(s).name}, ${fDay(s.start)}`, amount: o.single.price });
+  if (o.upgrade && pass && pass.kind !== "unlimited") out.push({ kind: "upgrade", label: `Upgrade to Regular · ${chf(o.upgrade.price)}`, what: `Upgrade to ${o.upgrade.name}`, amount: o.upgrade.price, note: o.upgrade.note });
+  if (!o.upgrade && pack) out.push({ kind: "pack", label: `Buy ${pack.name} · ${chf(pack.price)}`, what: pack.name, amount: pack.price });
+  return out;
+}
+/* A test purchase. No money moves; the pass or the single-session credit is written to the ledger. */
+function purchase(kind, org) {
+  const o = ORGS[org], pass = passOf(org), pack = o.products.find((x) => x.buy);
+  if (kind === "dropin") {
+    let t = ticketOf(org); if (!t) { t = { id: `t-${org}`, org, name: o.single.name, kind: "credits", single: true }; S.passes.push(t); }
+    S.ledger.push({ pass: t.id, delta: 1, kind: "grant", reason: `Bought 1 ${o.single.name.toLowerCase()}`, at: now() });
+  } else if (kind === "upgrade") {
+    S.ledger.push({ pass: pass.id, delta: 0, kind: "upgrade", reason: `Upgraded from ${pass.name} to ${o.upgrade.name}`, at: now() });
+    pass.name = o.upgrade.name; pass.kind = "unlimited"; delete pass.max; delete pass.covers;
+  } else if (kind === "pack") S.ledger.push({ pass: pass.id, delta: pack.buy, kind: "grant", reason: `Bought ${pack.name}`, at: now() });
 }
 /* Every state-changing call takes an idempotency key. The same key always returns the first result and changes nothing. */
-function remember(key, r) { if (key) S.idem[key] = { ok: r.ok, status: r.status || null, code: r.code || null, msg: r.msg, bid: r.bid || null }; return r; }
-function book(sid, source, key) {
+function remember(key, r) { if (key) S.idem[key] = { ok: r.ok, status: r.status || null, code: r.code || null, msg: r.msg, bid: r.bid || null, blocked: !!r.blocked }; return r; }
+function book(sid, source, key, opts = {}) {
   if (key && S.idem[key]) return S.idem[key];
   const s = S.sessions[sid]; if (!s) return remember(key, err("NOT_FOUND", "That session does not exist."));
-  const c = check(s); if (!c.ok) return remember(key, c);
+  const c = check(s);
+  if (!c.ok) {
+    // Out of credits on a full session: the waitlist is still open if the member asks for it, because nothing is charged until a spot comes up.
+    if (c.blocked && opts.wait && spots(s) === 0 && ORGS[s.org].policy.waitlist) return remember(key, joinWait(s, true));
+    return remember(key, c);
+  }
   if (spots(s) > 0) {
     const b = { id: S.seq++, sid, status: "confirmed", pass: c.pass ? c.pass.id : null, source, at: now() };
     S.bookings.push(b); if (c.pass) debit(c.pass, s, b);
     return remember(key, { ok: true, status: "confirmed", bid: b.id, msg: `Booked: ${offOf(s).name}, ${fDay(s.start)} ${fTime(s.start)}. Free cancel until ${fDay(deadline(s))} ${fTime(deadline(s))}.` });
   }
   if (!ORGS[s.org].policy.waitlist) return remember(key, err("SESSION_FULL", "This session is full."));
-  const pos = s.waitOthers + 1; S.waitlist.push({ sid, pos });
-  return remember(key, { ok: true, status: "waitlisted", msg: `${offOf(s).name} is full. You are #${pos} on the waitlist. Nothing is charged until you get a spot.` });
+  return remember(key, joinWait(s, false));
 }
+/* `behind` stands for the people who join after the member: in a full class, one more does. */
+function joinWait(s, blocked) {
+  const pos = s.waitOthers + 1; S.waitlist.push({ sid: s.id, pos, behind: 1, at: now() });
+  return { ok: true, status: "waitlisted", msg: `${offOf(s).name} is full. You are #${pos} on the waitlist. Nothing is charged until you get a spot.${blocked ? " Your pass is used up, so a spot would be held for you while you decide." : ""}` };
+}
+const waitTotal = (s) => { const w = myWait(s.id); return s.waitOthers + (w ? 1 + (w.behind || 0) : 0); };
 function cancel(bid, key) {
   if (key && S.idem[key]) return S.idem[key];
   const b = S.bookings.find((x) => x.id === bid);
@@ -239,21 +294,146 @@ function cancel(bid, key) {
   const tail = forfeit ? " This was inside the cancel deadline, so the credit is not returned." : !pass ? "" : pass.kind === "credits" ? " Your credit is back." : ` It no longer counts towards ${MOL[s.start.getMonth()]}.`;
   return remember(key, { ok: true, status: b.status, bid: b.id, msg: `Cancelled: ${offOf(s).name}, ${fDay(s.start)}.${tail}` });
 }
-function leaveWait(sid) { S.waitlist = S.waitlist.filter((w) => w.sid !== sid); return { ok: true, msg: "You left the waitlist." }; }
-/* Somebody else cancels: the queue moves, and the member is promoted through the same checks. */
+/* The member leaves the queue (or is taken out of it). Whoever joined behind her stays in it. */
+function dropWait(s) {
+  const w = myWait(s.id); if (!w) return null;
+  S.waitlist = S.waitlist.filter((x) => x !== w); s.waitOthers += w.behind || 0;
+  if (w.offer) s.held = 0;
+  return w;
+}
+function leaveWait(sid) {
+  const s = S.sessions[sid], w = dropWait(s);
+  if (w && w.offer) passSpotOn(s, "The spot");
+  return { ok: true, msg: "You left the waitlist." };
+}
+/* Somebody else cancels: the queue moves. */
 function freeSpot(sid) {
   const s = S.sessions[sid]; if (s.others <= 0) return "Nobody else is booked.";
-  const w = myWait(sid);
   s.left = (s.left || 0) + 1; s.others--;
-  if (s.waitOthers > 0) { s.waitOthers--; s.others++; if (w) w.pos = Math.max(1, w.pos - 1); return "A spot opened and went to the next person on the waitlist." + (w ? ` ${S.me.name} moved up to #${w.pos}.` : ""); }
-  if (w) { S.waitlist = S.waitlist.filter((x) => x.sid !== sid); const r = book(sid, "waitlist"); return r.ok ? `A spot opened. ${S.me.name} was promoted from the waitlist and booked.` : `A spot opened, but ${S.me.name} could not be promoted: ${r.msg}`; }
-  return "A spot opened.";
+  return passSpotOn(s, "A spot opened");
 }
+/* A free spot goes down the queue: people ahead of the member first, then the member.
+   Auto mode books her through the same checks. Offer mode (a club setting) holds the spot for her for a set time. */
+function passSpotOn(s, lead) {
+  const w = myWait(s.id), set = S.settings[s.org];
+  const short = lead === "It" || lead === "The spot"; // "It went to the next person." rather than "A spot opened and went to ..."
+  if (s.waitOthers > 0) { s.waitOthers--; s.others++; if (w) w.pos = Math.max(1, w.pos - 1); return `${lead}${short ? "" : " and"} went to the next person on the waitlist.` + (w ? ` ${S.me.name} moved up to #${w.pos}.` : ""); }
+  if (!w) return short ? `${lead} is open again for anyone to book.` : `${lead}.`;
+  if (set.waitlistMode === "auto") {
+    dropWait(s);
+    const r = book(s.id, "waitlist");
+    if (r.ok) return `${lead}. ${S.me.name} was promoted from the waitlist and booked.`;
+    if (!r.blocked) return `${lead}, but ${S.me.name} could not be promoted: ${r.msg}`;
+    S.waitlist.push(w); s.waitOthers -= w.behind || 0; // out of credits: hold the spot instead, so she can buy a drop-in or pass it on
+  }
+  w.pos = 1; w.offer = { expiresAt: new Date(now().getTime() + set.offerHoldMin * 60000) }; s.held = 1;
+  S.chat.push({ who: "coach", text: `A spot opened in ${offOf(s).name}, ${fDay(s.start)} ${fTime(s.start)} at ${ORGS[s.org].name}. It is held for you until ${fTime(w.offer.expiresAt)}. After that it goes to the next person.`, opts: { sid: s.id } });
+  return `${lead}. It is held for ${S.me.name} until ${fTime(w.offer.expiresAt)}, then it goes to the next person.`;
+}
+function acceptOffer(sid, key) {
+  if (key && S.idem[key]) return S.idem[key];
+  const s = S.sessions[sid], w = s && myWait(sid);
+  if (!w || !w.offer || now() >= w.offer.expiresAt) return remember(key, err("OFFER_GONE", "That spot is no longer held for you."));
+  dropWait(s);
+  const r = book(sid, "waitlist_offer");
+  if (!r.ok) { S.waitlist.push(w); s.waitOthers -= w.behind || 0; s.held = 1; } // still hers until it runs out
+  return remember(key, r);
+}
+function declineOffer(sid) {
+  const s = S.sessions[sid], w = s && myWait(sid); if (!w || !w.offer) return err("OFFER_GONE", "That spot is no longer held for you.");
+  dropWait(s);
+  return { ok: true, msg: `You passed on the spot. ${passSpotOn(s, "It")}` };
+}
+/* A held spot that nobody takes in time moves on. */
+function sweepOffers() {
+  let changed = false;
+  for (const w of [...S.waitlist]) {
+    const s = S.sessions[w.sid];
+    if (!w.offer || (now() < w.offer.expiresAt && s.start > now())) continue;
+    const at = fTime(w.offer.expiresAt); dropWait(s);
+    S.chat.push({ who: "coach", text: `The spot held for you in ${offOf(s).name}, ${fDay(s.start)}, ran out at ${at}. ${passSpotOn(s, "It")} You are no longer on that waitlist.` });
+    changed = true;
+  }
+  return changed;
+}
+
+/* ---------- recurring holds: "book every Thursday 18:30 this season" ---------- */
+const seriesOff = (se) => ORGS[se.org].offerings.find((o) => o.id === se.off);
+const seriesLabel = (se) => `Every ${WDL[se.weekday]} ${pad(se.hh)}:${pad(se.mm)}`;
+const findSeries = (org, off, weekday) => S.series.find((x) => x.org === org && x.off === off && x.weekday === weekday);
+const seriesSessions = (se) => sessList(se.org).filter((s) => s.off === se.off && s.start.getDay() === se.weekday && s.start > now() && s.start < addDays(sod(se.until), 1));
+function clashWith(s) {
+  const r = S.bookings.map((b) => ({ b, o: S.sessions[b.sid] })).find(({ b, o }) => b.status === "confirmed" && o.id !== s.id && o.start < endOf(s) && endOf(o) > s.start);
+  return r ? r.o : null;
+}
+/* One date of a series, through the same booking function as everything else. */
+function seriesTry(se, s) {
+  if (myBooking(s.id)) return { status: "kept", text: "Already booked" };
+  if (myWait(s.id)) return { status: "kept", text: "Already on the waitlist" };
+  if (now() < opensAt(s)) return { status: "opens", text: `Books itself when booking opens on ${fDay(opensAt(s))}` };
+  const clash = clashWith(s); if (clash) return { status: "skipped", text: `Clashes with ${offOf(clash).name} at ${fTime(clash.start)}` };
+  const r = book(s.id, "series", `series-${se.id}:${s.id}`);
+  if (!r.ok) return { status: "skipped", text: r.msg };
+  if (r.bid) S.bookings.find((b) => b.id === r.bid).series = se.id;
+  return r.status === "confirmed" ? { status: "booked", text: "Booked" } : { status: "waitlisted", text: "Full, so you are on the waitlist" };
+}
+/* Books every date that has opened and has not been handled yet. A skipped date stays skipped, so the report stays true. */
+function runSeries() {
+  let changed = false;
+  for (const se of S.series) {
+    if (se.paused) continue;
+    for (const s of seriesSessions(se)) {
+      const d = se.done[s.id]; if (d && d.status !== "opens") continue;
+      const r = seriesTry(se, s); if (!d || d.status !== r.status) changed = true;
+      se.done[s.id] = r;
+    }
+  }
+  return changed;
+}
+function seriesRows(se) {
+  return seriesSessions(se).map((s) => {
+    const d = se.done[s.id] || { status: "paused", text: "Not booked while paused" };
+    const gone = (d.status === "booked" && !myBooking(s.id)) || (d.status === "waitlisted" && !myBooking(s.id) && !myWait(s.id));
+    return { sid: s.id, date: s.start, ...(gone ? { status: "cancelled", text: "Cancelled by you" } : d) };
+  });
+}
+function seriesSummary(se) {
+  const rows = seriesRows(se), n = (st) => rows.filter((r) => r.status === st).length, parts = [];
+  if (n("booked") + n("kept")) parts.push(`${n("booked") + n("kept")} booked`);
+  if (n("waitlisted")) parts.push(`${n("waitlisted")} on the waitlist`);
+  if (n("skipped")) parts.push(`${n("skipped")} skipped`);
+  if (n("opens")) parts.push(`${n("opens")} waiting to open`);
+  if (n("cancelled")) parts.push(`${n("cancelled")} cancelled by you`);
+  return parts.join(", ") || "No dates in the schedule yet";
+}
+function createSeries(org, off, weekday, source) {
+  const o = ORGS[org].offerings.find((x) => x.id === off);
+  if (!o || !o.days.includes(weekday)) return null;
+  let se = findSeries(org, off, weekday);
+  if (se) se.paused = false;
+  else { se = { id: S.seq++, org, off, weekday, hh: o.time[0], mm: o.time[1], until: ORGS[org].season.end, paused: false, source, at: now(), done: {} }; S.series.push(se); }
+  runSeries();
+  return se;
+}
+/* What starting a series would do, date by date, worked out on a copy of the state so nothing is booked. */
+function previewSeries(org, off, weekday) {
+  const keep = S; S = structuredClone(S);
+  try { const se = createSeries(org, off, weekday, "preview"); return se ? seriesRows(se) : []; } finally { S = keep; }
+}
+/* One tap. Pausing books nothing new and keeps what is booked; resuming tries the skipped dates again. */
+function pauseSeries(id, paused) {
+  const se = S.series.find((x) => x.id === id); if (!se) return err("NOT_FOUND", "That series no longer exists.");
+  se.paused = paused === undefined ? !se.paused : !!paused;
+  if (!se.paused) { for (const k of Object.keys(se.done)) if (se.done[k].status === "skipped") delete se.done[k]; runSeries(); }
+  return { ok: true, msg: se.paused ? `${seriesLabel(se)} is paused. Your existing bookings stay.` : `${seriesLabel(se)} is on again. ${seriesSummary(se)}.` };
+}
+function endSeries(id) { const se = S.series.find((x) => x.id === id); S.series = S.series.filter((x) => x.id !== id); return { ok: true, msg: se ? `${seriesLabel(se)} ended. Your existing bookings stay.` : "Ended." }; }
 
 /* ---------- roster: confirmed bookings of that session, plus explicit walk-ins. Nothing else. ---------- */
 function rosterNames(s) {
   const off = Math.floor(hash(s.id + "n") * NAMES.length), base = NAMES.slice(off).concat(NAMES.slice(0, off)), left = (s.left || 0) % NAMES.length;
-  return { booked: base.slice(left, left + s.others), waiting: base.slice(left + s.others, left + s.others + s.waitOthers) };
+  const w = myWait(s.id), ahead = base.slice(left + s.others, left + s.others + s.waitOthers), behind = w ? base.slice(left + s.others + s.waitOthers, left + s.others + s.waitOthers + (w.behind || 0)) : [];
+  return { booked: base.slice(left, left + s.others), waiting: ahead, queue: w ? [...ahead, S.me.name, ...behind] : ahead };
 }
 function rosterRows(s) {
   const rows = rosterNames(s).booked.map((name) => ({ name, kind: "booked" }));
@@ -356,6 +536,8 @@ function applyDraft(d) {
 /* ---------- the rule-based next step ---------- */
 function nextStep() {
   const st = stats(), T = today(), over = S.invoices.find((i) => i.status === "open" && i.due < T);
+  const held = S.waitlist.find((w) => w.offer);
+  if (held) { const s = S.sessions[held.sid], can = check(s, { ignoreWait: true }).ok; return { kind: "offer", title: `A spot is held for you: ${offOf(s).name}`, meta: `${fDay(s.start)} ${fTime(s.start)} · ${ORGS[s.org].name} · held until ${fTime(held.offer.expiresAt)}`, cta: can ? "Take the spot" : "See your options", a: can ? "offer-accept" : "sheet", v: s.id, reason: "You were next on the waitlist and a spot opened. It is yours until the hold runs out, then it goes to the next person.", factors: [`Held until ${fDay(held.offer.expiresAt)} ${fTime(held.offer.expiresAt)}`, can ? "Nothing is charged until you take it" : "Your pass is used up, so taking it needs a drop-in or an upgrade"] }; }
   if (over) return { kind: "pay", title: "Pay your invoice", meta: `${chf(over.amount)} · ${over.what} · due ${fDay(over.due)}`, cta: "Open invoice", a: "go-invoices", reason: "An invoice is past its due date.", factors: [`Invoice ${over.id} was due ${fDay(over.due)}`, "No fees are added"] };
   if (S.planNews) { const d = currentDraft(); return { kind: "plan", title: "Your coach approved your plan", meta: `${d.title} · approved by Coach Sara`, cta: "Review plan", a: "review-plan", reason: "Your coach approved a new plan for your next stage.", factors: d.items.map((i) => `${i.day}: ${i.to}`) }; }
   if (st.pain) return { kind: "recover", title: "Recover today", meta: `You flagged pain (${esc(st.pain.painWhere)}, level ${st.pain.painLevel})`, cta: "Pain is gone, clear the flag", a: "clear-pain", reason: "You flagged pain, so intensity is paused until you or your coach clear it. If it persists or gets worse, see a doctor or physio.", factors: ["Pain flag logged " + fDay(st.pain.at), "No hard sessions are suggested while the flag is open"] };

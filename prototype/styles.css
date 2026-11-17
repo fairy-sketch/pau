@@ -193,3 +193,20 @@ svg text { font-family: var(--mono); font-size: 10px; fill: var(--text-2); }
 .was { text-decoration: line-through; color: var(--text-2); }
 .scroll:focus-visible, #view:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* ---- Iteration 2, milestone I2-1 ---- */
+#weekpane { touch-action: pan-y; }
+.weeknav { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.weeknav .x:disabled { opacity: .3; }
+.wk { display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+.wk .sub { font-size: 13px; }
+.wkdots { display: flex; gap: 6px; margin-top: 6px; }
+.wkdots i { width: 6px; height: 6px; border-radius: 50%; background: var(--track); }
+.wkdots i.on { background: var(--text); }
+.days button.past .n, .days button.none .n { font-weight: 400; } /* quieter: a day that is over, or has nothing that matches the filters */
+.days .mk { display: block; width: 4px; height: 4px; border-radius: 50%; margin: 3px auto 0; }
+.days .mk.on { background: currentColor; }
+.filters { display: flex; gap: 8px; overflow-x: auto; margin: 0 -24px; padding: 2px 24px; scrollbar-width: none; }
+.filters::-webkit-scrollbar { display: none; }
+.filters .chip { flex: none; white-space: nowrap; }
+.opts { align-self: stretch; display: flex; flex-direction: column; gap: 8px; }

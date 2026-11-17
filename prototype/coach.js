@@ -55,9 +55,17 @@ function runAct(a, key) {
     const s = S.sessions[a.sid];
     // The card promised a booking. If the session filled up meanwhile, do not quietly turn it into a waitlist entry.
     if (s && !a.wait && !S.idem[key] && check(s).ok && spots(s) === 0) return remember(key, err("SESSION_FULL", "It filled up since I asked. Ask me to join the waitlist if you want."));
-    return book(a.sid, "ai_coach", key);
+    return book(a.sid, "ai_coach", key, { wait: !!a.wait });
   }
   if (a.t === "cancel") return cancel(a.bid, key);
+  if (a.t === "accept") return acceptOffer(a.sid, key);
+  if (a.t === "series") {
+    if (S.idem[key]) return S.idem[key];
+    const se = createSeries(a.org, a.off, a.weekday, "ai_coach"); if (!se) return remember(key, err("NOT_FOUND", "That session no longer runs on that day."));
+    const r = remember(key, { ok: true, msg: `${seriesLabel(se)} is on until ${fDay(se.until)} ${se.until.getFullYear()}. Pause it with one tap under Week.` });
+    return { ...r, extra: seriesRows(se).map((x) => ({ ok: x.status !== "skipped", msg: `${fDay(x.date)}: ${x.status === "skipped" ? "skipped. " + x.text : x.text}` })) };
+  }
+  if (a.t === "series-pause") return pauseSeries(a.id, a.paused);
   if (a.t === "swap" || a.t === "ease") {
     if (S.idem[key]) return S.idem[key];
     const it = S.plan.items.find((i) => i.date === a.date); if (!it) return remember(key, err("NOT_FOUND", "That plan day no longer exists."));
@@ -68,7 +76,7 @@ function runAct(a, key) {
   }
   return err("UNKNOWN", "Unknown action.");
 }
-const FAIL = { book: "Couldn't book", cancel: "Couldn't cancel", swap: "Couldn't change the plan", ease: "Couldn't change the plan" };
+const FAIL = { book: "Couldn't book", cancel: "Couldn't cancel", swap: "Couldn't change the plan", ease: "Couldn't change the plan", accept: "Couldn't take the spot", series: "Couldn't start the series", "series-pause": "Couldn't change the series" };
 /* The only way the coach changes anything. A card can be decided once; each action carries the card's idempotency key. */
 function confirmProposal(id, yes) {
   sweepProposals();
@@ -80,7 +88,9 @@ function confirmProposal(id, yes) {
   for (const { a, i } of chosen) {
     const r = runAct(a, `${p.key}:${i}`);
     p.results.push({ ok: !!r.ok, msg: r.ok ? r.msg : `${FAIL[a.t] || "Couldn't do it"}: ${r.msg}` });
+    for (const x of r.extra || []) p.results.push(x);
     if (r.ok) done.push(a);
+    else if (r.blocked && a.sid) p.offerSid = a.sid; // the pass said no: the card offers the ways out right there
   }
   // A card only reads "Confirmed" if something actually happened. If nothing could be done, it is declined, with the reason.
   if (!done.length) { p.status = "declined"; p.failed = true; p.note = "Nothing was changed."; return p; }
@@ -142,15 +152,67 @@ function replyBook(text) {
     if (have) return say(`You are already ${myBooking(have.id) ? "booked for" : "on the waitlist for"} ${offOf(have).name} on ${fDay(have.start)} at ${fTime(have.start)}.`);
     return say(`I could not find ${off ? "a " + offName(org, off).toLowerCase() : "a session"}${when.label ? " on " + when.label : ""} at ${ORGS[org].name}.` + (off ? ` It runs on ${ORGS[org].offerings.find((o) => o.id === off).days.map((d) => WDL[d] + "s").join(", ")}.` : ""));
   }
-  const c = check(s);
-  if (!c.ok) {
-    const alt = sessList(s.org).find((x) => offOf(x).free && x.start > now() && !myBooking(x.id) && !myWait(x.id) && check(x).ok);
-    const msg = `I can't book ${offOf(s).name} on ${fDay(s.start)}. ${c.msg}`;
-    if (!alt) return say(msg);
-    return propose(`${msg}\nAn alternative: ${offOf(alt).name}, ${fDay(alt.start)} ${fTime(alt.start)}, is free and has ${spots(alt)} spots.`, { intent: `book:${alt.id}`, title: "Book the alternative?", lines: [`${offOf(alt).name}, ${fDay(alt.start)} ${fTime(alt.start)}, ${offOf(alt).loc}`, "Free session. No pass needed."], acts: [{ t: "book", sid: alt.id }] });
+  const c = check(s), full = spots(s) === 0, asksWait = /waitlist|wait list/.test(text.toLowerCase());
+  if (!c.ok && c.blocked && full) {
+    // Out of credits and full: the waitlist costs nothing, so the coach can still put her on it.
+    return propose(`${offOf(s).name} on ${fDay(s.start)} is full, and ${c.msg.charAt(0).toLowerCase() + c.msg.slice(1)} The waitlist costs nothing. If a spot comes up it is held for you while you decide.`, { intent: `book:${s.id}`, title: "Join the waitlist?", lines: [`${offOf(s).name}, ${fDay(s.start)} ${fTime(s.start)}, ${offOf(s).loc}`, `You would be #${s.waitOthers + 1} on the waitlist.`, "Nothing is charged until you take a spot."], acts: [{ t: "book", sid: s.id, wait: true }] });
   }
-  const full = spots(s) === 0;
+  if (!c.ok) {
+    const alt = c.blocked ? sessList(s.org).find((x) => offOf(x).free && x.start > now() && !myBooking(x.id) && !myWait(x.id) && check(x).ok) : null;
+    const msg = `I can't book ${offOf(s).name} on ${fDay(s.start)}. ${c.msg}`;
+    if (!c.blocked) return say(msg);
+    // The pass said no. Offer the ways out right here; each one opens the checkout, where the member decides.
+    S.chat.push({ who: "coach", text: `${msg}\nYou can sort that out right here.` + (alt ? `\nOr train for free: ${offOf(alt).name}, ${fDay(alt.start)} ${fTime(alt.start)}, has ${spots(alt)} spots. Just ask me to book it.` : ""), opts: { sid: s.id } });
+    return null;
+  }
+  if (asksWait && !full) why = `${offOf(s).name} on ${fDay(s.start)} still has ${spots(s)} ${spots(s) === 1 ? "spot" : "spots"}, so you don't need the waitlist.`;
   return propose(why, { intent: `book:${s.id}`, title: full ? "Join the waitlist?" : "Book this session?", lines: [`${offOf(s).name}, ${fDay(s.start)} ${fTime(s.start)}, ${offOf(s).loc}`, full ? `Full. You would be #${s.waitOthers + 1} on the waitlist.` : c.pass ? { pass: c.pass.id, sid: s.id } : c.note, `Free cancel until ${fDay(deadline(s))} ${fTime(deadline(s))}.`], acts: [{ t: "book", sid: s.id, wait: full }] });
+}
+
+/* "Where am I on the waitlist?" */
+function replyWaitlist() {
+  const rows = S.waitlist.map((w) => ({ w, s: S.sessions[w.sid] })).sort((a, b) => a.s.start - b.s.start);
+  if (!rows.length) return say("You are not on any waitlist. If a session is full, ask me to join its waitlist, for example \"join the waitlist for gym on Friday\".");
+  const held = rows.find((r) => r.w.offer);
+  S.chat.push({ who: "coach", text: rows.map(({ w, s }) => `${offOf(s).name}, ${fDay(s.start)} ${fTime(s.start)}, ${ORGS[s.org].name}: ` + (w.offer ? `a spot is held for you until ${fTime(w.offer.expiresAt)}.` : `you are #${w.pos} of ${waitTotal(s)} waiting.`)).join("\n") + `\nNothing is charged until you get a spot.`, opts: held ? { sid: held.s.id } : null });
+  return null;
+}
+/* "Take my spot": a held spot is taken through a confirm card, like every other change the coach makes. */
+function replyOffer() {
+  const w = S.waitlist.find((x) => x.offer); if (!w) return say("No spot is being held for you right now.");
+  const s = S.sessions[w.sid], c = check(s, { ignoreWait: true });
+  if (!c.ok) { S.chat.push({ who: "coach", text: `A spot in ${offOf(s).name}, ${fDay(s.start)}, is held for you until ${fTime(w.offer.expiresAt)}, but ${c.msg.charAt(0).toLowerCase() + c.msg.slice(1)} You can sort that out right here.`, opts: { sid: s.id } }); return null; }
+  return propose(`It is held until ${fTime(w.offer.expiresAt)}.`, { intent: `accept:${s.id}`, title: "Take the held spot?", lines: [`${offOf(s).name}, ${fDay(s.start)} ${fTime(s.start)}, ${offOf(s).loc}`, c.pass ? { pass: c.pass.id, sid: s.id } : c.note, `Free cancel until ${fDay(deadline(s))} ${fTime(deadline(s))}.`], acts: [{ t: "accept", sid: s.id }] });
+}
+/* "Book every Thursday 18:30 this season", and pausing or resuming a series. */
+function replySeries(text) {
+  const t = text.toLowerCase(), when = parseWhen(text), named = parseOffering(text), wd = when.date ? when.date.getDay() : when.weekday, org = named ? named.org : S.org;
+  if (/pause|stop|resume|restart|continue|switch (it )?(on|off)/.test(t)) {
+    const all = S.series.filter((x) => (wd == null || x.weekday === wd) && (!named || (x.org === named.org && x.off === named.off)));
+    if (!all.length) return say(S.series.length ? "I could not find that series. You can see all of them under Week, Repeating." : "You have no repeating bookings.");
+    const se = all[0], on = /resume|restart|continue|switch (it )?on/.test(t);
+    if (on === !se.paused) return say(`${seriesLabel(se)} (${seriesOff(se).name}) is already ${se.paused ? "paused" : "on"}.`);
+    return propose("Found it.", { intent: `series-pause:${se.id}`, title: on ? "Resume this series?" : "Pause this series?", lines: [`${seriesLabel(se)}, ${seriesOff(se).name}, ${ORGS[se.org].name}`, on ? "Dates that have opened are booked again from now on." : "Nothing new is booked while it is paused. Your existing bookings stay."], acts: [{ t: "series-pause", id: se.id, paused: !on }] });
+  }
+  if (wd == null) return say("Which day should repeat? For example: \"book every Thursday 18:30 this season\".");
+  const tm = t.match(/\b(\d{1,2})[:.](\d{2})\b/);
+  let off = named ? named.off : null;
+  if (!off) {
+    const cands = ORGS[org].offerings.filter((o) => o.days.includes(wd) && (!tm || (o.time[0] === Number(tm[1]) && o.time[1] === Number(tm[2]))));
+    const pat = S.patterns.find((p) => p.org === org && p.weekday === wd && cands.some((o) => o.id === p.off));
+    off = pat ? pat.off : cands.length === 1 ? cands[0].id : null;
+    if (!off) return say(cands.length ? `Several sessions run on ${WDL[wd]}s at ${ORGS[org].name}: ${cands.map((o) => `${o.name} at ${pad(o.time[0])}:${pad(o.time[1])}`).join(", ")}. Which one should repeat?` : `Nothing runs on ${WDL[wd]}s${tm ? " at " + tm[0] : ""} at ${ORGS[org].name}.`);
+  }
+  const o = ORGS[org].offerings.find((x) => x.id === off);
+  if (!o.days.includes(wd)) return say(`${o.name} does not run on ${WDL[wd]}s. It runs on ${o.days.map((d) => WDL[d] + "s").join(", ")}.`);
+  const had = findSeries(org, off, wd);
+  if (had && !had.paused) return say(`${seriesLabel(had)} (${o.name}) already repeats: ${seriesSummary(had)}. You can pause it with one tap under Week.`);
+  const rows = previewSeries(org, off, wd), until = ORGS[org].season.end, label = `every ${WDL[wd]} ${pad(o.time[0])}:${pad(o.time[1])}`;
+  return propose(`Here is what would happen. I book each date through the normal rules as soon as it opens, and I skip and report anything that clashes or goes over your pass.`, {
+    intent: `series:${org}:${off}:${wd}`, title: `Book ${label} this season?`,
+    lines: [`${o.name}, ${o.loc}, ${ORGS[org].name}`, ...rows.map((r) => `${fDay(r.date)}: ${r.status === "skipped" ? "skip. " + r.text : r.status === "booked" ? "book" : r.text.charAt(0).toLowerCase() + r.text.slice(1)}`), `Then every ${WDL[wd]} until ${fDay(until)} ${until.getFullYear()}, as the dates come into the schedule.`, "You can pause it with one tap under Week."],
+    acts: [{ t: "series", org, off, weekday: wd }],
+  });
 }
 
 const AREA_WORDS = [["Foot or ankle", /foot|feet|ankle|achilles|heel/], ["Calf or shin", /calf|calves|shin/], ["Knee", /knee/], ["Thigh or hamstring", /thigh|hamstring|quad/], ["Hip or groin", /hip|groin|glute/], ["Back", /back|spine/], ["Shoulder or arm", /shoulder|arm|elbow|wrist/]];
@@ -185,6 +247,9 @@ function coachReply(q) {
     return propose(`Your last 7 days are at ${Math.round(st.ratio * 100)}% of your 4-week average${st.hard ? ` and you logged ${st.hard} session(s) at RPE 9+` : ""}. Here is an easier week. It only reduces load, so you can accept it yourself; Coach Sara gets a note.`, { intent: "ease-week", title: "Easy week: plan change", lines: acts.map((a) => a.label), acts });
   }
   if (/cancel/.test(t)) return replyCancel(q);
+  if (/\bevery\b|\bweekly\b|recurring|repeat|\bseries\b|all season|this season|\beach (mon|tue|wed|thu|fri|sat|sun)/.test(t)) return replySeries(q);
+  if (/held|take (my|the) spot|accept/.test(t)) return replyOffer();
+  if (/wait ?list/.test(t) && !/\bjoin\b|add me|put me|sign me/.test(t)) return replyWaitlist();
   if (/remember|know about me|memory/.test(t)) {
     const ms = memoryFor(S.org);
     return say(ms.length ? `Here at ${ORGS[S.org].name} I use:\n${ms.map((m) => `[${memoryLabel(m)}] ${m.text}`).join("\n")}\nWhat I learned at your other clubs stays out of this club's chat. You can delete any of it under Me.` : "I remember nothing about you here. Anything I learn shows up under Me, and you can delete it.");
@@ -200,6 +265,6 @@ function coachReply(q) {
     return say(`Last 7 days: ${st.cur.count} session(s), load ${st.cur.load}. Your 4-week average is ${Math.round(st.avg)}, so you are at ${Math.round(st.ratio * 100)}%.\nLatest personal best: ${pb.metric} ${pb.value} ${pb.unit} on ${fDay(pb.at)}.\nStage: ${S.stages[S.stage]}, ${S.stageSessions} of ${PER} sessions done. ${st.ratio > LOAD_LIMIT ? "That is more than 10% above your average, so keep the next days easy." : "You are on track."}`);
   }
   if (/log/.test(t)) return say("Open the Log tab and tap how it felt. It takes under 30 seconds.");
-  say("In this demo I understand: \"book my usual\", \"book my usual Thursday\", \"what's on this week?\", \"cancel my next session\", \"cancel everything this week\", \"I need an easy week\", \"how am I doing?\", \"what do you remember?\" and anything about pain.");
+  say("In this demo I understand: \"book my usual\", \"book my usual Thursday\", \"book every Thursday 18:30 this season\", \"join the waitlist for gym on Friday\", \"where am I on the waitlist?\", \"what's on this week?\", \"cancel my next session\", \"cancel everything this week\", \"I need an easy week\", \"how am I doing?\", \"what do you remember?\" and anything about pain.");
 }
 function ask(text) { S.chat.push({ who: "me", text }); coachReply(text); }
