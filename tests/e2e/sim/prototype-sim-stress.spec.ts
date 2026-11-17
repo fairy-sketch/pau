@@ -657,18 +657,20 @@ test.describe("Empty, extreme and broken data", () => {
     expect(await page.evaluate(() => (window as any).__hit)).toBeUndefined();
   });
   test("a member's name is shown as text everywhere too", async ({ page }) => {
-    test.fail(
-      true,
-      "QA-05: the member's name is put into the page unescaped on Coach Review, Admin Members and Admin Money",
-    );
     await start(page);
     await sim(page, (d) => {
       d.state.me.name = 'Mia <img src=x onerror="window.__hit=1">';
+      d.state.goal.title = 'Sub-40 <img src=x onerror="window.__hit=1">';
+      d.state.me.sports = "<img src=x>";
     });
     for (const [role, tab] of ALL_SCREENS) {
       await screen(page, role, tab);
       expect(await page.locator("img[src='x']").count(), `${role}/${tab}`).toBe(0);
     }
+    expect(await page.evaluate(() => (window as any).__hit)).toBeUndefined();
+    expect(await screen(page, "admin", "members")).toContain(
+      'Mia <img src=x onerror="window.__hit=1">',
+    );
   });
 });
 
@@ -742,10 +744,6 @@ test.describe("The device", () => {
   test("with a keyboard: the focus stays where the person is, and a sheet keeps it inside", async ({
     page,
   }) => {
-    test.fail(
-      true,
-      "QA-09: every action redraws the screen and drops the keyboard focus; sheets do not hold the focus or give it back",
-    );
     await start(page);
     await screen(page, "athlete", "week");
     await page.locator(".filters .chip").nth(1).focus();
@@ -756,6 +754,23 @@ test.describe("The device", () => {
       await page.keyboard.press("Tab");
       expect(await page.evaluate(() => !!document.activeElement?.closest(".sheet"))).toBe(true);
     }
+    for (let i = 0; i < 6; i++) {
+      await page.keyboard.press("Shift+Tab");
+      expect(await page.evaluate(() => !!document.activeElement?.closest(".sheet"))).toBe(true);
+    }
+    // What is behind the sheet is out of reach, and closing gives the focus back to what opened it.
+    expect(await page.locator("#view[inert], nav.tabs[inert], header.top[inert]").count()).toBe(3);
+    await page.keyboard.press("Escape");
+    expect(await page.evaluate(() => (document.activeElement as HTMLElement)?.dataset?.a)).toBe(
+      "sheet",
+    );
+    expect(await page.locator("[inert]").count()).toBe(0);
+    // A tab in the bar keeps the focus when it is chosen with the keyboard.
+    await page.locator('nav.tabs [data-v="me"]').focus();
+    await page.keyboard.press("Enter");
+    expect(await page.evaluate(() => (document.activeElement as HTMLElement)?.dataset?.v)).toBe(
+      "me",
+    );
   });
   test("Escape closes a sheet", async ({ page }) => {
     await start(page);
@@ -768,13 +783,33 @@ test.describe("The device", () => {
   test("the phone's Back button closes the sheet or goes one screen back; it does not leave the app", async ({
     page,
   }) => {
-    test.fail(true, "QA-10: the app keeps no history; Back leaves PATH from any screen");
     await start(page);
     await screen(page, "athlete", "week");
     await page.locator('#classcard [data-a="sheet"]').first().click();
     await page.goBack().catch(() => {});
     await expect(page.getByRole("navigation", { name: "Sections" })).toBeVisible({ timeout: 1500 });
     await expect(page.locator(".sheet")).toHaveCount(0);
+    await expect(page.locator("#weeklabel")).toBeVisible();
+    // One screen back at a time: Me, then an athlete's page, each Back undoes one step.
+    await page.locator('nav.tabs [data-v="me"]').click();
+    await page.goBack();
+    await expect(page.locator("#weeklabel")).toBeVisible();
+    await page.goForward();
+    await expect(page.locator("#view h1")).toHaveText("Mia Keller");
+    await screen(page, "coach", "athletes");
+    await page.locator("#athlete-list .row").first().click();
+    await expect(page.locator("#athlete-detail")).toBeVisible();
+    await page.goBack();
+    await expect(page.locator("#athlete-list")).toBeVisible();
+    // A checkout is never reopened by Back or Forward.
+    await screen(page, "athlete", "me");
+    await page.getByRole("button", { name: /^Pay$/ }).click();
+    await expect(page.getByRole("dialog", { name: "Checkout" })).toBeVisible();
+    await page.goBack();
+    await expect(page.locator(".sheet")).toHaveCount(0);
+    await page.goForward();
+    await expect(page.locator(".sheet")).toHaveCount(0);
+    await expect(page.locator("#view h1")).toHaveText("Mia Keller");
   });
   test("screens draw fast: under 16 ms each, the heaviest list included", async ({ page }) => {
     await start(page);

@@ -13,23 +13,79 @@ function render() {
   document.documentElement.style.setProperty("--accent", (ACCENTS[S.accent] || ACCENTS.sage)[1]);
   for (const v of ["--bg", "--surface", "--soft"]) document.documentElement.style.setProperty(v, (GROUNDS[S.ground] || GROUNDS.stone)[1]);
   ensureSessions(); syncPlan(); sweepCancelled(); sweep(); sweepProposals(); sweepOffers(); runSeries();
+  const had = focusKey(document.activeElement), hadSheet = !!document.querySelector(".sheet"); // where the keyboard was, before the screen is redrawn
   const app = document.getElementById("app"), tab = S.tab[S.role], key = S.role + tab + S.org + (S.rosterSid || "") + ((S.dash && (S.dash.athlete || S.dash.planView || S.dash.sess)) || "") + (tab === "explore" ? S.explore.open || "" : ""), old = document.getElementById("view"), top = old && key === lastKey ? old.scrollTop : 0;
   const body = S.role === "athlete" ? { path: vPath, coach: vCoachChat, log: vLog, week: vWeek, me: vMe, explore: vExplore }[tab]() : S.role === "coach" ? vCoach() : vAdmin();
   const badge = S.role === "coach" ? coachAlerts().filter((a) => a.status === "open").length : 0;
   app.className = S.role === "admin" ? "wide" : "";
-  app.innerHTML = `<header class="top"><button class="name" data-a="home" aria-label="PATH, back to your start page">PATH</button>
+  const behind = UI.sheet ? "inert" : ""; // with a sheet open, what is behind it can't be reached by keyboard or screen reader
+  app.innerHTML = `<header class="top" ${behind}><button class="name" data-a="home" aria-label="PATH, back to your start page">PATH</button>
       <button class="clubbtn" data-a="clubs" data-org="${S.org}" aria-label="${esc(ORGS[S.org].name)}: your clubs and the demo view" aria-haspopup="dialog"><span class="mono36" aria-hidden="true">${mono(S.org)}</span></button></header>
-    <main id="view" tabindex="0">${body}</main>
+    <main id="view" tabindex="0" ${behind}>${body}</main>
     ${UI.toast ? `<div class="toast" role="status"><span>${esc(UI.toast)}</span>${UI.undo ? `<button class="btn sm" data-a="undo">Undo</button>` : ""}${xBtn("hide-toast", "Dismiss message")}</div>` : ""}
-    <nav class="tabs" aria-label="Sections">${TABS[S.role].map(([v, l, ic]) => `<button data-a="tab" data-v="${v}" aria-label="${l}${v === "alerts" && badge ? ` (${badge}), ${badge} open` : ""}" ${tab === v ? 'aria-current="page"' : ""}><span class="ic">${I(P[ic])}</span>${l}${v === "alerts" && badge ? ` (${badge})` : ""}</button>`).join("")}</nav>${vSheet()}`;
+    <nav class="tabs" aria-label="Sections" ${behind}>${TABS[S.role].map(([v, l, ic]) => `<button data-a="tab" data-v="${v}" aria-label="${l}${v === "alerts" && badge ? ` (${badge}), ${badge} open` : ""}" ${tab === v ? 'aria-current="page"' : ""}><span class="ic">${I(P[ic])}</span>${l}${v === "alerts" && badge ? ` (${badge})` : ""}</button>`).join("")}</nav>${vSheet()}`;
   const view = document.getElementById("view"); view.scrollTop = tab === "coach" && S.role === "athlete" ? view.scrollHeight : top; lastKey = key;
   app.querySelectorAll("textarea.stext").forEach((t) => { t.style.height = "auto"; t.style.height = t.scrollHeight + "px"; }); // a session line grows with its text, never cut off
-  if (UI.focus != null) { const el = app.querySelector(`.srow[data-i="${UI.focus}"] .stext`); UI.focus = null; if (el) el.focus(); }
-  if (UI.sheet) { const b = app.querySelector(".sheet .btn") || app.querySelector(".sheet[tabindex]"); if (b) b.focus(); }
+  let placed = false; // a screen that asks for the focus itself (a new line in a plan draft) gets it
+  if (UI.focus != null) { const el = app.querySelector(`.srow[data-i="${UI.focus}"] .stext`); UI.focus = null; if (el) { el.focus(); placed = true; } }
+  /* Keyboard focus (QA-09). A sheet takes the focus when it opens and gives it back to the control that opened it when it closes.
+     Anything else that redraws the screen leaves the focus on the control the person was on. */
+  const sheetEl = app.querySelector(".sheet");
+  if (sheetEl) {
+    sheetEl.setAttribute("tabindex", "-1");
+    if (!hadSheet) UI.opener = had;
+    const back = hadSheet && had && had.box === ".sheet" ? findFocus(had) : null;
+    (back || app.querySelector(".sheet .btn") || sheetEl).focus({ preventScroll: true });
+  } else if (!placed && (hadSheet || had)) {
+    const to = findFocus(hadSheet ? UI.opener : had) || (hadSheet && UI.opener ? null : view);
+    UI.opener = hadSheet ? null : UI.opener;
+    if (to) to.focus({ preventScroll: true });
+  }
   /* One accent per screen (D-7): only the first primary button in the page, and in a sheet, keeps the accent. */
   for (const box of [view, app.querySelector(".sheet")]) if (box) [...box.querySelectorAll(".btn.acc")].slice(1).forEach((el) => el.classList.add("demoted"));
-  flowLine(); save();
+  flowLine(); syncHistory(); save();
 }
+/* Which control has the focus, in a form that survives a redraw: its id, or its action and value and which one of those it is. */
+function focusKey(el) {
+  if (!el || !el.closest || !el.closest("#app") || el.id === "view") return null;
+  if (el.id) return { sel: "#" + CSS.escape(el.id), box: "", i: 0 };
+  if (!el.dataset || !el.dataset.a) return null;
+  const box = el.closest(".sheet") ? ".sheet" : el.closest("nav.tabs") ? "nav.tabs" : el.closest("header.top") ? "header.top" : "#view";
+  const sel = `[data-a="${el.dataset.a}"]` + (el.dataset.v !== undefined ? `[data-v="${CSS.escape(el.dataset.v)}"]` : "");
+  return { sel, box, i: Math.max(0, [...document.querySelectorAll(`${box} ${sel}`)].indexOf(el)) };
+}
+function findFocus(k) {
+  if (!k) return null;
+  const all = [...document.querySelectorAll(`${k.box} ${k.sel}`)], el = all[k.i] || all[0];
+  return el && !el.disabled && !el.closest("[inert]") ? el : null;
+}
+/* Tab stays inside an open sheet (QA-09). */
+document.addEventListener("keydown", (e) => {
+  const sh = e.key === "Tab" && UI.sheet && document.querySelector(".sheet"); if (!sh) return;
+  const f = [...sh.querySelectorAll("button:not([disabled]), a[href], input:not([disabled]), select, textarea, summary")].filter((el) => el.offsetParent !== null);
+  const a = document.activeElement, first = f[0] || sh, last = f[f.length - 1] || sh;
+  if (!sh.contains(a) || a === sh) { e.preventDefault(); (e.shiftKey ? last : first).focus(); }
+  else if (e.shiftKey && a === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && a === last) { e.preventDefault(); first.focus(); }
+});
+
+/* ---------- Back (QA-10): the phone's Back button closes a sheet, then goes one screen back. ----------
+   Every place you can be (role, club, tab, an open athlete, plan, session, provider or sheet) is one entry in the browser's history. */
+const navSnap = () => ({ role: S.role, org: S.org, tab: S.tab[S.role], roster: S.rosterSid || null, ath: (S.dash && S.dash.athlete) || null, plan: (S.dash && S.dash.planView) || null, sess: (S.dash && S.dash.sess) || null, open: S.explore.open || null,
+  sheet: !UI.sheet ? null : ["session", "clubs", "offer", "planday", "series"].includes(UI.sheet.type) ? UI.sheet : { type: "other" } }); // a checkout is never reopened by Back or Forward
+let navKey = null, navFromPop = false;
+function syncHistory() {
+  const snap = navSnap(), key = JSON.stringify(snap); if (key === navKey) return;
+  try { if (navKey === null || navFromPop) history.replaceState(snap, ""); else history.pushState(snap, ""); } catch (e) { /* no history here (a sandboxed frame): the app works as before */ }
+  navKey = key; navFromPop = false;
+}
+window.addEventListener("popstate", (e) => {
+  const n = e.state; if (!n || !n.role) return;
+  S.role = n.role; S.org = n.org; S.tab[n.role] = n.tab; S.rosterSid = n.roster && S.sessions[n.roster] ? n.roster : null; S.explore.open = n.open;
+  if (S.dash || n.ath || n.plan || n.sess) Object.assign(dash(), { athlete: n.ath, planView: n.plan, sess: n.sess });
+  UI.sheet = n.sheet && n.sheet.type !== "other" && (!n.sheet.sid || S.sessions[n.sheet.sid]) ? n.sheet : null; UI.toast = ""; UI.undo = null;
+  navFromPop = true; lastKey = ""; render();
+});
 
 const ACT = {
   /* The logo always leads to the start page of the role you are in. */
