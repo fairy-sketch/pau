@@ -11,7 +11,7 @@ const TOUR = [
   { who: "Athlete", enter: () => { S.role = "athlete"; S.tab.athlete = "coach"; },
     text: () => "The coach found your usual session and asks first. Nothing is booked until you tap Confirm.",
     done: () => !!tourBooking(), auto: () => { const p = tourCard(); if (p) confirmProposal(p.id, true); } },
-  { who: "Athlete", enter: () => { S.role = "athlete"; S.tab.athlete = "path"; },
+  { who: "Athlete", enter: () => { S.role = "athlete"; S.tab.athlete = "path"; dash().planOpen = true; }, // the whole week, so the booked day shows
     text: () => { const b = tourBooking(), s = b && S.sessions[b.sid]; return s ? `Booked: ${offOf(s).name}, ${fDay(s.start)} ${fTime(s.start)}. Your plan shows it on that day and your pass counts it.` : "Path is the athlete's home: the goal, the next step, the plan."; } },
   { who: "Coach", enter: () => { const b = tourBooking(); S.role = "coach"; S.org = "pau"; S.tab.coach = "week"; dash().sess = b && coachOf(S.sessions[b.sid]) === coachMe() ? b.sid : null; },
     text: () => `Now you are ${ORGS.pau.me.coach}. ${S.me.name.split(" ")[0]} is on the session she just booked, with only what she shares. The plan for the session is at the top.` },

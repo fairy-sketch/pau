@@ -255,9 +255,10 @@ document.addEventListener("pointercancel", () => { swipe = null; });
 
 /* The coach and club dashboard brings its own actions (dash.js). Leaving a tab or going home also leaves an open athlete. */
 Object.assign(ACT, DASH_ACT, ADMIN_ACT, ONBOARD_ACT, TOUR_ACT);
-for (const k of ["home", "tab"]) { const f = ACT[k]; ACT[k] = (v) => { const r = f(v); if (S.dash) Object.assign(S.dash, { athlete: null, planView: null, pdraft: null, sess: null, myWeek: 1, recap: null, noteFor: null, rvEdit: null, rvError: "" }); if (S.adm) Object.assign(S.adm, { view: null, error: "", form: null, rows: null }); return r; }; }
+for (const k of ["home", "tab"]) { const f = ACT[k]; ACT[k] = (v) => { const r = f(v); if (S.dash) Object.assign(S.dash, { athlete: null, planView: null, pdraft: null, sess: null, myWeek: 1, planOpen: false, recap: null, noteFor: null, rvEdit: null, rvError: "" }); if (S.adm) Object.assign(S.adm, { view: null, error: "", form: null, rows: null }); return r; }; }
 /* For the tests and for poking around in the console. */
 window.PATH_DEMO = {
+  dash,
   get state() { return S; }, disciplines, ACCENTS, GROUNDS, athletes, statusOf, roster, members, memberPass, ui: UI, ORGS, LOAD_LIMIT, CARD_TTL_MIN, STORE_KEY,
   render, seed, save, load, resetDemo, undoCancel, canUndoCancel, ensurePlan, TOUR, tourGo, inSeason, ptSlots, ptStats, ptPack, ptBook, ptCancel, ptMove, ptSell, ptClients, startOnboarding, finishOnboarding, setGoal, checkGoal, reviewItems, isEasier, draftRecap, checkedIn, comingToday, whatFor, clubStats, clubSentence, atRisk, riskOf, sentTo, draftCheckin, draftReminder, sendApproved, editSession, addSession, setRules, policyOf, policyText, parseMembersCsv, importMembers, baseMembers, coachOf, loadPhotos, PHOTOS, planWeekRows, planRowState, syncPlan, planText, planName, coachAlerts, openPains, book, cancel, cancelSession, clashAt, passEnded, renewalOf, check, freeSpot, leaveWait, passState, passOf, stats, guard, guardDraft, currentDraft, RAW_DRAFT,
   newForm, toLog, ask, confirmProposal, toggleAct, runAct, planLocked, nextChangeable, applyDraft, shiftWeek, weekIndex,

@@ -47,7 +47,14 @@ export const screen = (page: Page, role: Role, tab: string, org: Org = "pau") =>
       S.org = org;
       S.tab[role] = tab;
       d.ui.sheet = null;
-      if (S.dash) Object.assign(S.dash, { athlete: null, sess: null, planView: null });
+      // The plan on Path is read with the whole week open (B-25); closed, it shows three days.
+      d.dash();
+      Object.assign(S.dash, {
+        athlete: null,
+        sess: null,
+        planView: null,
+        planOpen: tab === "path",
+      });
       S.rosterSid = null;
       d.render();
       return (document.getElementById("view") as HTMLElement).innerText.replace(/\s+/g, " ");
