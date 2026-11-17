@@ -39,7 +39,7 @@ const ACT = {
   role: (v) => { S.role = v; S.rosterSid = null; UI.toast = ""; UI.sheet = null; },
   tab: (v) => { S.tab[S.role] = v; S.rosterSid = null; if (v === "explore") S.explore.open = null; if (v === "log" && S.role === "athlete" && S.form.pristine && !S.form.editId) S.form = newForm(); }, day: (v) => { S.day = v; }, logtab: (v) => { S.logTab = v; },
   /* Explore */
-  "prov-open": (v) => { S.explore.open = v || null; S.tab.athlete = "explore"; UI.sheet = null; }, xkind: (v) => { S.explore.kind = S.explore.kind === v ? "all" : v; S.explore.pin = null; },
+  "prov-open": (v) => { S.explore.open = v || null; S.tab.athlete = "explore"; UI.sheet = null; }, xkind: (v) => { S.explore.kind = v; if (S.explore.group !== "all" && !disciplines(v).includes(S.explore.group)) S.explore.group = "all"; }, // the discipline row follows the "who"; a choice that no longer exists falls back to All
   "plan-try": (v) => { UI.toast = tryPlan(v).msg + " Next: book a session with them."; }, "plan-drop": (v) => { UI.toast = dropPlan(v).msg; },
   xview: (v) => { S.explore.view = v; }, xgroup: (v) => { S.explore.group = v; S.explore.pin = null; }, xflag: (v) => { S.explore[v] = !S.explore[v]; S.explore.pin = null; },
   xclear: () => { Object.assign(S.explore, { kind: "all", group: "all", free: false, beginners: false, near: false, pin: null }); }, pin: (v) => { S.explore.pin = S.explore.pin === v ? null : v; },
@@ -184,7 +184,7 @@ Object.assign(ACT, DASH_ACT);
 for (const k of ["home", "tab"]) { const f = ACT[k]; ACT[k] = (v) => { const r = f(v); if (S.dash) Object.assign(S.dash, { athlete: null, planView: null, pdraft: null, sess: null }); return r; }; }
 /* For the tests and for poking around in the console. */
 window.PATH_DEMO = {
-  get state() { return S; }, ACCENTS, GROUNDS, athletes, statusOf, roster, ui: UI, ORGS, LOAD_LIMIT, CARD_TTL_MIN, STORE_KEY,
+  get state() { return S; }, disciplines, ACCENTS, GROUNDS, athletes, statusOf, roster, ui: UI, ORGS, LOAD_LIMIT, CARD_TTL_MIN, STORE_KEY,
   render, seed, save, load, resetDemo, book, cancel, check, freeSpot, leaveWait, passState, passOf, stats, guard, guardDraft, currentDraft, RAW_DRAFT,
   newForm, toLog, ask, confirmProposal, toggleAct, runAct, planLocked, nextChangeable, applyDraft, shiftWeek, weekIndex,
   parseClub, agenda, openPain, OFFERS, openOffers, exploreList, tryPlan, dropPlan, tryToday, providerOf, signUp, dropSignup, signedUp, offerStart, offerKm, offersFor, purchase, acceptOffer, declineOffer, sweepOffers, waitTotal, createSeries, previewSeries, pauseSeries, endSeries, runSeries, seriesRows, seriesSummary, findSeries, sweepProposals, parseWhen, parseOffering, rosterRows, rosterNames, addWalkin, markAttendance, memoryFor, upcomingBookings, sessList, myBooking, myWait, spots, nextStep,

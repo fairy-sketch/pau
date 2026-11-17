@@ -314,3 +314,6 @@ textarea.inp.big { min-height: 248px; padding: 16px; }
 .srow { align-items: flex-start; }
 .srow textarea.stext { flex: 1; min-width: 0; min-height: 44px; padding: 10px 12px; border: 0; box-shadow: var(--press); line-height: 24px; resize: none; overflow: hidden; field-sizing: content; }
 .srow .x { margin-right: -8px; }
+/* ---- Explore navigation (X-15): who offers it as six tabs that always fit, then the discipline as chips ---- */
+#xkinds button { padding: 0 2px; min-width: 44px; font-size: 13px; }
+.only { display: flex; gap: 4px; margin-right: -12px; }
