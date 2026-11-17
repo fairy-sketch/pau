@@ -7,6 +7,10 @@ import { asRole, open, tab } from "../helpers/demo";
 /** Coach and club dashboard, milestone A: Today, Athletes, Athlete detail. */
 const demo = <T>(page: Page, fn: (d: any) => T) =>
   page.evaluate(`(${fn.toString()})(window.PATH_DEMO)`) as Promise<T>;
+const drafted = (page: Page) =>
+  page
+    .locator("#draft-sessions .stext")
+    .evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value).join(" | "));
 const openAthlete = (page: Page, id: string) =>
   page.locator(`[data-a="athlete"][data-v="${id}"]`).first().click();
 
@@ -163,13 +167,31 @@ test.describe("Plans (K-7 to K-11)", () => {
     await page.locator("#pprompt").fill("6 weeks towards a 5K");
     await page.getByRole("button", { name: "Draft it" }).click();
     await expect(page.locator("#plan-draft")).toContainText("18 sessions over 6 weeks");
-    await expect(page.locator("#draft-sessions")).toContainText("6 × 400 m at 5K pace");
+    expect(await drafted(page)).toContain("6 × 400 m at 5K pace");
     // PATH helps to be creative, and the coach steers.
     await page.getByRole("button", { name: "A playful session each week" }).click();
     await expect(page.locator("#plan-draft")).toContainText("24 sessions over 6 weeks");
-    await expect(page.locator("#draft-sessions")).toContainText("Relay games");
+    expect(await drafted(page)).toContain("Relay games");
     await page.getByRole("button", { name: "Make it easier" }).click();
-    await expect(page.locator("#draft-sessions")).toContainText("4 × 400 m at 5K pace");
+    expect(await drafted(page)).toContain("4 × 400 m at 5K pace");
+    // The draft stays open: change a line, remove one, add one.
+    await page
+      .locator("#draft-sessions .stext")
+      .first()
+      .fill("Track: 5 × 300 m, relaxed, full recovery");
+    await expect(page.getByRole("group", { name: "Change the draft" })).toHaveCount(0); // hand edits are never overwritten
+    await page
+      .locator('[data-week="1"]')
+      .getByRole("button", { name: "Remove this session" })
+      .last()
+      .click();
+    await page.locator('[data-week="1"]').getByRole("button", { name: "Add a session" }).click();
+    await expect(page.locator('[data-week="1"] .stext').last()).toBeFocused();
+    await page
+      .locator('[data-week="1"] .stext')
+      .last()
+      .fill("Coffee run, 30 min, all paces together");
+    await page.locator('[data-week="1"] .sday').last().selectOption("Sun");
     await page.locator("#ptitle").fill("Spring 5K");
     await page.getByRole("button", { name: "Save plan" }).click();
     await expect(page.locator("#plan-status")).toContainText("Not shared yet");
@@ -188,6 +210,8 @@ test.describe("Plans (K-7 to K-11)", () => {
     const card = page.locator("#from-coach [data-plan]", { hasText: "Spring 5K" });
     await expect(card).toContainText("Coach Sara shared this with the Track group");
     await expect(card).toContainText("Relay games");
+    await expect(card).toContainText("Track: 5 × 300 m, relaxed, full recovery");
+    await expect(card).toContainText("Coffee run, 30 min, all paces together");
     // And it goes away when the coach stops sharing. It survives a reload until then.
     await page.reload();
     await expect(page.locator("#from-coach")).toContainText("Spring 5K");
@@ -214,7 +238,8 @@ test.describe("Plans (K-7 to K-11)", () => {
       .fill("Woche 1\nMo: 5 x 1 km\n- Do: Tempolauf 25 min\nWeek 2\nSat: long run 80 min");
     await page.getByRole("button", { name: "Read my plan" }).click();
     await expect(page.locator("#plan-draft")).toContainText("3 sessions over 2 weeks");
-    await expect(page.locator("#draft-sessions .row").first()).toHaveText("Mon5 x 1 km");
+    expect(await drafted(page)).toBe("5 x 1 km | Tempolauf 25 min | long run 80 min");
+    await expect(page.locator("#draft-sessions .sday").first()).toHaveValue("Mon");
     await page.getByRole("button", { name: "Start over" }).click();
     await page.locator("#pfile").setInputFiles({
       name: "herbst-block.txt",
@@ -272,4 +297,42 @@ test.describe("Plans (K-7 to K-11)", () => {
     await page.getByRole("button", { name: "Save plan" }).click();
     await check("detail");
   });
+});
+
+test("free words: a description becomes a draft, written-out sessions keep the coach's words, and a saved plan can be edited", async ({
+  page,
+}) => {
+  await open(page);
+  await asRole(page, "coach");
+  await tab(page, "Plans");
+  await page.getByRole("button", { name: "Add a plan" }).click();
+  const box = page.locator("#pprompt");
+  expect((await box.boundingBox())!.height).toBeGreaterThanOrEqual(240); // room to write freely
+  // Written-out sessions: PATH only sorts them.
+  await box.fill(
+    "Dienstag wird hart, Samstag locker.\nDi: 8 x 200 m Bergsprints, viel Pause\nSa: 50 min locker mit der ganzen Gruppe\nWoche 2\nDi: Staffelspiele",
+  );
+  await page.getByRole("button", { name: "Draft it" }).click();
+  await expect(page.locator("#plan-draft")).toContainText("Structured from your words");
+  expect(await drafted(page)).toBe(
+    "Dienstag wird hart, Samstag locker. | 8 x 200 m Bergsprints, viel Pause | 50 min locker mit der ganzen Gruppe | Staffelspiele",
+  );
+  await page.getByRole("button", { name: "Start over" }).click();
+  await expect(page.locator("#pprompt")).toHaveValue(/Bergsprints/); // the words are kept
+  // A description: PATH drafts.
+  await page
+    .locator("#pprompt")
+    .fill("eight weeks towards a half marathon for my long run group, keep it fun");
+  await page.getByRole("button", { name: "Draft it" }).click();
+  await expect(page.locator("#plan-draft")).toContainText("Drafted by PATH");
+  await expect(page.locator("#ptitle")).toHaveValue("Half marathon build, 8 weeks");
+  await page.getByRole("button", { name: "Add a week" }).click();
+  await page.locator('[data-week="9"] .stext').fill("Race rehearsal: 10 km at goal pace");
+  await page.getByRole("button", { name: "Save plan" }).click();
+  await expect(page.locator("#plan-detail")).toContainText("Race rehearsal: 10 km at goal pace");
+  // Still flexible after saving.
+  await page.getByRole("button", { name: "Edit plan" }).click();
+  await page.locator("#draft-sessions .stext").first().fill("Tempo run, by feel");
+  await page.getByRole("button", { name: "Save plan" }).click();
+  await expect(page.locator("#plan-detail")).toContainText("Tempo run, by feel");
 });

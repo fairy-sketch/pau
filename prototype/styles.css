@@ -308,3 +308,9 @@ textarea.inp { min-height: 168px; padding: 12px 16px; line-height: 24px; resize:
 .filebtn { cursor: pointer; box-shadow: var(--shadow); min-height: 52px; }
 .filebtn:has(+ input:focus-visible) { outline: 2px solid var(--text); outline-offset: 2px; }
 .card > .rows { margin: 0 0 -12px; }
+textarea.inp.big { min-height: 248px; padding: 16px; }
+.srow { display: flex; align-items: center; gap: 8px; }
+.srow .sday { flex: none; width: 76px; min-height: 44px; border: 0; border-radius: var(--r); background: var(--bg); box-shadow: var(--press); padding: 0 8px; font-size: 14px; color: var(--text); }
+.srow { align-items: flex-start; }
+.srow textarea.stext { flex: 1; min-width: 0; min-height: 44px; padding: 10px 12px; border: 0; box-shadow: var(--press); line-height: 24px; resize: none; overflow: hidden; field-sizing: content; }
+.srow .x { margin-right: -8px; }

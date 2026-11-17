@@ -142,12 +142,18 @@ const planMeta = (p) => `${weeksOf(p)} ${weeksOf(p) === 1 ? "week" : "weeks"} ·
 const groupSize = (g) => athletes().filter((a) => a.group === g).length;
 
 /* PATH's draft: simple, readable rules. The coach changes anything before saving; nothing is sent to anyone here. */
-function planParams(text) {
-  const t = text.toLowerCase(), w = t.match(/(\d+)\s*(?:weeks?|wochen?)/);
-  const kind = /taper|race week|wettkampfwoche/.test(t) ? "taper" : /strength|kraft|gym/.test(t) ? "strength" : /\b5\s?k/.test(t) ? "5k" : /half|halbmarathon/.test(t) ? "half" : "10k";
-  return { kind, weeks: kind === "taper" ? 1 : Math.min(12, Math.max(1, w ? Number(w[1]) : 4)), level: 0, fun: /fun|spass|spiel|game|relay|staffel/.test(t) };
+/* Weekdays the coach names ("my Tuesday and Saturday group") become the days of the plan. */
+function daysIn(t) {
+  const names = [["Mon", /\b(monday|mondays|montag|montags)\b/], ["Tue", /\b(tuesday|tuesdays|dienstag|dienstags)\b/], ["Wed", /\b(wednesday|wednesdays|mittwoch|mittwochs)\b/], ["Thu", /\b(thursday|thursdays|donnerstag|donnerstags)\b/], ["Fri", /\b(friday|fridays|freitag|freitags)\b/], ["Sat", /\b(saturday|saturdays|samstag|samstags)\b/], ["Sun", /\b(sunday|sundays|sonntag|sonntags)\b/]];
+  return names.filter(([, re]) => re.test(t)).map(([d]) => d);
 }
-function genPlan({ kind, weeks, level, fun }) {
+function planParams(text) {
+  const NUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, eine: 1, zwei: 2, drei: 3, vier: 4, fünf: 5, sechs: 6, sieben: 7, acht: 8, neun: 9, zehn: 10, elf: 11, zwölf: 12 };
+  const t = text.toLowerCase().replace(/[a-zäöü]+/g, (x) => (NUM[x] ? String(NUM[x]) : x)), w = t.match(/(\d+)[\s-]*(?:weeks?|wochen?)/);
+  const kind = /taper|race week|wettkampfwoche/.test(t) ? "taper" : /strength|kraft|gym/.test(t) ? "strength" : /\b5\s?k/.test(t) ? "5k" : /half|halbmarathon/.test(t) ? "half" : "10k";
+  return { kind, weeks: kind === "taper" ? 1 : Math.min(12, Math.max(1, w ? Number(w[1]) : 4)), level: 0, fun: /fun|playful|play\b|bored|variety|spass|spiel|abwechslung|game|relay|staffel/.test(t), days: daysIn(t) };
+}
+function genPlan({ kind, weeks, level, fun, days = [] }) {
   const out = [], add = (week, day, text) => out.push({ week, day, text });
   for (let w = 1; w <= weeks; w++) {
     const easy = weeks >= 4 && w === weeks, k = w - 1 + level - (easy ? 2 : 0);
@@ -156,8 +162,12 @@ function genPlan({ kind, weeks, level, fun }) {
     else if (kind === "5k") { add(w, "Mon", `Track: ${Math.max(4, 6 + 2 * k)} × 400 m at 5K pace, 90 s jog`); add(w, "Thu", `Hills: ${Math.max(4, 6 + k)} × 60 s, walk down`); add(w, "Sat", `Easy run ${40 + 5 * k} min, then strides`); }
     else if (kind === "half") { add(w, "Tue", `Tempo run: ${Math.max(15, 20 + 5 * k)} min steady`); add(w, "Thu", `Track: ${Math.max(3, 4 + k)} × 1 km at 10K pace, 2 min jog`); add(w, "Sun", `Long run: ${Math.max(60, 75 + 10 * k)} min easy`); }
     else { add(w, "Mon", `Track: ${Math.max(3, 4 + k)} × 1 km at 10K pace, 2 min jog`); add(w, "Thu", `Tempo run: ${Math.max(15, 20 + 5 * k)} min steady`); add(w, "Sat", `Long run: ${Math.max(50, 60 + 10 * k)} min easy`); }
-    if (fun) add(w, "Wed", ["Relay games in mixed teams, 4 × 200 m handovers", "Partner runs: one talks, one listens, swap every 5 min", "Hill tag and a sprint ladder, laughing allowed", "Parkour loop: benches, steps and balance lines"][(w - 1) % 4]);
-    const order = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], wk = out.filter((x) => x.week === w).sort((x, y) => order.indexOf(x.day) - order.indexOf(y.day)); out.splice(out.length - wk.length, wk.length, ...wk);
+    if (days.length && kind !== "taper") {
+      const base = out.filter((x) => x.week === w), keep = days.length >= base.length ? base : days.length === 1 ? [base[0]] : [base[0], ...base.slice(-(days.length - 1))];
+      out.splice(out.length - base.length, base.length, ...keep.map((x, i) => ({ ...x, day: days[i] })));
+    }
+    if (fun) add(w, days.length ? "" : "Wed", ["Relay games in mixed teams, 4 × 200 m handovers", "Partner runs: one talks, one listens, swap every 5 min", "Hill tag and a sprint ladder, laughing allowed", "Parkour loop: benches, steps and balance lines"][(w - 1) % 4]);
+    const order = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun", ""], wk = out.filter((x) => x.week === w).sort((x, y) => order.indexOf(x.day) - order.indexOf(y.day)); out.splice(out.length - wk.length, wk.length, ...wk);
     if (easy && kind !== "taper") out.filter((s) => s.week === w).forEach((s) => { s.text += " (recovery week)"; });
   }
   return out;
@@ -168,11 +178,18 @@ function parsePlan(text) {
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.replace(/^[\s\-*•\d.)]+(?=\D)/, "").trim(); if (!line) continue;
     const wk = raw.trim().match(/^(?:week|woche|wk)\s*(\d+)/i); if (wk) { week = Number(wk[1]); continue; }
-    const d = line.match(/^(mon|tue|wed|thu|fri|sat|sun|mo|di|mi|do|fr|sa|so)[a-zäöü]*[\s:,.\-–]+(.+)$/i);
+    /* A weekday counts only when it is clearly a label: "Mon: ...", "Di - ...", or "Mon 5 x 1 km". "Dienstag wird hart" stays a sentence. */
+    const d = line.match(/^(mon|tue|wed|thu|fri|sat|sun|mo|di|mi|do|fr|sa|so)[a-zäöü]*(?:\s*[:,.\-–]\s*|\s+(?=\d))(.+)$/i);
     const map = { mo: "Mon", di: "Tue", mi: "Wed", do: "Thu", fr: "Fri", sa: "Sat", so: "Sun" };
     out.push(d ? { week, day: map[d[1].toLowerCase()] || d[1][0].toUpperCase() + d[1].slice(1, 3).toLowerCase(), text: d[2].trim() } : { week, day: "", text: line });
   }
   return out;
+}
+/* The draft stays open: every line can be changed, removed or added to before saving. */
+const DAYS7 = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+function editRows(dr) {
+  const weeks = [...new Set(dr.sessions.map((s) => s.week))].sort((a, b) => a - b);
+  return weeks.map((w) => `<div class="stack" style="gap:8px" data-week="${w}"><div class="sub">Week ${w}</div><div class="card stack" style="gap:8px;padding:12px">${dr.sessions.map((s, i) => (s.week !== w ? "" : `<div class="srow" data-i="${i}"><select class="sday" aria-label="Day, week ${w}">${DAYS7.map((d) => `<option value="${d}" ${d === s.day ? "selected" : ""}>${d || "Any"}</option>`).join("")}</select><textarea class="inp stext" rows="1" aria-label="Session, week ${w}" placeholder="What happens in this session">${esc(s.text)}</textarea><button class="x" type="button" data-a="plan-rm" data-v="${i}" aria-label="Remove this session">${I(P.x, 18)}</button></div>`)).join("")}<button class="btn sm link" data-a="plan-add" data-v="${w}">Add a session</button></div></div>`).join("") + `<button class="btn sm link" data-a="plan-addweek">Add a week</button>`;
 }
 const sessionRows = (list) => [...new Set(list.map((s) => s.week))].map((w) => `<div class="stack" style="gap:8px"><div class="sub">Week ${w}</div><div class="card rows">${list.filter((s) => s.week === w).map((s) => `<div class="row"><span class="lead time" style="width:40px">${s.day || "·"}</span><span class="mid">${esc(s.text)}</span></div>`).join("")}</div></div>`).join("");
 /* Who would get a personal version, and why. Only from what they share. The coach approves each one in Review. */
@@ -190,14 +207,14 @@ function vCoachPlans() {
 function vPlanNew() {
   const d = dash(), dr = d.pdraft, mode = d.pmode || "path";
   const back = `<button class="btn sm link ghost" data-a="plan-open" data-v="" aria-label="Back to plans">${I(P.back, 16)}Plans</button>`;
-  if (dr) return `<section class="pad stack-l" id="plan-draft">${back}<div><div class="eyebrow">${dr.source === "path" ? "Drafted by PATH" : "Read from your plan"}</div><h1 class="h1">${dr.sessions.length} sessions over ${Math.max(1, ...dr.sessions.map((s) => s.week))} ${Math.max(1, ...dr.sessions.map((s) => s.week)) === 1 ? "week" : "weeks"}</h1><p class="sub" style="margin-top:4px">${dr.source === "path" ? "A starting point, not a prescription. Change anything; you know your group." : "Check that PATH read it the way you meant it."}</p></div>
+  if (dr) return `<section class="pad stack-l" id="plan-draft">${back}<div><div class="eyebrow">${dr.editId ? "Editing" : dr.source === "path" ? "Drafted by PATH" : "Structured from your words"}</div><h1 class="h1">${dr.sessions.length} sessions over ${Math.max(1, ...dr.sessions.map((s) => s.week))} ${Math.max(1, ...dr.sessions.map((s) => s.week)) === 1 ? "week" : "weeks"}</h1><p class="sub" style="margin-top:4px">${dr.editId ? "Change anything. Athletes see the new version once you save." : dr.source === "path" ? "A starting point, not a prescription. Change any line, add or remove sessions; you know your group." : "PATH put your words into weeks and sessions. Change any line before you save."}</p></div>
     <label class="f">Name<input id="ptitle" value="${esc(dr.title)}" autocomplete="off"></label>
-    ${dr.source === "path" ? `<div class="filters" role="group" aria-label="Change the draft"><button class="chip" data-a="plan-refine" data-v="easier">Make it easier</button><button class="chip" data-a="plan-refine" data-v="harder">Make it harder</button><button class="chip" data-a="plan-refine" data-v="fun" aria-pressed="${dr.params.fun}">A playful session each week</button><button class="chip" data-a="plan-refine" data-v="longer">One more week</button></div>` : ""}
-    <div class="stack" id="draft-sessions">${sessionRows(dr.sessions)}</div>
+    ${dr.source === "path" && !dr.edited ? `<div class="filters" role="group" aria-label="Change the draft"><button class="chip" data-a="plan-refine" data-v="easier">Make it easier</button><button class="chip" data-a="plan-refine" data-v="harder">Make it harder</button><button class="chip" data-a="plan-refine" data-v="fun" aria-pressed="${dr.params.fun}">A playful session each week</button><button class="chip" data-a="plan-refine" data-v="longer">One more week</button></div>` : ""}
+    <div class="stack" id="draft-sessions">${editRows(dr)}</div>
     <div class="stack" style="gap:8px"><button class="btn acc full" data-a="plan-save">Save plan</button><button class="btn full ghost" data-a="plan-reset">Start over</button></div></section>`;
   return `<section class="pad stack-l" id="plan-new">${back}<div><div class="eyebrow">Add a plan</div><h1 class="h1">${mode === "path" ? "Tell PATH what you want to coach" : "Bring a plan you already have"}</h1></div>
     <div class="seg full" role="group" aria-label="How to add a plan"><button data-a="plan-mode" data-v="path" aria-pressed="${mode === "path"}">Build with PATH</button><button data-a="plan-mode" data-v="own" aria-pressed="${mode === "own"}">Upload or paste</button></div>
-    ${mode === "path" ? `<form class="stack" data-f="pgen"><label class="f">In your own words<input id="pprompt" placeholder="4 weeks towards a 10K, three sessions a week" autocomplete="off"></label><div class="filters" role="group" aria-label="Ideas"><button class="chip" type="button" data-a="plan-gen" data-v="4 weeks 10K build">4 weeks 10K build</button><button class="chip" type="button" data-a="plan-gen" data-v="6 weeks 5K with fun sessions">6 weeks 5K, playful</button><button class="chip" type="button" data-a="plan-gen" data-v="Race week taper">Race week taper</button><button class="chip" type="button" data-a="plan-gen" data-v="6 weeks strength for runners">Strength for runners</button></div><button class="btn acc full" type="submit">Draft it</button><p class="sub">PATH drafts, you decide. Nothing reaches an athlete from here.</p></form>`
+    ${mode === "path" ? `<form class="stack" data-f="pgen"><label class="f">In your own words<textarea id="pprompt" class="inp big" rows="9" placeholder="Write it however you think of it.&#10;&#10;For example: six weeks for my Tuesday group towards a 5K, three sessions a week, one playful session, easy last week.&#10;&#10;Or type the sessions themselves, one per line. PATH puts it into weeks and sessions.">${esc(d.pwords || "")}</textarea></label><div class="filters" role="group" aria-label="Ideas"><button class="chip" type="button" data-a="plan-gen" data-v="4 weeks 10K build">4 weeks 10K build</button><button class="chip" type="button" data-a="plan-gen" data-v="6 weeks 5K with fun sessions">6 weeks 5K, playful</button><button class="chip" type="button" data-a="plan-gen" data-v="Race week taper">Race week taper</button><button class="chip" type="button" data-a="plan-gen" data-v="6 weeks strength for runners">Strength for runners</button></div><button class="btn acc full" type="submit">Draft it</button><p class="sub">PATH puts it into a plan you can still change, line by line. Nothing reaches an athlete from here.</p></form>`
     : `<form class="stack" data-f="ppaste"><label class="btn full filebtn" for="pfile">Choose a file</label><input class="sr" type="file" id="pfile" accept=".txt,.csv,.md,text/plain" aria-label="Choose a plan file"><label class="f">Or paste it here<textarea id="ptext" class="inp" rows="7" placeholder="Week 1&#10;Mon: 5 × 1 km at 10K pace&#10;Thu: tempo 25 min&#10;Sat: long run 70 min">${esc(d.ptext || "")}</textarea></label>${d.pnote ? `<p class="note" id="pnote">${esc(d.pnote)}</p>` : ""}<button class="btn acc full" type="submit">Read my plan</button><p class="sub">One session per line. "Week 2" starts a new week. In this demo PATH reads text files; PDFs, photos and spreadsheets come with the real app.</p></form>`}</section>`;
 }
 function vPlanDetail(p) {
@@ -207,7 +224,7 @@ function vPlanDetail(p) {
       ${pick.length ? `<button class="btn acc full" data-a="plan-share">Share with ${pick.join(" and ")}</button>` : `<p class="sub">${p.shared.length ? "Everyone in these groups sees it on their Path." : "Pick a group. Athletes see the plan on their Path once you share it."}</p>`}
       ${p.shared.length ? `<button class="btn sm link ghost" data-a="plan-unshare">Stop sharing</button>` : ""}</div>
     ${p.shared.length && pers.length ? `<div class="stack" id="personal"><div class="eyebrow">Personal versions</div><p class="sub">PATH suggests a lighter version for ${pers.length} ${pers.length === 1 ? "athlete" : "athletes"}, from what they share. Each one waits for your approval in Review; until then they get the plan as it is.</p><div class="card rows">${pers.slice(0, 5).map(({ a, st }) => `<button class="row" data-a="athlete" data-v="${a.id}"><span class="mid"><span class="strong">${esc(a.name)}</span><span class="sub">${esc(st.why)}</span></span><span class="end sub">Open</span></button>`).join("")}</div></div>` : ""}
-    <div class="stack">${sessionRows(p.sessions)}</div>
+    <div class="stack"><div class="between" style="align-items:center"><span class="eyebrow">Sessions</span><button class="btn sm" data-a="plan-edit">Edit plan</button></div>${sessionRows(p.sessions)}</div>
     ${p.shared.length ? "" : `<button class="btn full ghost" data-a="plan-del">Delete plan</button>`}</section>`;
 }
 /* What the athlete sees: only plans shared with their group, by their coach, at this club. */
@@ -216,6 +233,14 @@ function coachPlansCard() {
   const mine = plans().filter((p) => p.shared.includes("Track")); if (!mine.length) return "";
   return `<div class="stack" id="from-coach"><div class="eyebrow">From your coach</div>${mine.map((p) => `<div class="card stack" data-plan="${p.id}" style="gap:12px"><div><p class="h2">${esc(p.title)}</p><p class="sub">${COACH_ME} shared this with the Track group · ${planMeta(p)}</p></div><div class="rows">${p.sessions.filter((s) => s.week === 1).map((s) => `<div class="row"><span class="lead time" style="width:40px">${s.day || "·"}</span><span class="mid">${esc(s.text)}</span></div>`).join("")}</div></div>`).join("")}</div>`;
 }
+/* Free words in, structure out. If the coach wrote the sessions themselves (several lines, weekdays or "Week 2"), PATH keeps
+   their words and only sorts them into weeks; if they described what they want, PATH drafts it. Either way it stays editable. */
+function draftFromWords(text) {
+  const d = dash(), parsed = parsePlan(text), lines = text.split(/\r?\n/).filter((l) => l.trim()).length;
+  d.pwords = text;
+  if (lines >= 2 && parsed.length >= 2 && (parsed.some((s) => s.day) || /(^|\n)\s*(week|woche|wk)\s*\d/i.test(text) || lines >= 3)) d.pdraft = { source: "own", title: "My plan", sessions: parsed };
+  else newDraft(text);
+}
 const newDraft = (prompt) => { const params = planParams(prompt), names = { "10k": "10K build", "5k": "5K build", half: "Half marathon build", taper: "Race week taper", strength: "Strength for runners" }; dash().pdraft = { source: "path", params, title: `${names[params.kind]}${params.kind === "taper" ? "" : `, ${params.weeks} weeks`}`, sessions: genPlan(params) }; };
 Object.assign(DASH_ACT, {
   "plan-open": (v) => { Object.assign(dash(), { planView: v || null, pdraft: null, pgroups: [], pnote: "" }); S.tab.coach = "plans"; lastKey = ""; },
@@ -223,7 +248,17 @@ Object.assign(DASH_ACT, {
   "plan-mode": (v) => { dash().pmode = v; }, "plan-gen": (v) => { newDraft(v); lastKey = ""; },
   "plan-refine": (v) => { const dr = dash().pdraft, p = dr.params; if (v === "easier") p.level -= 1; if (v === "harder") p.level += 1; if (v === "fun") p.fun = !p.fun; if (v === "longer" && p.kind !== "taper") p.weeks = Math.min(12, p.weeks + 1); dr.title = (document.getElementById("ptitle") || {}).value || dr.title; dr.sessions = genPlan(p); },
   "plan-reset": () => { dash().pdraft = null; lastKey = ""; },
-  "plan-save": () => { const d = dash(), dr = d.pdraft, title = (document.getElementById("ptitle").value || "").trim() || dr.title, id = "p" + Date.now().toString(36); plans().unshift({ id, title, source: dr.source, sessions: dr.sessions, shared: [] }); Object.assign(d, { pdraft: null, planView: id, pgroups: [] }); UI.toast = "Plan saved. Only you can see it until you share it."; lastKey = ""; },
+  "plan-save": () => {
+    const d = dash(), dr = d.pdraft, title = (document.getElementById("ptitle").value || "").trim() || dr.title, sessions = dr.sessions.filter((x) => x.text.trim()).map((x) => ({ ...x, text: x.text.trim() }));
+    if (!sessions.length) { UI.toast = "Add at least one session before you save."; return; }
+    const old = dr.editId && planById(dr.editId), id = old ? old.id : "p" + Date.now().toString(36);
+    if (old) Object.assign(old, { title, sessions }); else plans().unshift({ id, title, source: dr.source, sessions, shared: [] });
+    Object.assign(d, { pdraft: null, planView: id, pgroups: [] }); UI.toast = old ? (old.shared.length ? `Saved. ${old.shared.join(" and ")} see the new version.` : "Saved.") : "Plan saved. Only you can see it until you share it."; lastKey = "";
+  },
+  "plan-edit": () => { const d = dash(), p = planById(d.planView); d.pdraft = { source: p.source, editId: p.id, edited: true, title: p.title, sessions: p.sessions.map((x) => ({ ...x })) }; d.planView = "new"; lastKey = ""; },
+  "plan-rm": (v) => { const dr = dash().pdraft; dr.sessions.splice(Number(v), 1); dr.edited = true; },
+  "plan-add": (v) => { const dr = dash().pdraft, w = Number(v), at = dr.sessions.reduce((n, x, i) => (x.week === w ? i + 1 : n), dr.sessions.length); dr.sessions.splice(at, 0, { week: w, day: "", text: "" }); dr.edited = true; UI.focus = at; },
+  "plan-addweek": () => { const dr = dash().pdraft; dr.sessions.push({ week: Math.max(0, ...dr.sessions.map((x) => x.week)) + 1, day: "", text: "" }); dr.edited = true; UI.focus = dr.sessions.length - 1; },
   "plan-group": (v) => { const d = dash(); d.pgroups = (d.pgroups || []).includes(v) ? d.pgroups.filter((g) => g !== v) : [...(d.pgroups || []), v]; },
   "plan-share": () => { const d = dash(), p = planById(d.planView), n = d.pgroups.reduce((s, g) => s + groupSize(g), 0); p.shared.push(...d.pgroups); UI.toast = `Shared with ${d.pgroups.join(" and ")}: ${n} athletes see it on their Path.`; d.pgroups = []; },
   "plan-unshare": () => { const p = planById(dash().planView); p.shared = []; UI.toast = "Sharing stopped. Athletes no longer see this plan."; },
@@ -231,7 +266,7 @@ Object.assign(DASH_ACT, {
 });
 document.addEventListener("submit", (e) => {
   const f = e.target.dataset.f; if (f !== "pgen" && f !== "ppaste") return; e.preventDefault(); const d = dash();
-  if (f === "pgen") { const v = document.getElementById("pprompt").value.trim(); if (!v) { document.getElementById("pprompt").focus(); return; } newDraft(v); }
+  if (f === "pgen") { const v = document.getElementById("pprompt").value.trim(); if (!v) { document.getElementById("pprompt").focus(); return; } draftFromWords(v); }
   else { d.ptext = document.getElementById("ptext").value; const s = parsePlan(d.ptext); if (!s.length) { d.pnote = "PATH found no sessions. Put one session on each line."; } else { d.pnote = ""; d.pdraft = { source: "own", title: d.pfileName ? d.pfileName.replace(/\.[^.]+$/, "") : "My plan", sessions: s }; } }
   lastKey = ""; render();
 });
@@ -240,3 +275,14 @@ document.addEventListener("change", (e) => {
   if (!/\.(txt|csv|md)$/i.test(file.name) && !file.type.startsWith("text/")) { d.pnote = `"${file.name}" is not a text file. In this demo PATH reads .txt, .csv and .md; PDFs, photos and spreadsheets come with the real app.`; render(); return; }
   file.text().then((t) => { d.ptext = t.slice(0, 20000); d.pfileName = file.name; d.pnote = `Read "${file.name}". Check it below, then tap Read my plan.`; render(); });
 });
+/* Typing in the draft is kept as you type, with no redraw, so nothing is lost when a chip or button is tapped next. */
+document.addEventListener("input", (e) => {
+  const dr = dash().pdraft, t = e.target; if (!dr) return;
+  if (t.id === "ptitle") { dr.title = t.value; return; }
+  if (t.id === "pprompt") { dash().pwords = t.value; return; }
+  const row = t.closest && t.closest(".srow"); if (!row) return;
+  const x = dr.sessions[Number(row.dataset.i)]; if (!x) return;
+  if (t.classList.contains("stext")) { x.text = t.value; t.style.height = "auto"; t.style.height = t.scrollHeight + "px"; } else if (t.classList.contains("sday")) x.day = t.value;
+  if (!dr.edited) { dr.edited = true; const chips = document.querySelector('#plan-draft [aria-label="Change the draft"]'); if (chips) chips.remove(); }
+});
+document.addEventListener("input", (e) => { if (e.target.id === "pprompt") dash().pwords = e.target.value; });

@@ -23,6 +23,8 @@ function render() {
     ${UI.toast ? `<div class="toast" role="status"><span>${esc(UI.toast)}</span>${UI.undo ? `<button class="btn sm" data-a="undo">Undo</button>` : ""}${xBtn("hide-toast", "Dismiss message")}</div>` : ""}
     <nav class="tabs" aria-label="Sections">${TABS[S.role].map(([v, l, ic]) => `<button data-a="tab" data-v="${v}" aria-label="${l}${v === "alerts" && badge ? ` (${badge}), ${badge} open` : ""}" ${tab === v ? 'aria-current="page"' : ""}><span class="ic">${I(P[ic])}</span>${l}${v === "alerts" && badge ? ` (${badge})` : ""}</button>`).join("")}</nav>${vSheet()}`;
   const view = document.getElementById("view"); view.scrollTop = tab === "coach" && S.role === "athlete" ? view.scrollHeight : top; lastKey = key;
+  app.querySelectorAll("textarea.stext").forEach((t) => { t.style.height = "auto"; t.style.height = t.scrollHeight + "px"; }); // a session line grows with its text, never cut off
+  if (UI.focus != null) { const el = app.querySelector(`.srow[data-i="${UI.focus}"] .stext`); UI.focus = null; if (el) el.focus(); }
   if (UI.sheet) { const b = app.querySelector(".sheet .btn") || app.querySelector(".sheet[tabindex]"); if (b) b.focus(); }
   /* One accent per screen (D-7): only the first primary button in the page, and in a sheet, keeps the accent. */
   for (const box of [view, app.querySelector(".sheet")]) if (box) [...box.querySelectorAll(".btn.acc")].slice(1).forEach((el) => el.classList.add("demoted"));
