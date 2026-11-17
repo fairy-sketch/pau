@@ -181,7 +181,7 @@ svg text { font-family: var(--body); font-size: 11px; fill: var(--text-2); }
 /* Photography: the only imagery. Muted, one photo per screen (Explore, where photos are the content, is the exception). */
 .ph { display: block; width: 100%; height: 100%; object-fit: cover; filter: saturate(.6) contrast(.96); }
 .hero { position: relative; height: 240px; overflow: hidden; }
-.hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(236,235,231,0) 40%, var(--bg) 100%); }
+.hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, color-mix(in srgb, var(--bg) 0%, transparent) 40%, var(--bg) 100%); }
 .ccard { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); overflow: hidden; }
 .ccard .pic { aspect-ratio: 2 / 1; background: var(--soft); }
 .ccard .between > span:last-child { white-space: nowrap; flex: none; }
@@ -301,3 +301,5 @@ svg text { font-family: var(--body); font-size: 11px; fill: var(--text-2); }
 .phases b.cur { background: var(--accent); }
 .dot.done { background: var(--accent); border-color: var(--text); }
 .sw[aria-checked="true"] .t { background: var(--accent); box-shadow: inset 1px 1px 3px rgba(0,0,0,.18); }
+.swatch i.light { box-shadow: 4px 5px 10px rgba(0,0,0,.14), -4px -4px 10px rgba(255,255,255,.95), inset 0 0 0 1px rgba(0,0,0,.06); }
+html, body { background: var(--bg); }
