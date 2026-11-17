@@ -5,15 +5,18 @@ import sharp from "sharp";
 
 const INK = "#1c1916";
 const PAPER = "#ffffff";
-const ACCENT = "#8e9a80";
 
-/** Two leaning lanes on black. `scale` shrinks the mark for the maskable safe zone. */
+/**
+ * "Just the cut" (decision L-5): a white block with the logo's cut through it, on warm black.
+ * Same geometry as MARK in src/ui/logo.tsx (on a 100 grid). `scale` shrinks it for the maskable safe zone.
+ */
 function mark(scale = 1) {
+  const u = 5.12; // 100 grid -> 512 px
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs><mask id="cut"><rect width="512" height="512" fill="#fff"/><rect x="0" y="${50.35 * u}" width="512" height="${4.3 * u}" fill="#000"/></mask></defs>
   <rect width="512" height="512" fill="${INK}"/>
   <g transform="translate(256 256) scale(${scale}) translate(-256 -256)">
-    <path d="M88 392h96l96-272h-96z" fill="${PAPER}"/>
-    <path d="M232 392h96l96-272h-96z" fill="${ACCENT}"/>
+    <rect x="${24 * u}" y="${24 * u}" width="${52 * u}" height="${52 * u}" rx="${4 * u}" fill="${PAPER}" mask="url(#cut)"/>
   </g>
 </svg>`;
 }

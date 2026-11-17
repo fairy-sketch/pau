@@ -2,6 +2,8 @@
 /* PATH clickable demo, part 4 of 4: the shell. Top bar, tabs, actions, events, start-up. */
 
 const TABS = { athlete: [["path", "Path", "flag"], ["coach", "Coach", "chat"], ["log", "Log", "plus"], ["week", "Week", "cal"], ["me", "Me", "user"]], coach: [["today", "Today", "clock"], ["athletes", "Athletes", "users"], ["review", "Review", "check"], ["alerts", "Alerts", "bell"]], admin: [["dash", "Home", "home"], ["sched", "Schedule", "cal"], ["members", "Members", "users"], ["products", "Products", "tag"], ["money", "Money", "card"]] };
+/* The logo, "Clean cut" (decision L-1): PATH in Satoshi Black with one straight cut, drawn as a mask. */
+const LOGO = '<svg viewBox="0 0 290 110" width="58" height="22" aria-hidden="true" class="logo"><defs><mask id="logo-cut" maskUnits="userSpaceOnUse" x="-40" y="-20" width="370" height="150"><rect x="-40" y="-20" width="370" height="150" fill="#fff"></rect><rect x="-10" y="56" width="310" height="6" fill="#000"></rect></mask></defs><text x="4" y="92" font-family="Satoshi" font-weight="900" font-size="104" letter-spacing="-2" fill="currentColor" mask="url(#logo-cut)">PATH</text></svg>';
 let lastKey = "", swipeClickGuard = -1e9;
 function render() {
   ensureSessions(); sweep(); sweepProposals(); sweepOffers(); runSeries();
@@ -9,7 +11,7 @@ function render() {
   const body = S.role === "athlete" ? { path: vPath, coach: vCoachChat, log: vLog, week: vWeek, me: vMe, explore: vExplore }[tab]() : S.role === "coach" ? vCoach() : vAdmin();
   const badge = S.role === "coach" ? S.alerts.filter((a) => a.status === "open" && (a.info || shares("alerts.pain"))).length : 0;
   app.className = S.role === "admin" ? "wide" : "";
-  app.innerHTML = `<header class="top"><button class="name" data-a="home" aria-label="PATH, back to your start page">PATH</button>
+  app.innerHTML = `<header class="top"><button class="name" data-a="home" aria-label="PATH, back to your start page">${LOGO}</button>
       <select id="role" aria-label="View as">${[["athlete", "Athlete"], ["coach", "Coach"], ["admin", "Admin"]].map(([v, l]) => `<option value="${v}" ${S.role === v ? "selected" : ""}>${l}</option>`).join("")}</select>
       <select id="org" aria-label="Club">${Object.entries(ORGS).map(([v, o]) => `<option value="${v}" ${S.org === v ? "selected" : ""}>${o.name}</option>`).join("")}</select>
       ${S.role === "athlete" ? `<button class="x explorebtn" data-a="tab" data-v="explore" aria-label="Explore: try something new" aria-pressed="${tab === "explore"}">${I(P.compass, 22)}</button>` : ""}</header>

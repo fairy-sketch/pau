@@ -21,6 +21,7 @@
     "title": "Styleguide",
     "intro": "Calm and minimal, with one focal element per screen. Every screen in the app is built from these.",
     "sections": {
+      "logo": "Logo",
       "colour": "Colour",
       "type": "Type",
       "shape": "Shape and space",
@@ -150,6 +151,10 @@
       "peopleLabel": "Community: a low banner, as on the club feed",
       "peopleTitle": "This week at the club",
       "peopleBody": "The Coach chat itself has no photo."
+    },
+    "logo": {
+      "intro": "{name} in Satoshi Black with one straight cut through it. One colour, on any ground: the cut lets the background through. The app icon is the cut alone, on a block.",
+      "markLabel": "{name} app icon"
     }
   }
 }

@@ -109,6 +109,31 @@ test.describe("styleguide", () => {
   });
 });
 
+test.describe("logo", () => {
+  test("the Clean cut wordmark on the home page and in the styleguide, and the cut mark as app icon", async ({
+    page,
+    request,
+  }) => {
+    await page.goto("/");
+    const logo = page.getByRole("heading", { level: 1 }).getByRole("img", { name: "PATH" });
+    await expect(logo).toBeVisible();
+    // Drawn in Satoshi Black with the cut as a mask, in the text colour.
+    await expect(logo.locator("text")).toHaveAttribute("font-weight", "900");
+    await expect(logo.locator("text")).toHaveAttribute("mask", "url(#path-logo-cut)");
+    await expect(logo).toHaveCSS("color", "rgb(28, 25, 22)");
+
+    await page.goto("/styleguide");
+    await expect(page.getByRole("heading", { level: 2, name: "Logo" })).toBeVisible();
+    await expect(page.locator("[data-logo]")).toHaveCount(3); // the header, and the two samples
+    await expect(page.getByRole("img", { name: "PATH app icon" })).toBeVisible();
+
+    // The favicon and the installed-app icons are the new mark.
+    const svg = await (await request.get("/icon.svg")).text();
+    expect(svg).toContain('mask="url(#cut)"');
+    expect(svg).not.toContain("#8e9a80"); // no accent in the icon any more
+  });
+});
+
 test.describe("photography", () => {
   test("class card: responsive next/image, muted, with all text below the photo", async ({
     page,

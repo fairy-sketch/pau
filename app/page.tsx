@@ -1,7 +1,8 @@
 import { getTranslations } from "next-intl/server";
 import { APP_NAME } from "@/src/config/app";
 import { ButtonLink } from "@/src/ui/button";
-import { Display, Label } from "@/src/ui/primitives";
+import { Logo } from "@/src/ui/logo";
+import { Label } from "@/src/ui/primitives";
 
 /** Placeholder cover for M0. The Path home replaces it in M1. */
 export default async function HomePage() {
@@ -11,7 +12,9 @@ export default async function HomePage() {
     <div className="p-screen mx-auto flex min-h-dvh max-w-md flex-col justify-between">
       <Label>{t("home.kicker")}</Label>
       <main id="main">
-        <Display>{APP_NAME}</Display>
+        <h1>
+          <Logo className="text-ink h-16" title={APP_NAME} />
+        </h1>
         <p className="type-heading text-heading mt-2">{t("app.tagline")}</p>
         <p className="text-secondary mt-6 max-w-prose">{t("home.body")}</p>
       </main>
