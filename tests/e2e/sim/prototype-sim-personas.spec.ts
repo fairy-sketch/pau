@@ -560,6 +560,38 @@ test.describe("Athlete Lea: new to PATH", () => {
     await say(page, "What's on this week?");
     await expect(page.locator(".msg").last()).toContainText(offer.club);
   });
+  test("the coach takes a short moment before answering: her message shows at once, dots stand in, then the answer comes", async ({
+    page,
+  }) => {
+    await start(page);
+    await page.evaluate(() => {
+      (window as unknown as { PATH_THINK_MS: number }).PATH_THINK_MS = 900; // as it is for a person
+    });
+    await screen(page, "athlete", "coach");
+    const before = await page.locator(".msg").count();
+    await page.locator("#chat-input").fill("How am I doing?");
+    const t0 = Date.now();
+    await page.keyboard.press("Enter");
+    await expect(page.locator(".msg.me").last()).toHaveText("How am I doing?"); // hers, at once
+    await expect(page.getByRole("status", { name: "Your coach is writing" })).toBeVisible();
+    expect(await page.locator(".msg").count()).toBe(before + 2); // her message and the dots, no answer yet
+    await expect(page.locator(".msg.coach").last()).toContainText("Last 7 days");
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(800);
+    expect(Date.now() - t0).toBeLessThan(3000); // short: a breath, not a wait
+    await expect(page.locator("#typing")).toHaveCount(0);
+    await expect(page.locator("#chat-input")).toBeFocused();
+    // A second message sent before the answer: the first is answered first, nothing is lost.
+    await page.locator('.quick button[data-v="How am I doing?"]').click();
+    await page.locator("#chat-input").fill("What's on this week?");
+    await page.keyboard.press("Enter");
+    await expect(page.locator(".msg.coach").last()).toContainText("Next at PAU Trackrunning");
+    expect(await sim(page, (d) => d.state.chat.slice(-4).map((m: any) => m.who))).toEqual([
+      "me",
+      "coach",
+      "me",
+      "coach",
+    ]);
+  });
   test("says she would like to learn yoga: the coach suggests the beginners' class from Explore, and books nothing until she confirms", async ({
     page,
   }) => {

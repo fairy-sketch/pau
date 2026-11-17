@@ -21,6 +21,10 @@ declare global {
 
 export async function open(page: Page) {
   await page.clock.setFixedTime(NOW);
+  // Tests read the coach's answer at once; the short pause before it (B-28) has its own test.
+  await page.addInitScript(() => {
+    (window as unknown as { PATH_THINK_MS: number }).PATH_THINK_MS = 0;
+  });
   await page.goto(DEMO);
   await expect(page.getByRole("navigation", { name: "Sections" })).toBeVisible();
 }
