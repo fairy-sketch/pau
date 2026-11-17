@@ -357,3 +357,11 @@ Seen in the app, the cut "looks bad". Ramon chose clean lettering instead, and k
 | L-9  | **The logo is PATH in Satoshi Black capitals, set tight (−0.02 em), with the font's own kerning. No cut, no symbol, no accent.** It replaces L-1 and L-2. It is stored as outlines (`src/ui/logo-path.ts`, `docs/brand/logo.svg`), so it needs no font and looks the same in every browser and in the icon files. | Ramon: "1 · Black, tight" out of nine lettering sketches, then "just the lettering for now".  |
 | L-10 | **The app icon, for now, is the same word in white on a warm black tile**, 64 % of the tile wide (`docs/brand/icon.svg`, and all icon sizes via `pnpm icons`). It replaces L-5 and L-7.                                                                                                                           | The lettering alone, as Ramon chose. A symbol can replace it later without touching the logo. |
 | L-11 | The symbol sketches stay on the "PATH logo sketches" canvas. Ramon liked "Cut 2" (one straight cut of 12 %) best among them; that is the starting point if a symbol comes back.                                                                                                                                   | So the work is not lost.                                                                      |
+
+### Lime, tried again and dropped (Ramon, 17 Nov 2026)
+
+Ramon asked for lime as a small highlight layer. Six placements were sketched ("PATH lime accents" canvas); "Highlighter on the goal" was built on the `lime` branch (PR #6). Seen in the app: "the lime green looks bad, go back to the old version".
+
+| #    | Decision                                                                                                                         | Reason                                   |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| V-12 | **No lime.** R52 stands: sage is the one accent, progress is warm black. PR #6 is closed unmerged; the branch stays as a record. | Ramon's call after seeing it in the app. |

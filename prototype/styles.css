@@ -165,7 +165,6 @@ svg text { font-family: var(--mono); font-size: 10px; fill: var(--text-2); }
 .tex { position: relative; overflow: hidden; border: 1px solid var(--hairline); border-radius: var(--r-card); padding: 28px 24px; text-align: center; }
 .tex img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: saturate(.35) contrast(.9); opacity: .16; }
 .tex > :not(img) { position: relative; }
-/* Hold to log: the button charges with lime while held, then releases into the line. */
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 
 /* ---- Iteration 2, milestone I2-0 ---- */
