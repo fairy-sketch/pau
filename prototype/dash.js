@@ -240,20 +240,31 @@ function sessionForPlanDay(day) {
   const mon = monday(today()), end = addDays(mon, 7);
   return sessList("pau").find((x) => x.start >= mon && x.start < end && WD[x.start.getDay()] === day && groupOf(x) === MY_GROUP) || null;
 }
+/* Where a line of the plan stands for the athlete: tied to its club session when there is one this week. */
+function planDayState(x, n) {
+  const s = n === 1 && x.day ? sessionForPlanDay(x.day) : null, mineB = s && myBooking(s.id), done = s && S.entries.some((e) => ymd(e.at) === ymd(s.start));
+  const label = n !== 1 ? "" : done ? "Done" : mineB ? `Booked · ${fTime(s.start)}` : s ? (s.start < today() ? "Missed" : `Club session · ${fTime(s.start)}`) : "On your own";
+  return { s, mineB, done, label };
+}
+/* Your plan on Path: one week at a time, every day a row you can open. No folded-away "whole plan": the weeks are a step apart. */
 function coachPlansCard() {
   const mine = myPlans();
   if (!mine.length) return `<div class="stack" id="from-coach" style="gap:8px"><div class="eyebrow">Your plan</div><p class="sub">${COACH_ME} has not shared a plan with the ${MY_GROUP} group yet.</p></div>`;
-  const p = mine[0], n = 1, wk = p.sessions.filter((x) => x.week === n), T = today();
-  const row = (x) => {
-    const s = x.day ? sessionForPlanDay(x.day) : null, mineB = s && myBooking(s.id), done = s && S.entries.some((e) => ymd(e.at) === ymd(s.start));
-    const state = done ? "Done" : mineB ? `Booked · ${fTime(s.start)}` : s ? (s.start < T ? "Missed" : `Book · ${fTime(s.start)}`) : "On your own";
-    const inner = `<span class="lead time" style="width:40px">${x.day || "·"}</span><span class="mid"><span>${esc(x.text)}</span><span class="sub">${state}</span></span>`;
-    return s && !done ? `<button class="row" data-a="sheet" data-v="${s.id}" style="align-items:flex-start">${inner}</button>` : `<div class="row" style="align-items:flex-start">${inner}</div>`;
-  };
-  const rest = [...new Set(p.sessions.map((x) => x.week))].filter((w) => w !== n);
-  return `<div class="stack" id="from-coach"><div class="between"><span class="eyebrow">Your plan</span><span class="sub">Week ${n} of ${weeksOf(p)}</span></div><div class="card stack" data-plan="${p.id}" style="gap:12px"><div><p class="h2">${esc(p.title)}</p><p class="sub">${COACH_ME} shared this with the ${MY_GROUP} group · ${esc(ORGS.pau.name)}</p></div><div class="rows">${wk.map(row).join("")}</div>
-    ${rest.length ? `<details style="margin:-4px 0 -12px"><summary>The whole plan</summary><div class="stack" style="gap:16px;padding-bottom:12px">${rest.map((w) => `<div><p class="sub">Week ${w}</p>${p.sessions.filter((x) => x.week === w).map((x) => `<p style="margin-top:4px"><span class="sub">${x.day || "·"}</span> ${esc(x.text)}</p>`).join("")}</div>`).join("")}</div></details>` : ""}</div>
+  const p = mine[0], N = weeksOf(p), n = Math.min(N, Math.max(1, dash().myWeek || 1));
+  const rows = p.sessions.map((x, i) => ({ x, i })).filter(({ x }) => x.week === n).map(({ x, i }) => { const st = planDayState(x, n); return `<button class="row" data-a="planday" data-v="${i}" style="align-items:flex-start"><span class="lead time" style="width:40px">${x.day || "·"}</span><span class="mid"><span>${esc(x.text)}</span>${st.label ? `<span class="sub">${st.label}</span>` : ""}</span></button>`; }).join("");
+  return `<div class="stack" id="from-coach"><div class="eyebrow">Your plan</div><div class="card stack" data-plan="${p.id}" style="gap:12px"><div><p class="h2">${esc(p.title)}</p><p class="sub">${COACH_ME} shared this with the ${MY_GROUP} group · ${esc(ORGS.pau.name)}</p></div>
+    <div class="weeknav" style="margin:0 -12px"><button class="x" data-a="myweek" data-v="-1" aria-label="Previous week of the plan" ${n <= 1 ? "disabled" : ""}>${I(P.back, 18)}</button><span class="sub" id="plan-week" aria-live="polite"><span class="strong" style="color:var(--text)">Week ${n} of ${N}</span>${n === 1 ? " · this week" : ""}</span><button class="x" data-a="myweek" data-v="1" aria-label="Next week of the plan" ${n >= N ? "disabled" : ""}>${I(P.fwd, 18)}</button></div>
+    <div class="rows" id="plan-days" style="margin-top:-12px">${rows}</div></div>
     ${mine.length > 1 ? `<p class="sub" id="also-shared">Also from your coach: ${mine.slice(1).map((x) => esc(x.title)).join(", ")}.</p>` : ""}</div>`;
+}
+/* One day of the plan, opened: what to do, who set it, and the one thing to do next. */
+function vPlanDaySheet() {
+  const p = myPlans()[0], x = p && p.sessions[UI.sheet.i]; if (!x) return "";
+  const st = planDayState(x, x.week), s = st.s, full = { Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday", Sat: "Saturday", Sun: "Sunday" }[x.day] || "Any day";
+  const next = st.done ? `<p class="sub">Logged. Well done.</p>` : s && st.mineB ? `<button class="btn acc full" data-a="sheet" data-v="${s.id}">Manage booking</button>` : s && s.start >= today() ? `<button class="btn acc full" data-a="sheet" data-v="${s.id}">Book this session</button>` : x.week === 1 ? `<button class="btn acc full" data-a="tab" data-v="log">Log it</button>` : "";
+  return `<div class="sheetbg" data-a="close"><div class="sheet stack-l" id="planday" role="dialog" aria-modal="true" aria-label="${full}, week ${x.week}"><div><div class="eyebrow">${full} · week ${x.week} of ${weeksOf(p)}</div><p class="h1" style="margin-top:8px">${esc(x.text)}</p><p class="sub" style="margin-top:8px">${esc(p.title)} · from ${COACH_ME}</p></div>
+    ${s ? `<div class="card stack" style="gap:4px"><p class="h2">${offOf(s).name}, ${fTime(s.start)}</p><p class="sub">${fDay(s.start)} · ${offOf(s).loc} · ${offOf(s).coach}</p><p class="sub">${st.label}</p></div>` : x.week === 1 ? `<p class="sub">The club has no session for this one. Do it on your own, then log it.</p>` : `<p class="sub">Comes up in week ${x.week}.</p>`}
+    <div class="stack" style="gap:8px">${next}<button class="btn full ghost" data-a="planday-close">Close</button></div></div></div>`;
 }
 /* On a session in the athlete's Week: what the plan says for it. */
 function myPlanNote(s) {
@@ -366,6 +377,8 @@ function vCoachSession(s, wk) {
     ${names.waiting.length ? `<p class="sub">Waiting: ${names.waiting.map(esc).join(", ")}.</p>` : ""}</div></section>`;
 }
 Object.assign(DASH_ACT, {
+  planday: (v) => { UI.sheet = { type: "planday", i: Number(v) }; }, "planday-close": () => { UI.sheet = null; },
+  myweek: (v) => { const d = dash(), p = myPlans()[0]; d.myWeek = Math.min(p ? weeksOf(p) : 1, Math.max(1, (d.myWeek || 1) + Number(v))); },
   sess: (v) => { dash().sess = v || null; S.tab.coach = "week"; lastKey = ""; },
   cwk: (v) => { const d = dash(); d.wk = Math.min(WEEKS - 1, Math.max(0, (d.wk || 0) + Number(v))); },
   wkind: (v) => { dash().wkind = v; },

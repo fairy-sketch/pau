@@ -433,13 +433,19 @@ test("the athlete's Path shows the plan they follow, and it mirrors what the coa
   await open(page);
   const plan = page.locator("#from-coach");
   await expect(plan).toContainText("Your plan");
-  await expect(plan).toContainText("Week 1 of 4");
+  await expect(page.locator("#plan-week")).toHaveText("Week 1 of 4 · this week");
   await expect(plan.locator("[data-plan] .h2")).toHaveText("Base block");
   await expect(plan).toContainText("Coach Sara shared this with the Track group");
-  // Each line knows its club session: Monday's track can be booked right from the plan.
-  const monday = plan.locator(".row", { hasText: "Track: 4 × 1 km at 10K pace" });
-  await expect(monday).toContainText("Book · 18:30");
+  await expect(plan.locator("details")).toHaveCount(0); // no folded-away "whole plan"
+  // Every day opens: what to do, who set it, and the one next thing to do.
+  const monday = plan.locator("#plan-days .row", { hasText: "Track: 4 × 1 km at 10K pace" });
+  await expect(monday).toContainText("Club session · 18:30");
   await monday.click();
+  const day = page.getByRole("dialog", { name: "Monday, week 1" });
+  await expect(day.locator(".h1")).toHaveText("Track: 4 × 1 km at 10K pace, 2 min jog");
+  await expect(day).toContainText("Base block · from Coach Sara");
+  await expect(day).toContainText("Track session, 18:30");
+  await day.getByRole("button", { name: "Book this session" }).click();
   await expect(page.locator(".sheet")).toContainText("Track session");
   await demo(page, (d) => {
     d.ui.sheet = null;
@@ -447,7 +453,26 @@ test("the athlete's Path shows the plan they follow, and it mirrors what the coa
     d.render();
   });
   await expect(monday).toContainText("Booked · 18:30");
-  await expect(plan.locator(".row", { hasText: "Long run" })).toContainText("On your own");
+  // A day with no club session is done on your own and logged.
+  await plan.locator("#plan-days .row", { hasText: "Long run" }).click();
+  await expect(page.getByRole("dialog", { name: "Saturday, week 1" })).toContainText(
+    "Do it on your own, then log it",
+  );
+  await page
+    .getByRole("dialog", { name: "Saturday, week 1" })
+    .getByRole("button", { name: "Close" })
+    .click();
+  // The other weeks are one step away, each day just as open.
+  await page.getByRole("button", { name: "Next week of the plan" }).click();
+  await expect(page.locator("#plan-week")).toHaveText("Week 2 of 4");
+  await plan.locator("#plan-days .row").first().click();
+  await expect(page.getByRole("dialog", { name: "Monday, week 2" })).toContainText(
+    "Track: 5 × 1 km at 10K pace",
+  );
+  await page
+    .getByRole("dialog", { name: "Monday, week 2" })
+    .getByRole("button", { name: "Close" })
+    .click();
   // The same line shows on the session in Week.
   await tab(page, "Week");
   await expect(page.locator("#plan-note")).toHaveText(
