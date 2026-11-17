@@ -8,7 +8,7 @@ const SPORT_IMAGE = {
   football: ["class-football-pitch-aerial", "50% 50%"], boxing: ["class-boxing-silhouette", "35% 45%"], crossfit: ["class-crossfit-ropes", "50% 60%"], cycling: ["hero-cyclist-mountain-path", "50% 60%"],
 };
 const FALLBACK_IMAGE = ["texture-chalk-hands", "50% 60%"]; // sports without a photo
-const HERO_IMAGE = ["hero-track-runner-silhouette", "30% 40%"], TEXTURE_IMAGE = ["texture-foam-roller", "45% 55%"];
+const HERO_IMAGE = ["hero-desert-run", "42% 38%"], TEXTURE_IMAGE = ["texture-foam-roller", "45% 55%"];
 const sportPhoto = (sport) => SPORT_IMAGE[sport] || FALLBACK_IMAGE;
 const photo = ([file, focus]) => `<img class="ph" src="images/${file}.jpg" alt="" style="object-position:${focus}">`;
 const texture = (inner) => `<div class="tex"><img src="images/${TEXTURE_IMAGE[0]}.jpg" alt="">${inner}</div>`;
