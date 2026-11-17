@@ -77,7 +77,9 @@ export const ALL_SCREENS: [Role, string][] = [
 export const layoutProblems = (page: Page) =>
   page.evaluate(() => {
     const out: string[] = [],
-      vw = innerWidth;
+      // On a phone the browser widens innerWidth to fit a page that is too wide,
+      // so measure against the width the page was given.
+      vw = document.documentElement.clientWidth;
     const name = (el: Element) =>
       `${el.tagName.toLowerCase()} "${((el as HTMLElement).innerText || "").replace(/\s+/g, " ").trim().slice(0, 30)}"`;
     const scrolls = (el: Element) => {

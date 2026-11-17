@@ -13,10 +13,10 @@ function render() {
   document.documentElement.style.setProperty("--accent", (ACCENTS[S.accent] || ACCENTS.sage)[1]);
   for (const v of ["--bg", "--surface", "--soft"]) document.documentElement.style.setProperty(v, (GROUNDS[S.ground] || GROUNDS.stone)[1]);
   const tc = document.querySelector('meta[name="theme-color"]'); if (tc) tc.content = (GROUNDS[S.ground] || GROUNDS.stone)[1]; // the phone's status bar takes the ground colour
-  ensureSessions(); syncPlan(); sweepCancelled(); sweep(); sweepProposals(); sweepOffers(); runSeries();
+  tourTick(); ensureSessions(); syncPlan(); sweepCancelled(); sweep(); sweepProposals(); sweepOffers(); runSeries();
   const had = focusKey(document.activeElement), hadSheet = !!document.querySelector(".sheet");
   const oldView = document.getElementById("view"), oldH = oldView ? oldView.clientHeight : 0, oldGap = oldView ? oldView.scrollHeight - oldView.scrollTop - oldH : 0; // where the keyboard was, before the screen is redrawn
-  const app = document.getElementById("app"), tab = S.tab[S.role], key = S.role + tab + S.org + (S.ob ? "ob" + S.ob.step : "") + (S.rosterSid || "") + ((S.dash && (S.dash.athlete || S.dash.planView || S.dash.sess)) || "") + ((S.role === "admin" && S.adm && S.adm.view) || "") + ((S.dash && S.dash.recap) || "") + (tab === "explore" ? S.explore.open || "" : ""), old = document.getElementById("view"), top = old && key === lastKey ? old.scrollTop : 0;
+  const app = document.getElementById("app"), tab = S.tab[S.role], key = S.role + tab + S.org + (S.ob ? "ob" + S.ob.step : "") + (S.tour ? "t" + S.tour.step : "") + (S.rosterSid || "") + ((S.dash && (S.dash.athlete || S.dash.planView || S.dash.sess)) || "") + ((S.role === "admin" && S.adm && S.adm.view) || "") + ((S.dash && S.dash.recap) || "") + (tab === "explore" ? S.explore.open || "" : ""), old = document.getElementById("view"), top = old && key === lastKey ? old.scrollTop : 0;
   const welcome = S.role === "athlete" && !!S.ob; // the first five minutes: three questions, nothing else on the screen
   const body = welcome ? vOnboarding() : S.role === "athlete" ? { path: vPath, coach: vCoachChat, log: vLog, week: vWeek, me: vMe, explore: vExplore }[tab]() : S.role === "coach" ? vCoach() : vAdmin();
   const badge = S.role === "coach" ? coachAlerts().filter((a) => a.status === "open").length : 0;
@@ -25,7 +25,7 @@ function render() {
   app.innerHTML = `<header class="top" ${behind}><button class="name" data-a="home" aria-label="PATH, back to your start page">PATH</button>
       <button class="clubbtn" data-a="clubs" data-org="${S.org}" aria-label="${esc(ORGS[S.org].name)}: your clubs and the demo view" aria-haspopup="dialog"><span class="mono36" aria-hidden="true">${mono(S.org)}</span></button></header>
     <main id="view" tabindex="0" ${behind}>${body}</main>
-    ${UI.toast ? `<div class="toast" role="status"><span>${esc(UI.toast)}</span>${UI.undo ? `<button class="btn sm" data-a="undo">Undo</button>` : ""}${xBtn("hide-toast", "Dismiss message")}</div>` : ""}
+    ${vGuide()}${UI.toast ? `<div class="toast" role="status"><span>${esc(UI.toast)}</span>${UI.undo ? `<button class="btn sm" data-a="undo">Undo</button>` : ""}${xBtn("hide-toast", "Dismiss message")}</div>` : ""}
     <nav class="tabs" aria-label="Sections" ${behind} ${welcome ? "hidden" : ""}>${TABS[S.role].map(([v, l, ic]) => `<button data-a="tab" data-v="${v}" aria-label="${l}${v === "alerts" && badge ? ` (${badge}), ${badge} open` : ""}" ${tab === v ? 'aria-current="page"' : ""}><span class="ic">${I(P[ic])}</span>${l}${v === "alerts" && badge ? ` (${badge})` : ""}</button>`).join("")}</nav>${vSheet()}`;
   /* A toast sits in its own row between the page and the tab bar, so it never lies on top of anything. That makes the page a little
      shorter. If the person was at the end of the page, the page stays at its end: the last line is still readable, above the toast. */
@@ -254,12 +254,12 @@ document.addEventListener("pointerup", (e) => {
 document.addEventListener("pointercancel", () => { swipe = null; });
 
 /* The coach and club dashboard brings its own actions (dash.js). Leaving a tab or going home also leaves an open athlete. */
-Object.assign(ACT, DASH_ACT, ADMIN_ACT, ONBOARD_ACT);
+Object.assign(ACT, DASH_ACT, ADMIN_ACT, ONBOARD_ACT, TOUR_ACT);
 for (const k of ["home", "tab"]) { const f = ACT[k]; ACT[k] = (v) => { const r = f(v); if (S.dash) Object.assign(S.dash, { athlete: null, planView: null, pdraft: null, sess: null, myWeek: 1, recap: null, noteFor: null, rvEdit: null, rvError: "" }); if (S.adm) Object.assign(S.adm, { view: null, error: "", form: null, rows: null }); return r; }; }
 /* For the tests and for poking around in the console. */
 window.PATH_DEMO = {
   get state() { return S; }, disciplines, ACCENTS, GROUNDS, athletes, statusOf, roster, members, memberPass, ui: UI, ORGS, LOAD_LIMIT, CARD_TTL_MIN, STORE_KEY,
-  render, seed, save, load, resetDemo, undoCancel, canUndoCancel, ensurePlan, ptSlots, ptStats, ptPack, ptBook, ptCancel, ptMove, ptSell, ptClients, startOnboarding, finishOnboarding, setGoal, checkGoal, reviewItems, isEasier, draftRecap, checkedIn, comingToday, whatFor, clubStats, clubSentence, atRisk, riskOf, sentTo, draftCheckin, draftReminder, sendApproved, editSession, addSession, setRules, policyOf, policyText, parseMembersCsv, importMembers, baseMembers, coachOf, loadPhotos, PHOTOS, planWeekRows, planRowState, syncPlan, planText, planName, coachAlerts, openPains, book, cancel, cancelSession, clashAt, passEnded, renewalOf, check, freeSpot, leaveWait, passState, passOf, stats, guard, guardDraft, currentDraft, RAW_DRAFT,
+  render, seed, save, load, resetDemo, undoCancel, canUndoCancel, ensurePlan, TOUR, tourGo, inSeason, ptSlots, ptStats, ptPack, ptBook, ptCancel, ptMove, ptSell, ptClients, startOnboarding, finishOnboarding, setGoal, checkGoal, reviewItems, isEasier, draftRecap, checkedIn, comingToday, whatFor, clubStats, clubSentence, atRisk, riskOf, sentTo, draftCheckin, draftReminder, sendApproved, editSession, addSession, setRules, policyOf, policyText, parseMembersCsv, importMembers, baseMembers, coachOf, loadPhotos, PHOTOS, planWeekRows, planRowState, syncPlan, planText, planName, coachAlerts, openPains, book, cancel, cancelSession, clashAt, passEnded, renewalOf, check, freeSpot, leaveWait, passState, passOf, stats, guard, guardDraft, currentDraft, RAW_DRAFT,
   newForm, toLog, ask, confirmProposal, toggleAct, runAct, planLocked, nextChangeable, applyDraft, shiftWeek, weekIndex,
   parseClub, agenda, openPain, OFFERS, openOffers, exploreList, tryPlan, dropPlan, tryToday, providerOf, signUp, dropSignup, signedUp, offerStart, offerKm, offersFor, purchase, acceptOffer, declineOffer, sweepOffers, waitTotal, createSeries, previewSeries, pauseSeries, endSeries, runSeries, seriesRows, seriesSummary, findSeries, sweepProposals, parseWhen, parseOffering, rosterRows, rosterNames, addWalkin, markAttendance, memoryFor, upcomingBookings, sessList, attendance, myBooking, myWait, spots, nextStep, offerById, packOf, ticketOf, myInvoices,
 };

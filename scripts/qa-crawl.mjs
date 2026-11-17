@@ -51,7 +51,7 @@ const restore = (role, tab, org) =>
 const audit = () =>
   p.evaluate(() => {
     const out = [],
-      vw = innerWidth,
+      vw = document.documentElement.clientWidth, // not innerWidth: a phone widens that to fit a page that is too wide
       desc = (el) =>
         `${el.tagName.toLowerCase()}${el.dataset.a ? "[" + el.dataset.a + "]" : ""}${el.id ? "#" + el.id : ""} "${(el.getAttribute("aria-label") || el.innerText || el.placeholder || "").replace(/\s+/g, " ").trim().slice(0, 40)}"`;
     const vis = (el) => {

@@ -25,7 +25,7 @@ const err = (code, msg) => ({ ok: false, code, msg });
 const ORGS = {
   pau: {
     name: "PAU Trackrunning", kind: "Athletics club",
-    season: { name: "Winter season", end: new Date(2027, 2, 31) }, next: { name: "Summer season", end: new Date(2027, 8, 30) },
+    season: { name: "Winter season", end: new Date(2027, 2, 31) }, next: { name: "Summer season", start: new Date(2027, 3, 12), end: new Date(2027, 8, 30) },
     single: { name: "Single session", price: 25 },
     upgrade: { name: "Regular season pass", price: 100, note: "Regular is CHF 400 for the season. Your drop-in pass (CHF 300) counts towards it, so the difference is CHF 100." },
     policy: { opensDays: 60, cancelMin: 120, lateCancel: "none", waitlist: true },
@@ -49,7 +49,7 @@ const ORGS = {
   },
   studio: {
     name: "Studio Demo", kind: "Boutique studio",
-    season: { name: "Winter term", end: new Date(2027, 1, 28) },
+    season: { name: "Winter term", end: new Date(2027, 1, 28) }, next: { name: "Spring term", start: new Date(2027, 2, 1), end: new Date(2027, 4, 31) },
     single: { name: "Drop-in", price: 33 },
     policy: { opensDays: 6, cancelMin: 240, lateCancel: "forfeit", waitlist: true, maxDay: 2, maxWeek: 7 },
     me: { coach: "Noor", groups: ["Yoga"], myGroup: "Yoga" },
@@ -126,7 +126,7 @@ const memberPass = (m) => `${m.product}${m.left != null ? ` · ${m.left} left` :
 function poolOf(s) { const off = offOf(s), all = baseMembers(s.org); return (off.only ? all.filter((m) => off.only.includes(m.group)) : all).map((m) => m.name); }
 
 /* ---------- state ---------- */
-const STORE_KEY = "path-demo-v5", WEEKS = 4, PER = 12, LOAD_LIMIT = 1.1, CARD_TTL_MIN = 15;
+const STORE_KEY = "path-demo-v6", WEEKS = 4, PER = 12, LOAD_LIMIT = 1.1, CARD_TTL_MIN = 15;
 let S;
 /* Things that belong to the open screen, not to the demo's data. Never saved. */
 const UI = { sheet: null, toast: "", undo: null, lineFrom: null, justDone: null, resetArmed: false };
@@ -143,10 +143,18 @@ function ensurePlan(weeks = WEEKS) {
   }
   S.plan.items.sort((a, b) => (a.date < b.date ? -1 : 1));
 }
+/* A club runs sessions inside its season, and inside the next one once it has begun. Between the two there is a break. */
+const inSeason = (org, d) => { const o = ORGS[org], day = sod(d); return day <= sod(o.season.end) || (!!o.next && day >= sod(o.next.start) && day <= sod(o.next.end)); };
+/* What to say about a day with no sessions because of the season: what ended, and what comes next. Empty inside a season. */
+function seasonNote(org, d) {
+  const o = ORGS[org], day = sod(d); if (inSeason(org, day)) return "";
+  if (o.next && day < sod(o.next.start)) return `The ${o.season.name.toLowerCase()} ended on ${fDate(o.season.end)}. The ${o.next.name.toLowerCase()} starts on ${fDay(o.next.start)} ${o.next.start.getFullYear()}.`;
+  return `The ${(o.next || o.season).name.toLowerCase()} ended on ${fDate((o.next || o.season).end)}. The next dates are not out yet.`;
+}
 function ensureSessions() {
   const T = today();
   for (const [oid, o] of Object.entries(ORGS)) for (const off of o.offerings) for (let i = -21; i <= 7 * WEEKS; i++) {
-    const d = addDays(T, i); if (!off.days.includes(d.getDay())) continue;
+    const d = addDays(T, i); if (!off.days.includes(d.getDay()) || !inSeason(oid, d)) continue; // the schedule stops at the season's end
     const id = `${oid}-${off.id}-${ymd(d)}`; if (S.sessions[id]) continue;
     const h = hash(id), h2 = hash(id + "w");
     let others = oid === "pau" ? (off.id === "track" ? 17 + Math.floor(h * 10) : off.id === "gym" ? 11 + Math.floor(h * 5) : 12 + Math.floor(h * 15)) : Math.min(off.cap, Math.floor(off.cap * (0.55 + h * 0.5)));
@@ -171,7 +179,7 @@ const overdue = (i) => i.status === "open" && i.due < today();
 function seed() {
   const T = today();
   S = {
-    v: 5, role: "athlete", org: "pau", tab: { athlete: "path", coach: "today", admin: "dash" }, banner: true, day: ymd(T), logTab: "log", rosterSid: null,
+    v: 6, role: "athlete", org: "pau", tab: { athlete: "path", coach: "today", admin: "dash" }, banner: true, day: ymd(T), logTab: "log", rosterSid: null,
     me: { name: "Mia Keller", sports: "Running · Strength" }, onboarded: true, ob: null,
     goal: { title: "Sub‑40 10K", date: new Date(2027, 4, 9), why: "Because I want to race the Zurich 10K with my club." },
     stages: ["Foundation", "Build", "Sharpen", "Test", "Recover"], stage: 1, stageSessions: 5,
@@ -241,7 +249,7 @@ function load() {
   try {
     const raw = localStorage.getItem(STORE_KEY); if (!raw) return false;
     const data = JSON.parse(raw, (k, v) => (v && typeof v === "object" && typeof v.$d === "number" ? new Date(v.$d) : v));
-    if (!data || data.v !== 5 || !data.sessions) return false;
+    if (!data || data.v !== 6 || !data.sessions) return false;
     S = data; ensureSessions();
     if (S.day < ymd(today())) S.day = ymd(today());
     return true;

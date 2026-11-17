@@ -526,7 +526,7 @@ test.describe("Time: Europe/Zurich", () => {
     });
   });
   test("across the switch back to winter time too", async ({ page }) => {
-    await start(page, new Date("2027-10-25T12:00:00+02:00"));
+    await start(page, new Date("2026-10-19T12:00:00+02:00")); // the Monday before the clocks go back on 25 October 2026
     const r = await sim(page, (d) => {
       const f = (id: string) =>
         d.state.sessions[id] &&
@@ -536,7 +536,7 @@ test.describe("Time: Europe/Zurich", () => {
           hour: "2-digit",
           minute: "2-digit",
         });
-      return [f("pau-track-2027-10-28"), f("pau-track-2027-11-01")];
+      return [f("pau-track-2026-10-22"), f("pau-track-2026-10-26")];
     });
     expect(r).toEqual(["Thu 18:30", "Mon 18:30"]);
   });
@@ -1138,6 +1138,140 @@ test.describe("Step 0: what Ramon's own test found", () => {
     } finally {
       await site.close();
     }
+  });
+});
+
+test.describe("Steps 5 and 6: the season's end, and Start demo", () => {
+  test("the schedule stops at the season's end and says what comes next; it picks up again when the next season starts", async ({
+    page,
+  }) => {
+    await start(page, new Date("2027-03-29T12:00:00+02:00")); // the Monday of the winter season's last week
+    const days = await sim(page, (d) =>
+      d
+        .sessList("pau")
+        .filter((s: any) => s.start > new Date())
+        .map((s: any) => `${s.start.getMonth() + 1}/${s.start.getDate()}`),
+    );
+    expect(days.filter((x: string) => /^3\//.test(x)).length).toBeGreaterThan(2); // Mon 29, Tue 30, Wed 31 March
+    expect(
+      days.some((x: string) => /^4\/([1-9]|1[01])$/.test(x)),
+      "nothing from 1 to 11 April",
+    ).toBe(false);
+    expect(days).toContain("4/12"); // the summer season starts on Monday 12 April
+    // Week says so on the week the season ends, and on a day in the break.
+    await screen(page, "athlete", "week");
+    await expect(page.locator("#season-end")).toHaveText(
+      "The winter season ends on Wed 31 Mar. The summer season starts on Mon 12 Apr.",
+    );
+    await page.getByRole("button", { name: "Thu 1 Apr", exact: true }).click();
+    await expect(page.locator("#season-end")).toHaveCount(0); // said once, not twice
+    await expect(page.locator("#noresults")).toHaveText(
+      "The winter season ended on 31 Mar 2027. The summer season starts on Mon 12 Apr 2027.",
+    );
+    await page.getByRole("button", { name: "Next week", exact: true }).click();
+    await expect(page.locator("#noresults")).toContainText(
+      "The summer season starts on Mon 12 Apr 2027.",
+    );
+    await page.getByRole("button", { name: "Next week", exact: true }).click();
+    await page.getByRole("button", { name: "Mon 12 Apr", exact: true }).click();
+    await expect(page.locator("#classcard")).toContainText("Track session");
+    // The admin reads the same, the studio has its own dates and no break, and the engine refuses a session in the break.
+    expect(await screen(page, "admin", "sched")).toContain(
+      "Winter season runs until 31 Mar 2027. No session is scheduled after that day until the summer season starts on 12 Apr 2027; it runs until 30 Sep 2027.",
+    );
+    expect(
+      await sim(page, (d) => d.sessList("studio").filter((s: any) => s.start > new Date()).length),
+    ).toBeGreaterThan(40);
+    expect(
+      await sim(page, (d) => [
+        d.inSeason("pau", new Date(2027, 3, 5)),
+        d.inSeason("pau", new Date(2027, 3, 12)),
+        d.inSeason("studio", new Date(2027, 2, 1)),
+        d.inSeason("studio", new Date(2027, 5, 1)),
+      ]),
+    ).toEqual([false, true, true, false]);
+    // The plan does not promise a club session on a day the club is closed.
+    const path = await screen(page, "athlete", "path");
+    expect(path).not.toMatch(/Thu [^]{0,60}Club session · 18:30[^]*Fri/);
+  });
+  test("Start demo resets the data and walks through the story: the athlete books by chat, the coach sees it, the admin sees club health", async ({
+    page,
+  }) => {
+    await start(page);
+    // Something that Start demo has to wipe.
+    await sim(page, (d) => {
+      d.book("pau-gym-2026-11-17", "t");
+      d.state.consent.pau["alerts.pain"] = true;
+    });
+    await page.locator(".clubbtn").click();
+    await page.getByRole("button", { name: "Start demo" }).click();
+    expect(
+      await sim(page, (d) => [
+        d.state.bookings.filter((b: any) => b.sid === "pau-gym-2026-11-17").length,
+        d.state.consent.pau["alerts.pain"],
+      ]),
+    ).toEqual([0, false]);
+    const guide = page.locator("#guide");
+    // 1. The athlete asks, by hand. The guide moves on by itself.
+    await expect(guide).toContainText("Demo · 1 of 6 · Athlete", { ignoreCase: true });
+    await expect(guide).toContainText('tap "Book my usual"');
+    await expect(guide.getByRole("button", { name: "Do it for me" })).toBeVisible();
+    await page.locator(".quick button", { hasText: "Book my usual" }).click();
+    await expect(guide).toContainText("2 of 6", { ignoreCase: true });
+    await expect(guide).toContainText("Nothing is booked until you tap Confirm.");
+    expect(
+      await sim(page, (d) => d.state.bookings.filter((b: any) => b.source === "ai_coach").length),
+    ).toBe(0);
+    // 2. She confirms. Path shows it.
+    await lastCard(page).getByRole("button", { name: "Confirm", exact: true }).click();
+    await expect(guide).toContainText("3 of 6", { ignoreCase: true });
+    await expect(guide).toContainText("Booked: Track session, Thu 19 Nov 18:30.");
+    await expect(page.locator("#plan-days")).toContainText("Booked · 18:30");
+    // The guide has its own row: it does not lie on the page or on the tab bar.
+    const rects = await page.evaluate(() => {
+      const r = (q: string) => document.querySelector(q)!.getBoundingClientRect();
+      return [
+        r("#guide").top >= r("#view").bottom - 0.5,
+        r("#guide").bottom <= r("nav.tabs").top + 0.5,
+      ];
+    });
+    expect(rects).toEqual([true, true]);
+    // 3. The coach sees her on the session.
+    await guide.getByRole("button", { name: "Next" }).click();
+    await expect(guide).toContainText("4 of 6 · Coach", { ignoreCase: true });
+    await expect(page.locator("#coach-session h1")).toHaveText("Track session, 18:30");
+    await expect(page.locator("#attendees")).toContainText("Mia Keller");
+    await guide.getByRole("button", { name: "Next" }).click();
+    await expect(page.locator("#briefing")).toBeVisible();
+    // 4. The admin sees club health. Finish ends the tour.
+    await guide.getByRole("button", { name: "Next" }).click();
+    await expect(guide).toContainText("6 of 6 · Admin", { ignoreCase: true });
+    await expect(page.locator("#health")).toContainText("PAU Trackrunning is");
+    await guide.getByRole("button", { name: "Finish" }).click();
+    await expect(page.locator("#guide")).toHaveCount(0);
+    await expect(page.locator(".toast")).toContainText("That was the tour.");
+    // Watching instead of doing: "Do it for me" and Next alone tell the same story, and End tour stops it anywhere.
+    await page.locator(".clubbtn").click();
+    await page.getByRole("button", { name: "Start demo" }).click();
+    await guide.getByRole("button", { name: "Do it for me" }).click();
+    await guide.getByRole("button", { name: "Do it for me" }).click();
+    await expect(guide).toContainText("Booked: Track session, Thu 19 Nov 18:30.");
+    expect(
+      await sim(
+        page,
+        (d) =>
+          d.state.bookings.filter((b: any) => b.source === "ai_coach" && b.status === "confirmed")
+            .length,
+      ),
+    ).toBe(1);
+    await guide.getByRole("button", { name: "End tour" }).click();
+    await expect(page.locator("#guide")).toHaveCount(0);
+    expect(await sim(page, (d) => !!d.myBooking("pau-track-2026-11-19"))).toBe(true); // ending the tour keeps the demo as it is
+    // It survives a reload mid-tour.
+    await page.locator(".clubbtn").click();
+    await page.getByRole("button", { name: "Start demo" }).click();
+    await page.reload();
+    await expect(page.locator("#guide")).toContainText("1 of 6", { ignoreCase: true });
   });
 });
 
