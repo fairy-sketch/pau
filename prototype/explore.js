@@ -146,6 +146,26 @@ const exploreList = () => openOffers().filter(exploreMatch);
 /* ---------- the coach can look here too ---------- */
 const SPORT_WORDS = { nightrun: /night run|10k race|\brace\b/, street3: /3 ?[x×] ?3|tournament/, snowday: /open day|snow day/, plank: /plank/, talk: /\btalk\b/, openstage: /open stage/, volleycup: /winter cup|volleyball cup/, physio: /physio/, massage: /massage/, food: /nutrition|dietit|fuel|what to eat/, mind: /mental|nerves|mindset/, cold: /sauna|cold plunge|ice bath/, nico: /nico|footballer|soccer player|midfield/, mara: /mara|form check|running coach/, jonasw: /jonas wyss|strength coach|strength for runners/, aline: /aline|skier/, dario: /dario|pro boxer/, swim: /swim|crawl|pool/, boulder: /climb|boulder/, row: /\brow/, padel: /padel/, boxing: /box/, dance: /contemporary/, openfloor: /dance|dancing/, yoga: /yoga/, streetball: /basket|streetball/, volley: /volley/, xc: /ski/, trail: /trail/, bars: /calisthenic|pull.?up|bars/, dojo: /kickbox|martial|dojo/, hockey: /hockey|skat/, football: /football|soccer/, pilates: /pilates|reformer/, tennis: /tennis/, velo: /cycl|bike|ride|velo/, ropes: /crossfit|conditioning|functional/, mobility: /mobility|stretch/ };
 const namedOffer = (text) => { const t = text.toLowerCase(); const hit = Object.entries(SPORT_WORDS).find(([id, re]) => re.test(t) && offerStart(offerById(id)) > now()); return hit ? offerById(hit[0]) : OFFERS.find((o) => t.includes(o.club.toLowerCase())) || null; };
+/* "I'd like to learn yoga": a wish, not a booking. The coach looks in Explore for that sport, beginners first, and suggests it.
+   Nothing is booked; the card under the answer opens the offer. */
+const WISH = /\b(learn|try|start (with|doing)|get started|take up|get into|new to|interested in|curious about|would (like|love) to|want to|wanna|like to do|never done)\b/;
+const sportWord = (o) => o.sport.toLowerCase().split(" ").find((w) => w.length > 3) || o.sport.toLowerCase();
+function wishedOffers(text) {
+  const t = text.toLowerCase(); if (!WISH.test(t) || /\bbook\b|\bcancel|sign me up|\bjoin\b/.test(t)) return [];
+  return openOffers().filter((o) => kindOf(o) !== "care" && kindOf(o) !== "event" && (t.includes(o.sport.toLowerCase()) || new RegExp(`\\b${sportWord(o)}\\b`).test(t)))
+    .sort((a, b) => (b.beginners ? 1 : 0) - (a.beginners ? 1 : 0) || (a.intensity === "low" ? 0 : 1) - (b.intensity === "low" ? 0 : 1) || offerStart(a) - offerStart(b));
+}
+function replyWish(text) {
+  const found = wishedOffers(text), g = guard(), list = found.filter((o) => !g.active || o.intensity === "low").slice(0, 2), o = list[0];
+  if (!o) return say(`${found[0].sport} in Explore is hard training, and your load is up right now, so I won't suggest it this week. Ask me again when you are back in range.`);
+  const sport = o.sport.toLowerCase(), far = elsewhereOnly(text);
+  const lead = signedUp(o.id) ? `Your name is already down for ${sport}:` : `Nice idea. Explore has ${o.beginners ? "a beginners' " + sport + " class" : sport + " near you"}:`;
+  const more = list[1] ? `\nAlso: ${offerLine(list[1])}.` : "";
+  const next = signedUp(o.id) ? "" : o.price ? "\nOpen it to read more and book there. I never pay for you." : "\nShall I put your name down? Say yes and I will ask you to confirm.";
+  const own = far ? `\n${ORGS[far.org].name}, your other club, has ${offName(far.org, far.off)} too.` : "";
+  S.chat.push({ who: "coach", text: `${lead}\n${offerLine(o)}. ${offerSpots(o)} spots left.${more}${next}${own}`, picks: list.map((x) => x.id), wish: signedUp(o.id) || o.price ? null : o.id });
+  return null;
+}
 function replyExplore(text) {
   const t = text.toLowerCase(), named = namedOffer(text), wantsIn = /sign me up|put me down|put my name|book|join|i'?m in|count me in/.test(t);
   if (named && /\bplan\b|train like|follow/.test(t)) {

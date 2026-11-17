@@ -280,7 +280,7 @@ const GERMAN = [[/\bmontags?\b/g, "monday"], [/\bdienstags?\b/g, "tuesday"], [/\
   [/\bschmerz\w*|\btut weh\b|\bweh\b|\bverletz\w*/g, "hurts"], [/\bknie\b/g, "knee"], [/\bwade\b/g, "calf"], [/\br(ü|ue)cken\b/g, "back"], [/\b(fuss|fuß|kn(ö|oe)chel)\b/g, "ankle"],
   [/\b(leichte|ruhige|lockere|einfache)\w* woche\b|\bm(ü|ue)de\b|\bersch(ö|oe)pft\b|\bzu (hart|viel|streng)\b/g, "easy week"], [/\bwie l(ä|ae)uft\w*\b|\bwie stehe ich\b|\bfortschritt\w*/g, "how am i doing"],
   [/\bwas l(ä|ae)uft\b|\bwas gibt es\b|\bwelche (trainings|kurse|stunden)\b|\bstundenplan\b|\bprogramm\b/g, "what's on"], [/\bwas kostet\b|\bwie ?viel kostet\b|\bpreise?\b|\bkosten\b/g, "how much"], [/\bguthaben\b|\babo\b/g, "pass"],
-  [/\bwas (weisst|weißt) du\b|\bmerkst du dir\b|\berinnerst\b/g, "remember"], [/\betwas neues\b|\bvorschlag\b|\bschlag\w*\b.*\bvor\b|\bempfiehl\w*/g, "suggest something new"]];
+  [/\bwas (weisst|weißt) du\b|\bmerkst du dir\b|\berinnerst\b/g, "remember"], [/\b(lernen|ausprobieren|anfangen|probieren)\b|\bm(ö|oe)chte\b|\bwürde gern\w*/g, "learn"], [/\betwas neues\b|\bvorschlag\b|\bschlag\w*\b.*\bvor\b|\bempfiehl\w*/g, "suggest something new"]];
 const understood = (q) => GERMAN.reduce((t, [re, en]) => t.replace(re, en), q.toLowerCase());
 const EASY_WISH = /easy week|easier|too hard|too much|tired|exhausted|worn out|wrecked|(make|keep|take) (this|the|my|it)( whole)?( week)? (easy|easier|light|lighter)|week (easy|easier|light|lighter)|(lighter|light|rest|recovery) week|go easy|take it easy|less (training|load)|ease (off|up|my|this|the)|back off|need a break/;
 function coachReply(raw) {
@@ -326,6 +326,11 @@ function coachReply(raw) {
   }
   if (/cancel/.test(t)) return replyCancel(q);
   if (/\bevery\b|\bweekly\b|recurring|repeat|\bseries\b|all season|this season|\beach (mon|tue|wed|thu|fri|sat|sun)/.test(t)) return replySeries(q);
+  // "Yes" right after a suggestion from Explore: still only a confirm card, never a booking.
+  const lastCoach = [...S.chat].reverse().find((m) => m.who === "coach");
+  if (lastCoach && lastCoach.wish && /^\s*(yes|yep|yeah|ok|okay|sure|please|do it|go ahead|ja|gerne|klar)\b/.test(t) && offerById(lastCoach.wish)) return replyExplore(`put my name down at ${offerById(lastCoach.wish).club}`);
+  if (OFFERS.some((o) => t.includes(o.club.toLowerCase()))) return replyExplore(q);
+  if (wishedOffers(q).length) return replyWish(q);
   if (/explore|something (new|else|different)|suggest|recommend|new sport|other clubs?|what else|try out|train like|pro athlete|personal coach|physio|massage|recovery|nutrition|\bevents?\b|\braces?\b|tournament|open day/.test(t) || (namedOffer(q) && !parseOffering(q))) return replyExplore(q);
   if (/held|take (my|the) spot|accept/.test(t)) return replyOffer();
   if (/wait ?list/.test(t) && !/\bjoin\b|add me|put me|sign me/.test(t)) return replyWaitlist();
