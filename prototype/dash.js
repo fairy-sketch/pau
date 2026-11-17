@@ -137,6 +137,8 @@ const PLAN_SEED = () => [
   { id: "p2", title: "Race week taper", source: "Yours", sessions: genPlan({ kind: "taper", weeks: 1, level: 0, fun: false }), shared: [] },
 ];
 const plans = () => (dash().plans ||= PLAN_SEED());
+/* The plans a group has, the one shared last first: that one is the plan the group follows now. */
+const plansOf = (g) => plans().filter((p) => p.shared.includes(g)).sort((a, b) => (b.seq || 0) - (a.seq || 0));
 const planById = (id) => plans().find((p) => p.id === id);
 const weeksOf = (p) => Math.max(1, ...p.sessions.map((s) => s.week));
 const planMeta = (p) => `${weeksOf(p)} ${weeksOf(p) === 1 ? "week" : "weeks"} · ${p.sessions.length} sessions`;
@@ -228,11 +230,37 @@ function vPlanDetail(p) {
     <div class="stack"><div class="between" style="align-items:center"><span class="eyebrow">Sessions</span><button class="btn sm" data-a="plan-edit">Edit plan</button></div>${sessionRows(p.sessions)}</div>
     ${p.shared.length ? "" : `<button class="btn full ghost" data-a="plan-del">Delete plan</button>`}</section>`;
 }
-/* What the athlete sees: only plans shared with their group, by their coach, at this club. */
+/* ---- The athlete's side of it (K-19 to K-21): the plan you follow, as your coach set it ----
+   Mia is in the Track group at PAU. The newest plan her coach shared with that group is the plan she follows;
+   the coach sees the same thing under "From you" on her page and on every session of the week. */
+const MY_GROUP = "Track";
+const myPlans = () => plansOf(MY_GROUP);
+/* The club session that belongs to a line of the plan: same group, same weekday, this week. */
+function sessionForPlanDay(day) {
+  const mon = monday(today()), end = addDays(mon, 7);
+  return sessList("pau").find((x) => x.start >= mon && x.start < end && WD[x.start.getDay()] === day && groupOf(x) === MY_GROUP) || null;
+}
 function coachPlansCard() {
-  if (S.org !== "pau") return "";
-  const mine = plans().filter((p) => p.shared.includes("Track")); if (!mine.length) return "";
-  return `<div class="stack" id="from-coach"><div class="eyebrow">From your coach</div>${mine.map((p) => `<div class="card stack" data-plan="${p.id}" style="gap:12px"><div><p class="h2">${esc(p.title)}</p><p class="sub">${COACH_ME} shared this with the Track group · ${planMeta(p)}</p></div><div class="rows">${p.sessions.filter((s) => s.week === 1).map((s) => `<div class="row"><span class="lead time" style="width:40px">${s.day || "·"}</span><span class="mid">${esc(s.text)}</span></div>`).join("")}</div></div>`).join("")}</div>`;
+  const mine = myPlans();
+  if (!mine.length) return `<div class="stack" id="from-coach" style="gap:8px"><div class="eyebrow">Your plan</div><p class="sub">${COACH_ME} has not shared a plan with the ${MY_GROUP} group yet.</p></div>`;
+  const p = mine[0], n = 1, wk = p.sessions.filter((x) => x.week === n), T = today();
+  const row = (x) => {
+    const s = x.day ? sessionForPlanDay(x.day) : null, mineB = s && myBooking(s.id), done = s && S.entries.some((e) => ymd(e.at) === ymd(s.start));
+    const state = done ? "Done" : mineB ? `Booked · ${fTime(s.start)}` : s ? (s.start < T ? "Missed" : `Book · ${fTime(s.start)}`) : "On your own";
+    const inner = `<span class="lead time" style="width:40px">${x.day || "·"}</span><span class="mid"><span>${esc(x.text)}</span><span class="sub">${state}</span></span>`;
+    return s && !done ? `<button class="row" data-a="sheet" data-v="${s.id}" style="align-items:flex-start">${inner}</button>` : `<div class="row" style="align-items:flex-start">${inner}</div>`;
+  };
+  const rest = [...new Set(p.sessions.map((x) => x.week))].filter((w) => w !== n);
+  return `<div class="stack" id="from-coach"><div class="between"><span class="eyebrow">Your plan</span><span class="sub">Week ${n} of ${weeksOf(p)}</span></div><div class="card stack" data-plan="${p.id}" style="gap:12px"><div><p class="h2">${esc(p.title)}</p><p class="sub">${COACH_ME} shared this with the ${MY_GROUP} group · ${esc(ORGS.pau.name)}</p></div><div class="rows">${wk.map(row).join("")}</div>
+    ${rest.length ? `<details style="margin:-4px 0 -12px"><summary>The whole plan</summary><div class="stack" style="gap:16px;padding-bottom:12px">${rest.map((w) => `<div><p class="sub">Week ${w}</p>${p.sessions.filter((x) => x.week === w).map((x) => `<p style="margin-top:4px"><span class="sub">${x.day || "·"}</span> ${esc(x.text)}</p>`).join("")}</div>`).join("")}</div></details>` : ""}</div>
+    ${mine.length > 1 ? `<p class="sub" id="also-shared">Also from your coach: ${mine.slice(1).map((x) => esc(x.title)).join(", ")}.</p>` : ""}</div>`;
+}
+/* On a session in the athlete's Week: what the plan says for it. */
+function myPlanNote(s) {
+  if (s.org !== "pau" && !String(s.id).startsWith("pau")) return "";
+  const p = myPlans()[0]; if (!p || groupOf(s) !== MY_GROUP) return "";
+  const hit = p.sessions.find((x) => x.week === 1 && x.day === WD[s.start.getDay()]);
+  return hit ? `<p class="note" id="plan-note" style="margin-top:-4px"><span class="strong" style="color:var(--text)">Your plan:</span> ${esc(hit.text)}</p>` : "";
 }
 /* Free words in, structure out. If the coach wrote the sessions themselves (several lines, weekdays or "Week 2"), PATH keeps
    their words and only sorts them into weeks; if they described what they want, PATH drafts it. Either way it stays editable. */
@@ -261,7 +289,7 @@ Object.assign(DASH_ACT, {
   "plan-add": (v) => { const dr = dash().pdraft, w = Number(v), at = dr.sessions.reduce((n, x, i) => (x.week === w ? i + 1 : n), dr.sessions.length); dr.sessions.splice(at, 0, { week: w, day: "", text: "" }); dr.edited = true; UI.focus = at; },
   "plan-addweek": () => { const dr = dash().pdraft; dr.sessions.push({ week: Math.max(0, ...dr.sessions.map((x) => x.week)) + 1, day: "", text: "" }); dr.edited = true; UI.focus = dr.sessions.length - 1; },
   "plan-group": (v) => { const d = dash(); d.pgroups = (d.pgroups || []).includes(v) ? d.pgroups.filter((g) => g !== v) : [...(d.pgroups || []), v]; },
-  "plan-share": () => { const d = dash(), p = planById(d.planView), n = d.pgroups.reduce((s, g) => s + groupSize(g), 0); p.shared.push(...d.pgroups); UI.toast = `Shared with ${d.pgroups.join(" and ")}: ${n} athletes see it on their Path.`; d.pgroups = []; },
+  "plan-share": () => { const d = dash(), p = planById(d.planView), n = d.pgroups.reduce((s, g) => s + groupSize(g), 0); p.shared.push(...d.pgroups); p.seq = d.seq = (d.seq || 0) + 1; UI.toast = `Shared with ${d.pgroups.join(" and ")}: ${n} athletes see it on their Path.`; d.pgroups = []; },
   "plan-unshare": () => { const p = planById(dash().planView); p.shared = []; UI.toast = "Sharing stopped. Athletes no longer see this plan."; },
   "plan-del": () => { const d = dash(); d.plans = plans().filter((p) => p.id !== d.planView); d.planView = null; UI.toast = "Plan deleted."; },
 });
@@ -289,12 +317,12 @@ document.addEventListener("input", (e) => {
 document.addEventListener("input", (e) => { if (e.target.id === "pprompt") dash().pwords = e.target.value; });
 
 /* ================= Week (K-14 to K-18): every session the coach runs, groups and one-to-one, in one list ================= */
-const planFor = (a) => plans().filter((p) => p.shared.includes(a.group));
+const planFor = (a) => plansOf(a.group);
 const planNames = (a) => planFor(a).map((p) => p.title).join(", ") || "No plan from you yet";
 const groupOf = (s) => (/technique/i.test(offOf(s).name) ? "Technique" : /track/i.test(offOf(s).name) ? "Track" : null);
 /* What the shared plan says for this session: the plan of the session's group, its week, this weekday. */
 function planLine(s, wk) {
-  const g = groupOf(s), p = g && plans().find((x) => x.shared.includes(g)); if (!p) return null;
+  const g = groupOf(s), p = g && plansOf(g)[0]; if (!p) return null;
   const n = Math.min(weeksOf(p), wk + 1), hit = p.sessions.find((x) => x.week === n && x.day === WD[s.start.getDay()]);
   return hit ? { p, n, text: hit.text } : { p, n, text: "" };
 }

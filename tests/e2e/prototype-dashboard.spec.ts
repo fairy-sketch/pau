@@ -426,3 +426,49 @@ test.describe("Week: groups and one-to-one in one place (K-14 to K-18)", () => {
     await check("session");
   });
 });
+
+test("the athlete's Path shows the plan they follow, and it mirrors what the coach set (K-19 to K-21)", async ({
+  page,
+}) => {
+  await open(page);
+  const plan = page.locator("#from-coach");
+  await expect(plan).toContainText("Your plan");
+  await expect(plan).toContainText("Week 1 of 4");
+  await expect(plan.locator("[data-plan] .h2")).toHaveText("Base block");
+  await expect(plan).toContainText("Coach Sara shared this with the Track group");
+  // Each line knows its club session: Monday's track can be booked right from the plan.
+  const monday = plan.locator(".row", { hasText: "Track: 4 × 1 km at 10K pace" });
+  await expect(monday).toContainText("Book · 18:30");
+  await monday.click();
+  await expect(page.locator(".sheet")).toContainText("Track session");
+  await demo(page, (d) => {
+    d.ui.sheet = null;
+    d.book("pau-track-2026-11-16", "sheet");
+    d.render();
+  });
+  await expect(monday).toContainText("Booked · 18:30");
+  await expect(plan.locator(".row", { hasText: "Long run" })).toContainText("On your own");
+  // The same line shows on the session in Week.
+  await tab(page, "Week");
+  await expect(page.locator("#plan-note")).toHaveText(
+    "Your plan: Track: 4 × 1 km at 10K pace, 2 min jog",
+  );
+
+  // The coach sees the same plan on Mia's page and on the session; a newer shared plan becomes the one she follows.
+  await asRole(page, "coach");
+  await tab(page, "Athletes");
+  await openAthlete(page, "mia");
+  await expect(page.locator("#plan-from-you")).toContainText("Base block");
+  await tab(page, "Plans");
+  await page.locator("#plan-list .row", { hasText: "Race week taper" }).click();
+  await page.getByRole("button", { name: /^Track/ }).click();
+  await page.getByRole("button", { name: "Share with Track" }).click();
+  await tab(page, "Week");
+  await expect(page.locator('[data-day="2026-11-16"] [data-kind="group"]')).toContainText(
+    "Race week taper, week 1: Track: 4 × 400 m at race pace",
+  );
+  await asRole(page, "athlete");
+  await tab(page, "Path");
+  await expect(plan.locator("[data-plan] .h2")).toHaveText("Race week taper");
+  await expect(page.locator("#also-shared")).toHaveText("Also from your coach: Base block.");
+});
