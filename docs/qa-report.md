@@ -95,7 +95,7 @@ Severity: **blocker** = breaks a promise the product makes; **major** = wrong re
 - **Nothing is sent for real.** Messages to members stop in the demo's outbox; a PT pack or a reminder moves no money. Sending and payment belong to the backend.
 - **Club health, the briefing and the drafts are written by fixed rules**, not by a model. The only model in the build is behind "Build with PATH" on the live site.
 - **Only PAU has personal training**; Studio Demo's coach has none.
-- **The live site is behind the prototype** until PR #17 and `build-n` are merged (next section).
+- **The live site is behind the prototype** until PR #18 is merged (next section).
 - **Tested in Chromium only.** Safari's and Firefox's engines could not be installed on the test machine.
 
 ## Live site against the prototype
@@ -116,7 +116,7 @@ pathpau.netlify.app deploys `main`, which stands at PR #13. Read in a browser on
 | Club sheet         | No "Start demo"                                     | "Start demo"                                                  |
 | Stored data        | `path-demo-v4`                                      | `path-demo-v6` (a phone that used the old site starts over)   |
 
-It will match once PR #17 (`qa-fix`) and the pull request for `build-n` are merged into `main`.
+It will match once PR #18 (`build-n`) is merged into `main`. PR #18 contains PR #15, #16 and #17, so merging it alone is enough.
 
 ## Visual changes, each with its reason
 
@@ -182,4 +182,4 @@ Both are booking and payment tools for the club. Neither knows what the member i
 2. **The coach's day in five minutes** (dashboard B: live session, per-athlete note at check-in, group recap, edit and bulk approve in Review). A booking tool tells a coach who is coming. PATH tells them who needs what today and drafts the follow-up.
 3. **The admin's "how is my club doing?"** (dashboard C and D: members at risk with a drafted message, overdue reminders, cancel a session, club health against last month). Retention that comes from the training data, not only from who stopped booking.
 
-State after step 6: numbers 2 and 3 are built in the clickable demo, with fixed rules where a model will later write the drafts. Number 1 is open, and so is the backend all three need to be real (accounts, sending, payment).
+State after step 6: numbers 2 and 3 are built in the clickable demo, with fixed rules where a model will later write the drafts. One difference from the sentence above: "at risk" is read from bookings and the pass only, not from training data, because the office sees no training data. Number 1 is open, and so is the backend all three need to be real (accounts, sending, payment).
