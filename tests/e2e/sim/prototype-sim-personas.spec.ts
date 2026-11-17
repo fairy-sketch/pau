@@ -1008,14 +1008,137 @@ test.describe("PT coach: one-to-one work", () => {
       /6 sessions: 3 groups, 3 one-to-one, 1 open slot/,
     );
   });
-  test.fixme("sells a PT pack to a client", () => {
-    // Not built: "PT 10-pack" is listed under Products, but nobody can buy or be given one.
+  test("sells a PT pack to a client: the sessions are hers at once, the invoice is with the office, and it counts in the month", async ({
+    page,
+  }) => {
+    await start(page);
+    const before = await sim(page, (d) => d.ptStats());
+    await screen(page, "coach", "athletes");
+    await page.locator("#athlete-list .row", { hasText: "Sofia Brunner" }).click();
+    await expect(page.locator("#member-pass")).not.toContainText("PT 10-pack");
+    await page.getByRole("button", { name: "Sell a PT 10-pack" }).click();
+    const fx = page.locator("#pt-sell-effects");
+    await expect(fx).toContainText("Sofia gets 10 sessions of 60 minutes, ready to book at once.");
+    await expect(fx).toContainText(
+      "An invoice for CHF 900.00 goes to Sofia. The office sees it under Money.",
+    );
+    // "Not now" sells nothing.
+    await page.getByRole("button", { name: "Not now" }).click();
+    expect(await sim(page, (d) => d.ptStats().sold)).toBe(before.sold);
+    await page.getByRole("button", { name: "Sell a PT 10-pack" }).click();
+    await page.getByRole("button", { name: "Record the sale" }).click();
+    await expect(page.locator(".toast")).toContainText(
+      /Sold: PT 10-pack to Sofia Brunner\. 10 sessions are ready to book\. Invoice PAU-2026-00\d\d is with the office\./,
+    );
+    await expect(page.locator("#member-pass")).toContainText("PT 10-pack, 10 of 10 left");
+    // The month's numbers follow, the office sees the invoice and the pack, and it is written down.
+    const after = await sim(page, (d) => d.ptStats());
+    expect([after.sold, after.soldSum]).toEqual([before.sold + 1, before.soldSum + 900]);
+    expect(await screen(page, "coach", "week")).toContain(`Packs sold ${before.sold + 1} · CHF`);
+    const money = await screen(page, "admin", "money");
+    expect(money).toMatch(
+      /CHF 900\.00 · Sofia Brunner PAU-2026-00\d\d · PT 10-pack · due Mon 30 Nov/,
+    );
+    expect(money).toMatch(/AUDIT LOG Coach Sara sold a PT 10-pack to Sofia Brunner/);
+    expect(await screen(page, "admin", "members")).toMatch(
+      /Sofia Brunner Active [^]*?PT 10-pack, 10 of 10 left/,
+    );
+    // The other club has no personal training with this coach, and nothing of this.
+    const studio = await screen(page, "coach", "week", "studio");
+    expect(studio).not.toMatch(/PERSONAL TRAINING|One-to-one ·/);
+    expect(await screen(page, "admin", "money", "studio")).not.toContain("Sofia Brunner");
+    // One club's audit log is never shown in the other's.
+    await sim(page, (d) => {
+      d.state.settings.studio.waitlistMode = "auto";
+      d.state.audit.unshift({ org: "studio", what: "Studio-only entry", at: new Date() });
+    });
+    expect(await screen(page, "admin", "money", "pau")).not.toContain("Studio-only entry");
+    expect(await screen(page, "admin", "money", "studio")).toContain("Studio-only entry");
   });
-  test.fixme("books and reschedules a client into a slot", () => {
-    // Not built: one-to-one sessions are fixed demo rows; "Open slot" cannot be tapped.
+  test("books a client into an open slot, moves her, and cancels: the pack follows every step", async ({
+    page,
+  }) => {
+    await start(page);
+    await screen(page, "coach", "week");
+    // The open slot is a button now. Only people with sessions left can be booked.
+    const open = page.locator('#coach-week [data-kind="open"]');
+    await expect(open).toContainText("Book a client");
+    await open.click();
+    const sheet = page.getByRole("dialog", { name: "Open slot" });
+    const who = await sheet.locator("#pt-who option").allInnerTexts();
+    expect(who.length).toBeGreaterThan(5);
+    for (const w of who) expect(w).toMatch(/ · [1-9]\d? left$/);
+    await sheet.locator("#pt-who").selectOption({ label: "Lea Brunner · 6 left" });
+    await sheet.getByRole("button", { name: "Book this slot" }).click();
+    await expect(page.locator(".toast")).toContainText(
+      "Booked: Lea Brunner, Thu 19 Nov 12:15. 5 of 10 left on the pack.",
+    );
+    await expect(page.locator("#week-answer")).toHaveText("7 sessions: 3 groups, 4 one-to-one");
+    const thu = page.locator('[data-day="2026-11-19"] [data-kind="one"]');
+    await expect(thu).toContainText("Lea Brunner");
+    await expect(thu.locator("[data-pack]")).toHaveText("PT 10-pack: 5 of 10 left");
+    // Move her to next week's open slot: the pack is untouched and this week's slot is open again.
+    await thu.click();
+    await page.getByRole("button", { name: "Move to another time" }).click();
+    await page.locator("#pt-move .row", { hasText: "Thu 26 Nov" }).click();
+    await expect(page.locator(".toast")).toContainText(
+      "Moved: Lea Brunner is now on Thu 26 Nov at 12:15. The pack is untouched",
+    );
+    await expect(page.locator('[data-day="2026-11-19"] [data-kind="open"]')).toHaveCount(1);
+    expect(await sim(page, (d) => d.ptPack(d.roster("pau")[0]).left)).toBe(5);
+    // Cancel it: she has the session back.
+    await page.getByRole("button", { name: "Next week" }).click();
+    await page.locator('[data-day="2026-11-26"] [data-kind="one"]').click();
+    await page.getByRole("button", { name: "Cancel this session" }).click();
+    await expect(page.locator(".toast")).toContainText(
+      "Cancelled. Lea has the session back: 6 of 10 left. The slot is open again.",
+    );
+    // What can't be done is refused: a slot that is taken, a client with nothing left, a session that is over.
+    const r = await sim(page, (d) => {
+      const slots = d.ptSlots(new Date(2026, 10, 16)),
+        taken = slots.find((x: any) => x.athlete),
+        free = slots.find((x: any) => !x.athlete),
+        none = d.roster("pau").find((a: any) => d.ptPack(a).left === 0);
+      return [
+        d.ptBook(taken.id, d.roster("pau")[0].m.id).code,
+        d.ptBook(free.id, none.m.id).code,
+        d.ptMove(taken.id, taken.id).code,
+      ];
+    });
+    expect(r).toEqual(["TAKEN", "NO_PACK", "TAKEN"]);
+    await clock(page, ZURICH("2026-11-17T08:00"));
+    await sim(page, (d) => {
+      d.state.dash.wk = 0;
+    });
+    await screen(page, "coach", "week");
+    await page.locator('[data-day="2026-11-17"] [data-kind="one"]').click();
+    await expect(page.getByRole("dialog")).toContainText(
+      "This session is over. It counts as given.",
+    );
+    await expect(page.getByRole("button", { name: "Cancel this session" })).toHaveCount(0);
   });
-  test.fixme("sees earnings and how full the slots are", () => {
-    // Not built (brief item 7, My coaching business).
+  test("sees the month: sessions given, how full the slots are, packs sold, and where the numbers are invented", async ({
+    page,
+  }) => {
+    await start(page);
+    await screen(page, "coach", "week");
+    const card = page.locator("#pt-card");
+    await expect(card).toContainText("PERSONAL TRAINING · NOVEMBER", { ignoreCase: true });
+    await expect(page.locator("#pt-given")).toHaveText("6 · CHF 540.00"); // two weeks of three sessions, CHF 90 each
+    await expect(page.locator("#pt-fill")).toHaveText("12 of 16 · 75%");
+    await expect(page.locator("#pt-sold")).toHaveText("3 · CHF 2'700.00");
+    await expect(card).toContainText("Packs sold before today are invented.");
+    await expect(card).toContainText("DEMO DATA", { ignoreCase: true });
+    // A day later one more session has been given; booking the open slot fills the week.
+    await clock(page, ZURICH("2026-11-17T09:00"));
+    await screen(page, "coach", "week");
+    await expect(page.locator("#pt-given")).toHaveText("7 · CHF 630.00");
+    await sim(page, (d) => {
+      const open: any = d.ptSlots(new Date(2026, 10, 16)).find((x: any) => !x.athlete);
+      d.ptBook(open.id, d.roster("pau")[0].m.id);
+      d.render();
+    });
+    await expect(page.locator("#pt-fill")).toHaveText("12 of 15 · 80%");
   });
 });
 

@@ -113,7 +113,7 @@ function vAthleteDetail(a) {
   const proposal = draft ? `<div class="stack" style="gap:8px" id="proposal"><p class="strong">PATH proposes: ${esc(draft.title)}</p><p class="sub">${esc(draft.rationale)}</p><ul class="stack" style="gap:4px">${draft.items.filter((i) => i.changed).slice(0, 4).map((i) => `<li><span class="sub">${i.day}:</span> ${esc(i.to)}</li>`).join("")}</ul><button class="btn sm link" data-a="tab" data-v="review">Open in Review</button></div>`
     : !M && (st.kinds.includes("pain") || st.kinds.includes("load")) ? `<div class="stack" style="gap:8px" id="proposal"><p class="strong">PATH proposes: make Thursday easy</p><p class="sub">Why: ${esc(st.why.toLowerCase())}. The change waits in your review queue; ${esc(a.first)} sees nothing until you approve.</p></div>`
     : `<p class="sub">No changes proposed.</p>`;
-  return `<section class="pad stack-l" id="athlete-detail" data-ath="${a.id}"><div><button class="btn sm link ghost" data-a="athlete-back" aria-label="Back to ${d.from === "week" ? "the session" : "athletes"}">${I(P.back, 16)}${d.from === "week" ? "Back" : "Athletes"}</button><div class="eyebrow" style="margin-top:8px">${esc(a.group)} group${M ? "" : " · demo data"}</div><h1 class="h1">${esc(a.name)}</h1><p class="sub" style="margin-top:4px" id="detail-status">${sdot(st)}${esc(st.why)}</p>${M && passOf(S.org) ? `<p class="sub" style="margin-top:4px">${passLine(passOf(S.org))}</p>` : ""}${!M ? `<p class="sub" style="margin-top:4px" id="member-pass">${esc(memberPass(a.m))}</p>` : ""}</div>
+  return `<section class="pad stack-l" id="athlete-detail" data-ath="${a.id}"><div><button class="btn sm link ghost" data-a="athlete-back" aria-label="Back to ${d.from === "week" ? "the session" : "athletes"}">${I(P.back, 16)}${d.from === "week" ? "Back" : "Athletes"}</button><div class="eyebrow" style="margin-top:8px">${esc(a.group)} group${M ? "" : " · demo data"}</div><h1 class="h1">${esc(a.name)}</h1><p class="sub" style="margin-top:4px" id="detail-status">${sdot(st)}${esc(st.why)}</p>${M && passOf(S.org) ? `<p class="sub" style="margin-top:4px">${passLine(passOf(S.org))}</p>` : ""}${!M ? `<p class="sub" style="margin-top:4px" id="member-pass">${esc(a.m.product)}${a.m.left != null ? ` · ${a.m.left} left` : ""}${hasPT() && ptPack(a).of ? ` · PT 10-pack, ${ptPack(a).left} of ${ptPack(a).of} left` : ""}</p>` : ""}${!M && hasPT() ? `<button class="btn sm" style="margin-top:12px" data-a="pt-sell" data-v="${a.m.id}">Sell a PT 10-pack</button>` : ""}</div>
     <div class="stack"><div class="eyebrow">Path at a glance</div>${a.shares.path ? `<div class="card stack"><div><p class="h2">${esc(a.goal)}</p><div style="margin-top:12px">${pbar(a)}</div><p class="sub" style="margin-top:8px">${S.stages[a.stage]} · session ${a.inSt} of ${PER}</p></div>
       <div class="rows"><div class="row"><span class="mid sub">Next step</span><span class="strong" style="text-align:right">${esc(nextStep)}</span></div><div class="row"><span class="mid sub">Attendance this season</span><span class="strong" id="attendance">${M ? (a.attend ? `${a.attend.pct}% · ${a.attend.came} of ${a.attend.of}` : "No sessions yet") : a.attend + "%"}</span></div>${a.shares.log ? (M ? S.pbs.map((p) => [p.metric, p.value, p.unit]) : a.pbs).slice(0, 2).map((p) => `<div class="row"><span class="mid sub">Best ${p[0]}</span><span class="strong">${p[1]} ${p[2]}</span></div>`).join("") : ""}</div></div>` : `<p class="sub">Goal and progress are not shared.</p>`}</div>
     ${a.shares.log ? `<div class="stack"><div class="between"><span class="eyebrow">Weekly load</span><span class="sub">${Math.round(a.load * 100)}% of usual</span></div>${M ? lineChart(loadPts(stats()), stats().wl.length - 1) : lineChart(a.pts, a.pts.length - 1)}</div>
@@ -129,7 +129,7 @@ const nextStep0 = () => { const n = nextStep(); return n.title; };
 
 /* ---------- actions (merged into the shell's action map) ---------- */
 const DASH_ACT = {
-  athlete: (v) => { const d = dash(); d.from = S.tab.coach === "week" ? "week" : "athletes"; d.athlete = v || null; S.tab.coach = "athletes"; lastKey = ""; },
+  athlete: (v) => { const d = dash(); d.from = S.tab.coach === "week" ? "week" : "athletes"; d.athlete = v || null; S.tab.coach = "athletes"; UI.sheet = null; lastKey = ""; },
   "athlete-back": () => { const d = dash(); d.athlete = null; if (d.from === "week") S.tab.coach = "week"; lastKey = ""; },
   att: (v) => { dash().att = v; }, agroup: (v) => { dash().group = v; },
   "needs-all": () => { Object.assign(dash(), { att: "needs", group: "all", athlete: null }); S.tab.coach = "athletes"; },
@@ -411,16 +411,104 @@ function planLine(s, wk) {
   const n = Math.min(weeksOf(p), wk + 1), hit = p.sessions.find((x) => x.week === n && x.day === WD[s.start.getDay()]);
   return hit ? { p, n, text: hit.text } : { p, n, text: "" };
 }
-/* One-to-one sessions. Invented, the same every week: three booked, one open slot. Only at the club where this coach has them. */
-function oneToOnes(mon) {
-  if (S.org !== "pau") return [];
-  const at = (d, h, m) => { const x = addDays(mon, d); x.setHours(h, m, 0, 0); return x; }, R = roster("pau");
-  return [[1, 7, 0, R[9]], [2, 12, 15, R[27]], [3, 12, 15, null], [4, 7, 0, R[0]]].map(([d, h, m, a]) => ({ id: `pt-${d}`, one: true, start: at(d, h, m), athlete: a, dur: 60, loc: "Letzigrund" }));
+/* ---------- Personal training (N-03): one-to-one slots, packs, earnings. Only where this coach gives it (PAU). ----------
+   A slot is a time the coach offers. It is open, or one client has it. Booking a client takes one session off their PT pack;
+   cancelling gives it back; moving keeps it. A pack is sold from the client's page: the sessions are theirs at once and the
+   invoice goes to the office. Slots in the past count as given. */
+const PT_RATE = (ORGS.pau.products.find((p) => /^PT/.test(p.name)) || { price: 900 }).price / 10;
+const PT_WEEK = [[1, 7, 0, 9], [2, 12, 15, 27], [3, 12, 15, null], [4, 7, 0, 0]]; // Tue, Wed, Thu, Fri; the usual client by member number, or open
+const hasPT = () => S.org === "pau";
+const ptData = () => (clubData("pau").pt ||= { slots: {}, packs: {}, sales: [] });
+const ptClient = (id) => (id == null ? null : roster("pau").find((a) => a.m.id === id) || null);
+/* What a client has left on their PT pack: what they started the demo with, plus and minus what happened since. */
+function ptPack(a) { const base = a.m.pt || { left: 0, of: 0 }, d = ptData().packs[a.m.id] || { delta: 0, of: 0 }; return { left: base.left + d.delta, of: base.of + d.of }; }
+const ptAdjust = (a, delta, of = 0) => { const p = (ptData().packs[a.m.id] ||= { delta: 0, of: 0 }); p.delta += delta; p.of += of; };
+function ptSlots(mon) {
+  if (!hasPT()) return [];
+  return PT_WEEK.map(([d, h, m, usual]) => {
+    const start = addDays(mon, d); start.setHours(h, m, 0, 0);
+    const id = `pt-${ymd(start)}-${pad(h)}${pad(m)}`, ov = ptData().slots[id], cid = ov ? ov.client : usual == null ? null : baseMembers("pau")[usual].id;
+    return { id, one: true, start, athlete: ptClient(cid), dur: 60, loc: "Letzigrund" };
+  });
 }
+const ptAll = (from, weeks) => [...Array(weeks)].flatMap((_, k) => ptSlots(addDays(from, 7 * k)));
+const ptSlot = (id) => ptAll(addDays(monday(today()), -35), 5 + WEEKS).find((x) => x.id === id) || null;
+const ptClients = () => roster("pau").filter((a) => ptPack(a).left > 0).sort((x, y) => x.name.localeCompare(y.name));
+function ptBook(slotId, memberId) {
+  const sl = ptSlot(slotId), a = ptClient(memberId);
+  if (!sl || sl.start <= now()) return err("WINDOW_CLOSED", "That time is already over.");
+  if (sl.athlete) return err("TAKEN", `That slot is ${sl.athlete.first}'s.`);
+  if (!a) return err("NO_CLIENT", "Choose who it is for.");
+  if (ptPack(a).left <= 0) return err("NO_PACK", `${a.first} has no PT sessions left. Sell a pack on their page first.`);
+  ptData().slots[slotId] = { client: a.m.id }; ptAdjust(a, -1);
+  return { ok: true, msg: `Booked: ${a.name}, ${fDay(sl.start)} ${fTime(sl.start)}. ${ptPack(a).left} of ${ptPack(a).of} left on the pack. ${a.first} sees it in the app.` };
+}
+function ptCancel(slotId) {
+  const sl = ptSlot(slotId); if (!sl || !sl.athlete) return err("NOT_FOUND", "Nobody is booked there.");
+  if (sl.start <= now()) return err("WINDOW_CLOSED", "That session has already started.");
+  ptData().slots[slotId] = { client: null }; ptAdjust(sl.athlete, 1);
+  return { ok: true, msg: `Cancelled. ${sl.athlete.first} has the session back: ${ptPack(sl.athlete).left} of ${ptPack(sl.athlete).of} left. The slot is open again.` };
+}
+function ptMove(fromId, toId) {
+  const a = ptSlot(fromId), b = ptSlot(toId);
+  if (!a || !a.athlete || !b) return err("NOT_FOUND", "That session is not there any more.");
+  if (a.start <= now() || b.start <= now()) return err("WINDOW_CLOSED", "A session that has started can't be moved.");
+  if (b.athlete) return err("TAKEN", `That slot is ${b.athlete.first}'s.`);
+  ptData().slots[toId] = { client: a.athlete.m.id }; ptData().slots[fromId] = { client: null };
+  return { ok: true, msg: `Moved: ${a.athlete.name} is now on ${fDay(b.start)} at ${fTime(b.start)}. The pack is untouched, and ${a.athlete.first} sees the new time in the app.` };
+}
+/* Selling a pack: the sessions are the client's at once; the invoice goes to the office, where the admin sees it under Money. */
+function ptSell(memberId) {
+  const a = ptClient(memberId), prod = ORGS.pau.products.find((p) => /^PT/.test(p.name)); if (!a || !prod) return err("NOT_FOUND", "That is not possible here.");
+  ptAdjust(a, 10, 10);
+  const n = 1 + Math.max(0, ...S.invoices.filter((i) => i.org === "pau").map((i) => Number(i.id.slice(-4)))), id = `PAU-2026-${String(n).padStart(4, "0")}`;
+  S.invoices.push({ id, org: "pau", member: a.name, what: prod.name, amount: prod.price, due: addDays(today(), 14), status: "open" });
+  ptData().sales.push({ member: a.m.id, amount: prod.price, at: now(), invoice: id });
+  S.audit.unshift({ org: "pau", what: `${coachMe()} sold a ${prod.name} to ${a.name} (${id}, ${chf(prod.price)})`, at: now() });
+  return { ok: true, msg: `Sold: ${prod.name} to ${a.name}. ${ptPack(a).left} sessions are ready to book. Invoice ${id} is with the office.` };
+}
+/* The month in personal training. Sessions given and packs sold here are counted; the packs sold before the demo began are invented. */
+function ptStats() {
+  const first = new Date(now().getFullYear(), now().getMonth(), 1), month = ptAll(monday(first), 6).filter((x) => x.start >= first && x.start.getMonth() === first.getMonth()), ahead = ptAll(monday(today()), WEEKS).filter((x) => x.start > now());
+  const given = month.filter((x) => x.athlete && x.start <= now()).length, seeded = baseMembers("pau").filter((m) => m.pt && m.pt.left >= 8).length, sold = seeded + ptData().sales.length, price = PT_RATE * 10;
+  return { given, earned: given * PT_RATE, booked: ahead.filter((x) => x.athlete).length, slots: ahead.length, sold, soldSum: sold * price };
+}
+const vPtCard = () => { if (!hasPT()) return ""; const p = ptStats(); return `<div class="stack" id="pt-card"><div class="eyebrow">Personal training · ${monthName()}</div><div class="card rows"><div class="row"><span class="mid"><span class="sub">Sessions given</span></span><span class="strong" id="pt-given">${p.given} · ${chf(p.earned)}</span></div><div class="row"><span class="mid"><span class="sub">Slots filled, next ${WEEKS} weeks</span></span><span class="strong" id="pt-fill">${p.booked} of ${p.slots} · ${Math.round((p.booked / Math.max(1, p.slots)) * 100)}%</span></div><div class="row"><span class="mid"><span class="sub">Packs sold</span></span><span class="strong" id="pt-sold">${p.sold} · ${chf(p.soldSum)}</span></div></div><p class="sub demo">A session given counts ${chf(PT_RATE)}, a tenth of a pack. Packs sold before today are invented. <span class="eyebrow" style="display:inline;margin-left:4px">Demo data</span></p></div>`; };
+function vPtSheet() {
+  const sh = UI.sheet, sl = ptSlot(sh.id); if (!sl) return "";
+  const a = sl.athlete, over = sl.start <= now(), head = `<div><div class="eyebrow">One-to-one · ${fDay(sl.start)} · ${fTime(sl.start)}</div><h2 class="h1">${a ? esc(a.name) : "Open slot"}</h2><p class="sub" style="margin-top:4px">${sl.dur} min · ${sl.loc}${a ? ` · PT 10-pack: ${ptPack(a).left} of ${ptPack(a).of} left` : ""}</p></div>`;
+  const wrap = (body) => `<div class="sheetbg" data-a="close"><div class="sheet stack" role="dialog" aria-modal="true" aria-label="${a ? `One-to-one with ${esc(a.name)}` : "Open slot"}">${head}${body}<button class="btn ghost full" data-a="close-btn">Close</button></div></div>`;
+  if (!a) {
+    const cs = ptClients();
+    return wrap(over ? `<p class="note">This slot is over. Nobody had it.</p>` : cs.length ? `<form class="stack" data-f="ptbook" data-id="${sl.id}" novalidate><label class="f">Who is it for?<select id="pt-who">${cs.map((c) => `<option value="${c.m.id}">${esc(c.name)} · ${ptPack(c).left} left</option>`).join("")}</select></label>${sh.error ? `<p class="err" role="alert">${esc(sh.error)}</p>` : ""}<button class="btn acc full" type="submit">Book this slot</button><p class="sub">It takes one session off their PT pack. To book someone who has no sessions left, sell them a pack on their page first.</p></form>` : `<p class="note">Nobody has PT sessions left. Sell a pack on an athlete's page first.</p>`);
+  }
+  if (sh.move) { const open = ptAll(monday(today()), WEEKS).filter((x) => !x.athlete && x.start > now()); return wrap(`<div class="stack" id="pt-move" style="gap:8px"><div class="eyebrow">Move ${esc(a.first)} to</div>${open.length ? `<div class="card rows">${open.map((x) => `<button class="row" data-a="pt-move-to" data-v="${sl.id}|${x.id}"><span class="lead time" style="width:92px">${fDay(x.start)}</span><span class="mid"><span class="strong">${fTime(x.start)}</span><span class="sub">${x.dur} min · ${x.loc}</span></span></button>`).join("")}</div>` : `<p class="sub">There is no open slot in the next ${WEEKS} weeks.</p>`}</div><button class="btn full" data-a="pt-open" data-v="${sl.id}">Back</button>`); }
+  return wrap(`${over ? `<p class="note">This session is over. It counts as given.</p>` : `<button class="btn acc full" data-a="pt-move" data-v="${sl.id}">Move to another time</button><button class="btn full" data-a="pt-cancel" data-v="${sl.id}">Cancel this session</button><p class="sub">Moving keeps the pack as it is. Cancelling gives ${esc(a.first)} the session back.</p>`}<button class="btn full" data-a="athlete" data-v="${a.id}" aria-label="Open ${esc(a.name)}'s page">Open ${esc(a.first)}'s page</button>`);
+}
+function vPtSellSheet() {
+  const a = ptClient(UI.sheet.id), prod = ORGS.pau.products.find((p) => /^PT/.test(p.name)); if (!a) return "";
+  return `<div class="sheetbg" data-a="close"><div class="sheet stack" role="dialog" aria-modal="true" aria-label="Sell a PT pack"><div><div class="eyebrow">Personal training</div><h2 class="h1">${esc(prod.name)} for ${esc(a.name)}</h2><p class="num" style="margin-top:8px">${chf(prod.price)}</p></div>
+    <ul class="sub stack" id="pt-sell-effects" style="gap:4px;padding-left:18px;list-style:disc"><li>${esc(a.first)} gets 10 sessions of 60 minutes, ready to book at once.</li><li>An invoice for ${chf(prod.price)} goes to ${esc(a.first)}. The office sees it under Money.</li><li>This is the full price. No fees are added. Demo: no real money moves.</li></ul>
+    <button class="btn acc full" data-a="pt-sell-do" data-v="${a.m.id}">Record the sale</button><button class="btn ghost full" data-a="close-btn">Not now</button></div></div>`;
+}
+Object.assign(DASH_ACT, {
+  "pt-open": (v) => { UI.sheet = { type: "pt", id: v }; },
+  "pt-move": (v) => { UI.sheet = { type: "pt", id: v, move: true }; },
+  "pt-move-to": (v) => { const [a, b] = v.split("|"); UI.toast = ptMove(a, b).msg; UI.sheet = null; },
+  "pt-cancel": (v) => { UI.toast = ptCancel(v).msg; UI.sheet = null; },
+  "pt-sell": (v) => { UI.sheet = { type: "ptsell", id: v }; },
+  "pt-sell-do": (v) => { UI.toast = ptSell(v).msg; UI.sheet = null; },
+});
+document.addEventListener("submit", (e) => {
+  if (e.target.dataset.f !== "ptbook") return; e.preventDefault();
+  const r = ptBook(e.target.dataset.id, document.getElementById("pt-who").value);
+  if (r.ok) { UI.toast = r.msg; UI.sheet = null; } else UI.sheet = { ...UI.sheet, error: r.msg };
+  render();
+});
 function coachWeek(wk) {
   const mon = addDays(monday(today()), 7 * wk), end = addDays(mon, 7);
   const groups = mySessions().filter((s) => s.start >= mon && s.start < end).map((s) => ({ id: s.id, one: false, start: s.start, s }));
-  return { mon, items: [...groups, ...oneToOnes(mon)].sort((a, b) => a.start - b.start) };
+  return { mon, items: [...groups, ...ptSlots(mon)].sort((a, b) => a.start - b.start) };
 }
 function vCoachWeek() {
   const d = dash(), wk = d.wk || 0, kind = d.wkind || "all";
@@ -430,15 +518,15 @@ function vCoachWeek() {
   const chip = (v, l) => `<button class="chip" data-a="wkind" data-v="${v}" aria-pressed="${kind === v}">${l}</button>`;
   const row = (x) => {
     if (!x.one) { const s = x.s, pl = planLine(s, wk); return `<button class="row" data-a="sess" data-v="${s.id}" data-kind="group" style="align-items:flex-start"><span class="lead time">${fTime(s.start)}</span><span class="mid"><span class="strong">${offOf(s).name}</span><span class="sub">Group · ${booked(s)} of ${s.cap} booked${waitTotal(s) ? ` · ${waitTotal(s)} waiting` : ""}</span><span class="sub">${pl ? `${esc(pl.p.title)}, week ${pl.n}${pl.text ? ": " + esc(pl.text) : ""}` : "No plan shared with this group"}</span></span></button>`; }
-    if (!x.athlete) return `<div class="row quiet" data-kind="open" style="align-items:flex-start"><span class="lead time">${fTime(x.start)}</span><span class="mid"><span class="strong">Open slot</span><span class="sub">One-to-one · ${x.dur} min · nobody has booked it yet</span></span></div>`;
+    if (!x.athlete) return x.start <= now() ? `<div class="row quiet" data-kind="open" style="align-items:flex-start"><span class="lead time">${fTime(x.start)}</span><span class="mid"><span class="strong">Open slot</span><span class="sub">One-to-one · ${x.dur} min · nobody had it</span></span></div>` : `<button class="row" data-a="pt-open" data-v="${x.id}" data-kind="open" style="align-items:flex-start"><span class="lead time">${fTime(x.start)}</span><span class="mid"><span class="strong">Open slot</span><span class="sub">One-to-one · ${x.dur} min · nobody has booked it yet</span></span><span class="end sub">Book a client</span></button>`;
     const st = statusOf(x.athlete);
-    return `<button class="row" data-a="athlete" data-v="${x.athlete.id}" data-kind="one" style="align-items:flex-start"><span class="lead time">${fTime(x.start)}</span><span class="mid"><span class="strong">${sdot(st)}${esc(x.athlete.name)}</span><span class="sub">One-to-one · ${x.dur} min · ${esc(st.why)}</span>${x.athlete.m.pt ? `<span class="sub">PT 10-pack: ${x.athlete.m.pt.left} of ${x.athlete.m.pt.of} left</span>` : ""}<span class="sub">${esc(planNames(x.athlete))}</span></span></button>`;
+    return `<button class="row" data-a="pt-open" data-v="${x.id}" data-kind="one" style="align-items:flex-start"><span class="lead time">${fTime(x.start)}</span><span class="mid"><span class="strong">${sdot(st)}${esc(x.athlete.name)}</span><span class="sub">One-to-one · ${x.dur} min · ${esc(st.why)}</span><span class="sub" data-pack>PT 10-pack: ${ptPack(x.athlete).left} of ${ptPack(x.athlete).of} left</span><span class="sub">${esc(planNames(x.athlete))}</span></span></button>`;
   };
   const days = [...Array(7)].map((_, i) => addDays(mon, i)).map((day) => ({ day, rows: list.filter((x) => ymd(x.start) === ymd(day)) })).filter((x) => x.rows.length);
   return `<section class="pad stack-l" id="coach-week"><div><div class="weeknav"><button class="x" data-a="cwk" data-v="-1" aria-label="Previous week" ${wk <= 0 ? "disabled" : ""}>${I(P.back, 18)}</button><span class="eyebrow" aria-live="polite">${wk === 0 ? "This week" : wk === 1 ? "Next week" : `In ${wk} weeks`} · ${mon.getDate()} ${MOL[mon.getMonth()].slice(0, 3)} to ${addDays(mon, 6).getDate()} ${MOL[addDays(mon, 6).getMonth()].slice(0, 3)}</span><button class="x" data-a="cwk" data-v="1" aria-label="Next week" ${wk >= WEEKS - 1 ? "disabled" : ""}>${I(P.fwd, 18)}</button></div>
     <h1 class="h1" id="week-answer">${g.length + o.length} sessions: ${g.length} ${g.length === 1 ? "group" : "groups"}, ${o.length} one-to-one${open.length ? `, ${open.length} open ${open.length === 1 ? "slot" : "slots"}` : ""}</h1><p class="sub" style="margin-top:4px">Everything you coach at ${esc(ORGS[S.org].name)} this week. Tap a group for its plan and who is coming, or a person for their page.</p></div>
     <div class="stack"><div class="filters" role="group" aria-label="Show">${chip("all", "All")}${chip("group", "Groups")}${chip("one", "One-to-one")}</div>
-    ${days.length ? days.map(({ day, rows }) => `<div class="stack" style="gap:8px" data-day="${ymd(day)}"><div class="sub" ${ymd(day) === ymd(T) ? 'style="color:var(--text);font-weight:500"' : ""}>${["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][day.getDay()]} ${day.getDate()}${ymd(day) === ymd(T) ? " · today" : ""}</div><div class="card rows">${rows.map(row).join("")}</div></div>`).join("") : `<p class="sub">Nothing here this week.</p>`}</div></section>`;
+    ${days.length ? days.map(({ day, rows }) => `<div class="stack" style="gap:8px" data-day="${ymd(day)}"><div class="sub" ${ymd(day) === ymd(T) ? 'style="color:var(--text);font-weight:500"' : ""}>${["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][day.getDay()]} ${day.getDate()}${ymd(day) === ymd(T) ? " · today" : ""}</div><div class="card rows">${rows.map(row).join("")}</div></div>`).join("") : `<p class="sub">Nothing here this week.</p>`}</div>${vPtCard()}</section>`;
 }
 function vCoachSession(s, wk) {
   const pl = planLine(s, wk), names = rosterNames(s), mine = myBooking(s.id), R = roster();

@@ -390,6 +390,7 @@ test.describe("Week: groups and one-to-one in one place (K-14 to K-18)", () => {
     await page.getByRole("button", { name: "One-to-one", exact: true }).click();
     await expect(page.locator('#coach-week [data-kind="group"]')).toHaveCount(0);
     await page.locator('#coach-week [data-kind="one"]').first().click();
+    await page.getByRole("button", { name: "Open Jonas Meier's page" }).click();
     await expect(page.locator("#athlete-detail h1")).toHaveText("Jonas Meier");
     // Next week is there too.
     await page.getByRole("button", { name: "Back to the session" }).click();

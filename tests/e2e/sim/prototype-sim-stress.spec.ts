@@ -1190,7 +1190,7 @@ test.describe("The small things (QA-19 to QA-24)", () => {
     });
     expect(await open()).toBe("No sessions yet");
   });
-  test("every screen has one heading, the coach chat included; an open slot is not a button; Send with nothing typed says so", async ({
+  test("every screen has one heading, the coach chat included; an open slot is no dead end; Send with nothing typed says so", async ({
     page,
   }) => {
     await start(page);
@@ -1200,14 +1200,22 @@ test.describe("The small things (QA-19 to QA-24)", () => {
         expect(await page.locator("#view h1").count(), `${org}/${role}/${tab}`).toBe(1);
       }
     await screen(page, "coach", "week", "pau");
+    // An open slot is no dead end: it is a button that books a client. Once its time is over it is plain information.
     const slot = page.locator('#coach-week [data-kind="open"]');
-    expect(await slot.evaluate((el) => [el.tagName, el.classList.contains("quiet")])).toEqual([
-      "DIV",
-      true,
-    ]);
-    expect(await slot.locator(".strong").evaluate((el) => getComputedStyle(el).fontWeight)).toBe(
-      "400",
-    );
+    expect(await slot.evaluate((el) => el.tagName)).toBe("BUTTON");
+    await slot.click();
+    await expect(page.getByRole("dialog", { name: "Open slot" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await clock(page, ZURICH("2026-11-19T13:00"));
+    await screen(page, "coach", "week", "pau");
+    expect(
+      await slot.evaluate((el) => [
+        el.tagName,
+        el.classList.contains("quiet"),
+        getComputedStyle(el.querySelector(".strong")!).fontWeight,
+      ]),
+    ).toEqual(["DIV", true, "400"]);
+    await clock(page, MONDAY_NOON);
     await screen(page, "athlete", "coach", "pau");
     const before = await sim(page, (d) => d.state.chat.length);
     await page.getByRole("button", { name: "Send message" }).click();

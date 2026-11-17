@@ -119,7 +119,9 @@ function baseMembers(org) {
 }
 /* Everyone at the club: the members it started with, and the ones an admin imported since. */
 const members = (org) => [...baseMembers(org), ...((S.extra && S.extra[org]) || [])];
-const memberPass = (m) => `${m.product}${m.left != null ? ` · ${m.left} left` : ""}${m.pt ? ` · PT 10-pack, ${m.pt.left} of ${m.pt.of} left` : ""}`;
+/* A member's PT pack as it stands now: what they began with, and what the coach sold, booked and cancelled since (dash.js keeps that). */
+const ptOf = (m) => { const d = ((((S.coach || {}).pau || {}).pt || {}).packs || {})[m.id] || { delta: 0, of: 0 }, b = m.pt || { left: 0, of: 0 }; return { left: b.left + d.delta, of: b.of + d.of }; };
+const memberPass = (m) => `${m.product}${m.left != null ? ` · ${m.left} left` : ""}${ptOf(m).of ? ` · PT 10-pack, ${ptOf(m).left} of ${ptOf(m).of} left` : ""}`;
 /* Who can be on the roster of a session: the groups that train in it, or the whole club. */
 function poolOf(s) { const off = offOf(s), all = baseMembers(s.org); return (off.only ? all.filter((m) => off.only.includes(m.group)) : all).map((m) => m.name); }
 
@@ -329,7 +331,7 @@ function cancelSession(sid) {
   if (s.cancelled) return err("ALREADY", "That session is already cancelled.");
   if (s.start <= now()) return err("WINDOW_CLOSED", "That session has already started, so it can't be cancelled.");
   const n = booked(s); s.cancelled = true; sweepCancelled();
-  S.audit.unshift({ what: `Cancelled ${offOf(s).name}, ${fDay(s.start)} ${fTime(s.start)}: ${n} booked ${n === 1 ? "member" : "members"} told, sessions returned to their passes`, at: now() });
+  S.audit.unshift({ org: s.org, what: `Cancelled ${offOf(s).name}, ${fDay(s.start)} ${fTime(s.start)}: ${n} booked ${n === 1 ? "member" : "members"} told, sessions returned to their passes`, at: now() });
   return { ok: true, msg: `Cancelled. ${n} booked ${n === 1 ? "member was" : "members were"} told and got the session back on their pass.` };
 }
 const openNotice = () => (S.notices || []).find((n) => !n.seen && S.sessions[n.sid] && S.sessions[n.sid].start > now()) || null;
@@ -646,7 +648,7 @@ function sendApproved(org, to, kind, text, ref, by = "the admin") {
   (S.outbox ||= []).push({ id: S.seq++, org, to, kind, text: body, at: now(), ref: ref || null });
   if (kind === "reminder") { const i = S.invoices.find((x) => x.id === ref); if (i) i.reminded = now(); }
   if (to === S.me.name) S.chat.push({ who: "coach", text: `From ${ORGS[org].name}: ${body}` });
-  S.audit.unshift({ what: `${kind === "reminder" ? "Payment reminder" : kind === "recap" ? "Group recap" : "Message"} to ${to}, approved by ${by}${ref && kind === "reminder" ? ` (${ref})` : ""}`, at: now() });
+  S.audit.unshift({ org: org, what: `${kind === "reminder" ? "Payment reminder" : kind === "recap" ? "Group recap" : "Message"} to ${to}, approved by ${by}${ref && kind === "reminder" ? ` (${ref})` : ""}`, at: now() });
   return { ok: true, msg: `Sent to ${to}. Demo: no real message leaves PATH.` };
 }
 /* How the club is doing, against last month. Counted from the member list, the schedule and the invoices; "last month" is demo data. */
@@ -695,7 +697,7 @@ function editSession(sid, ch, scope) {
     x.cap = cap; if (ch.coach) x.coach = ch.coach === offOf(x).coach ? undefined : ch.coach;
   }
   if (scope === "following") ((S.settings[s.org].sched ||= {})[`${s.off}:${wd}`] = { time: [hh, mm], cap, ...(ch.coach && ch.coach !== offOf(s).coach ? { coach: ch.coach } : {}) });
-  S.audit.unshift({ what: `Changed ${offOf(s).name}, ${fDay(s.start)}${scope === "following" ? ` and every later ${WDL[wd]}` : ""}: ${fTime(s.start)}, ${cap} places, ${coachOf(s)}`, at: now() });
+  S.audit.unshift({ org: s.org, what: `Changed ${offOf(s).name}, ${fDay(s.start)}${scope === "following" ? ` and every later ${WDL[wd]}` : ""}: ${fTime(s.start)}, ${cap} places, ${coachOf(s)}`, at: now() });
   return { ok: true, msg: `Saved${list.length > 1 ? ` for ${list.length} sessions` : ""}.${moved ? ` ${told} booked ${told === 1 ? "member was" : "members were"} told about the new time.` : ""}` };
 }
 function addSession(org, offId, date, time, capIn) {
@@ -710,7 +712,7 @@ function addSession(org, offId, date, time, capIn) {
   if (sessList(org).some((x) => x.off === offId && !x.cancelled && x.start.getTime() === start.getTime())) return err("DUPLICATE", `There is already a ${off.name.toLowerCase()} at that time.`);
   let id = `${org}-${offId}-${ymd(start)}`; for (let k = 2; S.sessions[id]; k++) id = `${org}-${offId}-${ymd(start)}-${k}`;
   S.sessions[id] = { id, org, off: offId, start, cap, others: 0, waitOthers: 0, left: 0, added: true };
-  S.audit.unshift({ what: `Added ${off.name}, ${fDay(start)} ${fTime(start)}, ${cap} places`, at: now() });
+  S.audit.unshift({ org: org, what: `Added ${off.name}, ${fDay(start)} ${fTime(start)}, ${cap} places`, at: now() });
   return { ok: true, sid: id, msg: `Added: ${off.name}, ${fDay(start)} ${fTime(start)}. Members can book it now.` };
 }
 /* Booking rules. Each one is checked, then kept as the club's own change on top of what it started with. They hold for bookings made from now on. */
@@ -726,7 +728,7 @@ function setRules(org, r) {
   const before = policyText(org);
   S.settings[org].rules = out; S.settings[org].waitlistMode = r.waitlistMode === "offer" ? "offer" : "auto"; S.settings[org].offerHoldMin = Math.round(n(r.holdHours) * 60);
   if (policyText(org) === before) return { ok: true, msg: "Nothing changed." };
-  S.audit.unshift({ what: `Booking rules at ${ORGS[org].name}: ${policyText(org)}`, at: now() });
+  S.audit.unshift({ org: org, what: `Booking rules at ${ORGS[org].name}: ${policyText(org)}`, at: now() });
   return { ok: true, msg: "Rules saved. They hold for every booking from now on; existing bookings keep what they were promised." };
 }
 /* A member list from a spreadsheet: name, email, pass. Every row is checked and shown before anything is added. */
@@ -753,7 +755,7 @@ function importMembers(org, rows) {
   const ok = rows.filter((r) => !r.problems.length); if (!ok.length) return err("EMPTY", "There is nobody to import in this file.");
   const list = ((S.extra ||= { pau: [], studio: [] })[org] ||= []);
   for (const r of ok) list.push({ id: `${org}-x${S.seq++}`, i: -1, name: r.name, first: r.name.split(" ")[0], email: r.email, group: "New", status: "New", product: r.pass || "No pass yet", left: null, pt: null, prev: 0, cur: 0, last: 0, joined: true });
-  S.audit.unshift({ what: `Imported ${ok.length} ${ok.length === 1 ? "member" : "members"} from a file${rows.length > ok.length ? `, ${rows.length - ok.length} left out` : ""}`, at: now() });
+  S.audit.unshift({ org: org, what: `Imported ${ok.length} ${ok.length === 1 ? "member" : "members"} from a file${rows.length > ok.length ? `, ${rows.length - ok.length} left out` : ""}`, at: now() });
   return { ok: true, msg: `${ok.length} ${ok.length === 1 ? "member" : "members"} added.${rows.length > ok.length ? ` ${rows.length - ok.length} left out.` : ""} Nobody has been written to: invitations are yours to send.` };
 }
 

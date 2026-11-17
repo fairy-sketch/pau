@@ -237,6 +237,8 @@ function vSheet() {
   if (UI.sheet.type === "offer") return vOfferSheet();
   if (UI.sheet.type === "planday") return vPlanDaySheet();
   if (UI.sheet.type === "goal") return vGoalSheet();
+  if (UI.sheet.type === "pt") return vPtSheet();
+  if (UI.sheet.type === "ptsell") return vPtSellSheet();
   if (UI.sheet.type === "asess") return vAdminSessionSheet();
   if (UI.sheet.type === "aadd") return vAdminAddSheet();
   if (UI.sheet.type === "amsg") return vAdminMessageSheet();

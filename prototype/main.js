@@ -79,7 +79,7 @@ document.addEventListener("keydown", (e) => {
 /* ---------- Back (QA-10): the phone's Back button closes a sheet, then goes one screen back. ----------
    Every place you can be (role, club, tab, an open athlete, plan, session, provider or sheet) is one entry in the browser's history. */
 const navSnap = () => ({ role: S.role, org: S.org, tab: S.tab[S.role], roster: S.rosterSid || null, ath: (S.dash && S.dash.athlete) || null, plan: (S.dash && S.dash.planView) || null, sess: (S.dash && S.dash.sess) || null, open: S.explore.open || null, adm: (S.adm && S.adm.view) || null, rc: (S.dash && S.dash.recap) || null, ob: S.ob ? S.ob.step : null,
-  sheet: !UI.sheet ? null : ["session", "clubs", "offer", "planday", "series", "asess", "aadd", "amsg", "goal"].includes(UI.sheet.type) ? UI.sheet : { type: "other" } }); // a checkout is never reopened by Back or Forward
+  sheet: !UI.sheet ? null : ["session", "clubs", "offer", "planday", "series", "asess", "aadd", "amsg", "goal", "pt", "ptsell"].includes(UI.sheet.type) ? UI.sheet : { type: "other" } }); // a checkout is never reopened by Back or Forward
 let navKey = null, navFromPop = false;
 function syncHistory() {
   const snap = navSnap(), key = JSON.stringify(snap); if (key === navKey) return;
@@ -125,7 +125,7 @@ const ACT = {
   "series-preview": (v) => { UI.sheet = { type: "series", sid: v }; },
   "series-start": (v) => { const s = S.sessions[v], se = createSeries(s.org, s.off, s.start.getDay(), "sheet"); UI.sheet = null; UI.toast = `${seriesLabel(se)} is on. ${seriesSummary(se)}. Pause it any time under Your bookings.`; },
   "series-pause": (v) => { UI.toast = pauseSeries(Number(v)).msg; }, "series-end": (v) => { UI.toast = endSeries(Number(v)).msg; },
-  "wl-mode": (v) => { const set = S.settings[v]; set.waitlistMode = set.waitlistMode === "offer" ? "auto" : "offer"; S.audit.unshift({ what: `Waitlist at ${ORGS[v].name}: ${set.waitlistMode === "offer" ? `freed spots are offered with a ${set.offerHoldMin / 60} h hold` : "the next person is booked automatically"}`, at: now() }); UI.toast = set.waitlistMode === "offer" ? `From now on a freed spot is held for the next person for ${set.offerHoldMin / 60} h.` : "From now on the next person on the waitlist is booked automatically."; },
+  "wl-mode": (v) => { const set = S.settings[v]; set.waitlistMode = set.waitlistMode === "offer" ? "auto" : "offer"; S.audit.unshift({ org: v, what: `Waitlist at ${ORGS[v].name}: ${set.waitlistMode === "offer" ? `freed spots are offered with a ${set.offerHoldMin / 60} h hold` : "the next person is booked automatically"}`, at: now() }); UI.toast = set.waitlistMode === "offer" ? `From now on a freed spot is held for the next person for ${set.offerHoldMin / 60} h.` : "From now on the next person on the waitlist is booked automatically."; },
   sheet: (v) => { UI.sheet = { type: "session", sid: v }; }, "close-btn": () => { UI.sheet = null; },
   book: (v) => { UI.toast = book(v, "app").msg; UI.sheet = null; }, cancel: (v) => { const r = cancel(Number(v)); UI.toast = r.msg; UI.sheet = null; if (r.ok && canUndoCancel(S.bookings.find((b) => b.id === r.bid))) return (UI.undo = { cancel: r.bid }), "undo"; }, leave: (v) => { UI.toast = leaveWait(v).msg; UI.sheet = null; },
   "go-invoices": () => { S.org = "pau"; S.tab.athlete = "me"; setTimeout(() => { const el = document.getElementById("invoices"); if (el) el.scrollIntoView(); }, 0); },
@@ -163,7 +163,7 @@ const ACT = {
   "all-present": (v) => { for (const r of rosterRows(S.sessions[v])) markAttendance(v, r.name, "present"); UI.toast = "Everyone on the roster marked present."; },
   draft: (v) => { if (v === "approved") { S.draftApproved = guardDraft(RAW_DRAFT); S.planNews = true; } S.draftStatus = v; UI.toast = v === "approved" ? `Approved. ${S.me.name} now sees it as the next step.` : "Rejected. The athlete keeps the current plan."; },
   ack: (v) => { if (String(v)[0] === "e") { const e = S.entries.find((x) => x.id === Number(String(v).slice(1))); if (e) e.seenByCoach = true; } else S.alerts.find((a) => a.id === Number(v)).status = "seen"; },
-  free: (v) => { UI.toast = freeSpot(v); }, "mark-paid": (v) => { S.invoices.find((x) => x.id === v).status = "paid"; S.audit.unshift({ what: `Marked invoice ${v} paid (bank transfer)`, at: now() }); UI.toast = "Invoice marked paid and recorded in the audit log."; },
+  free: (v) => { UI.toast = freeSpot(v); }, "mark-paid": (v) => { S.invoices.find((x) => x.id === v).status = "paid"; S.audit.unshift({ org: S.invoices.find((x) => x.id === v).org, what: `Marked invoice ${v} paid (bank transfer)`, at: now() }); UI.toast = "Invoice marked paid and recorded in the audit log."; },
 };
 document.addEventListener("click", (e) => {
   const bg = e.target.classList && e.target.classList.contains("sheetbg");
@@ -230,13 +230,13 @@ function submitLog() {
 }
 document.addEventListener("submit", (e) => {
   e.preventDefault(); const f = e.target.dataset.f;
-  if (["cnote", "dcomment", "pgen", "ppaste", "predo", "snote", "recap", "rvedit", "obgoal", "goal"].includes(f) || ADMIN_FORMS.includes(f)) return; // the coach dashboard's own forms (dash.js) answer for themselves; clearing here wiped their confirmation
+  if (["cnote", "dcomment", "pgen", "ppaste", "predo", "snote", "recap", "rvedit", "obgoal", "goal", "ptbook"].includes(f) || ADMIN_FORMS.includes(f)) return; // the coach dashboard's own forms (dash.js) answer for themselves; clearing here wiped their confirmation
   UI.toast = ""; UI.resetArmed = false; UI.undo = null;
   if (f === "chat") { const v = document.getElementById("chat-input").value.trim(); if (v) ask(v); else UI.toast = "Type a message first, or tap one of the suggestions."; setTimeout(() => { const el = document.getElementById("chat-input"); if (el) el.focus(); }, 0); }
   if (f === "log") submitLog();
   if (f === "walkin") UI.toast = addWalkin(e.target.dataset.id, document.getElementById("walkin-name").value).msg;
   if (f === "comment") { const id = Number(e.target.dataset.id), inp = document.getElementById("c-" + id), v = inp.value.trim(); if (v) { S.entries.find((x) => x.id === id).comments.push({ by: coachMe(), text: v }); UI.toast = "Comment sent. The athlete sees it in their log."; } }
-  if (f === "adjust") { const n = Number(document.getElementById("adj-n").value), r = document.getElementById("adj-r").value.trim(); if (!r) UI.toast = "A reason is required for every credit change."; else if (!n) UI.toast = "Enter a change other than 0."; else { const p = passOf(S.org); S.ledger.push({ pass: p.id, delta: n, kind: "admin_adjust", reason: "Admin: " + r, at: now() }); S.audit.unshift({ what: `Adjusted ${S.me.name}'s credits by ${n > 0 ? "+" : ""}${n}: ${r}`, at: now() }); UI.toast = `Credits adjusted. New balance: ${passState(p).text}.`; } }
+  if (f === "adjust") { const n = Number(document.getElementById("adj-n").value), r = document.getElementById("adj-r").value.trim(); if (!r) UI.toast = "A reason is required for every credit change."; else if (!n) UI.toast = "Enter a change other than 0."; else { const p = passOf(S.org); S.ledger.push({ pass: p.id, delta: n, kind: "admin_adjust", reason: "Admin: " + r, at: now() }); S.audit.unshift({ org: S.org, what: `Adjusted ${S.me.name}'s credits by ${n > 0 ? "+" : ""}${n}: ${r}`, at: now() }); UI.toast = `Credits adjusted. New balance: ${passState(p).text}.`; } }
   render();
 });
 /* A confirm card that runs out while you are looking at it closes by itself. */
@@ -259,7 +259,7 @@ for (const k of ["home", "tab"]) { const f = ACT[k]; ACT[k] = (v) => { const r =
 /* For the tests and for poking around in the console. */
 window.PATH_DEMO = {
   get state() { return S; }, disciplines, ACCENTS, GROUNDS, athletes, statusOf, roster, members, memberPass, ui: UI, ORGS, LOAD_LIMIT, CARD_TTL_MIN, STORE_KEY,
-  render, seed, save, load, resetDemo, undoCancel, canUndoCancel, ensurePlan, startOnboarding, finishOnboarding, setGoal, checkGoal, reviewItems, isEasier, draftRecap, checkedIn, comingToday, whatFor, clubStats, clubSentence, atRisk, riskOf, sentTo, draftCheckin, draftReminder, sendApproved, editSession, addSession, setRules, policyOf, policyText, parseMembersCsv, importMembers, baseMembers, coachOf, loadPhotos, PHOTOS, planWeekRows, planRowState, syncPlan, planText, planName, coachAlerts, openPains, book, cancel, cancelSession, clashAt, passEnded, renewalOf, check, freeSpot, leaveWait, passState, passOf, stats, guard, guardDraft, currentDraft, RAW_DRAFT,
+  render, seed, save, load, resetDemo, undoCancel, canUndoCancel, ensurePlan, ptSlots, ptStats, ptPack, ptBook, ptCancel, ptMove, ptSell, ptClients, startOnboarding, finishOnboarding, setGoal, checkGoal, reviewItems, isEasier, draftRecap, checkedIn, comingToday, whatFor, clubStats, clubSentence, atRisk, riskOf, sentTo, draftCheckin, draftReminder, sendApproved, editSession, addSession, setRules, policyOf, policyText, parseMembersCsv, importMembers, baseMembers, coachOf, loadPhotos, PHOTOS, planWeekRows, planRowState, syncPlan, planText, planName, coachAlerts, openPains, book, cancel, cancelSession, clashAt, passEnded, renewalOf, check, freeSpot, leaveWait, passState, passOf, stats, guard, guardDraft, currentDraft, RAW_DRAFT,
   newForm, toLog, ask, confirmProposal, toggleAct, runAct, planLocked, nextChangeable, applyDraft, shiftWeek, weekIndex,
   parseClub, agenda, openPain, OFFERS, openOffers, exploreList, tryPlan, dropPlan, tryToday, providerOf, signUp, dropSignup, signedUp, offerStart, offerKm, offersFor, purchase, acceptOffer, declineOffer, sweepOffers, waitTotal, createSeries, previewSeries, pauseSeries, endSeries, runSeries, seriesRows, seriesSummary, findSeries, sweepProposals, parseWhen, parseOffering, rosterRows, rosterNames, addWalkin, markAttendance, memoryFor, upcomingBookings, sessList, attendance, myBooking, myWait, spots, nextStep, offerById, packOf, ticketOf, myInvoices,
 };

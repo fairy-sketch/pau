@@ -5,6 +5,8 @@
    sees only itself. Numbers that are not counted from what happens in the demo are labelled as demo data. */
 
 const adm = () => (S.adm ||= { view: null });
+/* The audit log of this club. What one club's office did is never shown in another's. */
+const clubAudit = () => S.audit.filter((a) => a.org === S.org);
 const signed = (n, unit = "") => `${n > 0 ? "+" : n < 0 ? "−" : "±"}${Math.abs(n)}${unit}`;
 const demoNote = (text) => `<p class="sub demo">${text} <span class="eyebrow" style="display:inline;margin-left:4px">Demo data</span></p>`;
 const backTo = (label) => `<button class="btn sm link ghost" data-a="adm-view" data-v="" aria-label="Back to ${label}">${I(P.back, 16)}${label}</button>`;
@@ -117,7 +119,7 @@ function vAdminMoney() {
   return `<section class="pad stack-l" id="admin-money"><div><h1 class="h1">Money</h1><p class="sub" style="margin-top:4px" id="money-answer">${op.length} open${od.length ? `, ${od.length} of them overdue (${chf(od.reduce((n, i) => n + i.amount, 0))})` : ""}, ${inv.length - op.length} paid.</p></div>
     ${todo.length ? `<button class="btn acc full" data-a="adm-view" data-v="reminders">Review ${todo.length} drafted ${todo.length === 1 ? "reminder" : "reminders"}</button>` : ""}
     <div class="stack"><div class="eyebrow">Invoices</div>${inv.length ? `<div class="card rows" id="invoice-list">${inv.map(row).join("")}</div>` : `<p class="sub">No invoices at this club.</p>`}${demoNote("The other members' invoices are invented.")}</div>
-    <div class="stack"><div class="eyebrow">Audit log</div>${S.audit.length ? `<div class="card rows" id="audit">${S.audit.map((a) => `<div class="row"><span class="mid"><span>${esc(a.what)}</span><span class="sub">${fDay(a.at)} ${fTime(a.at)} · Admin</span></span></div>`).join("")}</div>` : `<p class="sub">Overrides, credit changes, messages and manual payments are recorded here.</p>`}</div></section>`;
+    <div class="stack"><div class="eyebrow">Audit log</div>${clubAudit().length ? `<div class="card rows" id="audit">${clubAudit().map((a) => `<div class="row"><span class="mid"><span>${esc(a.what)}</span><span class="sub">${fDay(a.at)} ${fTime(a.at)} · Admin</span></span></div>`).join("")}</div>` : `<p class="sub">Overrides, credit changes, messages and manual payments are recorded here.</p>`}</div></section>`;
 }
 /* All overdue reminders at once: every draft is on the screen, each can be changed or left out, and one tap approves the rest. */
 function vAdminReminders() {
