@@ -12,6 +12,7 @@ export const colorTokens = [
   { id: "ink", name: "ink", cssVar: "--color-ink", hex: "#1c1916" },
   { id: "secondary", name: "secondary", cssVar: "--color-secondary", hex: "#5e6259" },
   { id: "accent", name: "accent", cssVar: "--color-accent-base", hex: "#8e9a80" },
+  { id: "lime", name: "lime", cssVar: "--color-lime", hex: "#d2f05e" },
 ] as const;
 
 export type ColorTokenId = (typeof colorTokens)[number]["id"];
@@ -25,6 +26,7 @@ export const contrastPairs: ReadonlyArray<{ fg: ColorTokenId; bg: ColorTokenId }
   { fg: "secondary", bg: "surface" },
   { fg: "secondary", bg: "soft" },
   { fg: "ink", bg: "accent" },
+  { fg: "ink", bg: "lime" },
   { fg: "surface", bg: "ink" },
 ];
 

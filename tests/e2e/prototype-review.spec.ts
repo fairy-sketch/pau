@@ -469,3 +469,24 @@ test("6 Explore: dots coloured by kind with a legend, Reset filters, and what bo
   await expect(c).toContainText("You pay CHF 15.00 once, in the test checkout.");
   await expect(c).toContainText("It shows up in your Week");
 });
+
+test.describe("Lime as a punctual highlight (V-12)", () => {
+  test("the goal is highlighted and only 'where you are' is lime", async ({ page }) => {
+    await open(page);
+    const lime = "rgb(210, 240, 94)";
+    const hl = page.locator(".goal .hl");
+    await expect(hl).toHaveText(/^Sub.40 10K$/);
+    await expect(hl).toHaveCSS("text-decoration-color", lime);
+    await expect(page.locator(".blk.next")).toHaveCSS("background-color", lime);
+    // Never an action colour: no button or text on the screen is lime.
+    const limeActions = await page.evaluate(
+      (c) =>
+        [...document.querySelectorAll("button, a, p, span, h1, h2, h3")].filter((el) => {
+          const s = getComputedStyle(el);
+          return s.backgroundColor === c || s.color === c;
+        }).length,
+      lime,
+    );
+    expect(limeActions).toBe(0);
+  });
+});

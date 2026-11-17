@@ -18,6 +18,20 @@ describe("design tokens", () => {
     expect(colorTokens.filter((t) => t.id.startsWith("accent"))).toHaveLength(1);
   });
 
+  it("keeps lime a highlight: never text, never a button", () => {
+    const files = [
+      "src/ui/button.tsx",
+      "src/ui/tab-bar.tsx",
+      "src/ui/toggle.tsx",
+      "src/ui/primitives.tsx",
+    ];
+    for (const f of files) {
+      const src = readFileSync(f, "utf8");
+      expect(src, f).not.toMatch(/\btext-lime\b|\bbg-lime\b|\bborder-lime\b/);
+    }
+    expect(readFileSync("src/ui/primitives.tsx", "utf8")).toContain("decoration-lime");
+  });
+
   it("drops Tailwind's default palette and sets soft radii", () => {
     expect(css).toContain("--color-*: initial;");
     expect(css).toContain("--radius-*: initial;");

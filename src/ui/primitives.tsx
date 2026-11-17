@@ -10,6 +10,23 @@ export function Display({
   return <Tag className={cx("type-goal text-balance", className)} {...rest} />;
 }
 
+/**
+ * Lime highlighter under the goal. Drawn as a thick underline, which paints
+ * behind the glyphs, so it needs no gradient and wraps line by line.
+ */
+export function Highlight({ className, ...rest }: ComponentProps<"span">) {
+  return (
+    <span
+      className={cx(
+        "decoration-lime underline decoration-[0.3em] underline-offset-[-0.34em] [text-decoration-skip-ink:none]",
+        className,
+      )}
+      data-highlight
+      {...rest}
+    />
+  );
+}
+
 /** Screen title (lg) or section title (md). Sentence case. */
 export function Heading({
   as: Tag = "h2",

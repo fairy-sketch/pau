@@ -11,6 +11,7 @@ import {
   DemoBadge,
   Display,
   Heading,
+  Highlight,
   Label,
   StatusPill,
 } from "@/src/ui/primitives";
@@ -129,7 +130,7 @@ export default async function StyleguidePage() {
           <div>
             <Label>{t("type.goalLabel")}</Label>
             <Display as="p" className="mt-2">
-              {t("type.goalSample")}
+              <Highlight>{t("type.goalSample")}</Highlight>
             </Display>
           </div>
           <div>
@@ -273,7 +274,7 @@ export default async function StyleguidePage() {
                 <div className="px-5">
                   <Label>{t("cover.goalLabel")}</Label>
                   <Display as="p" className="mt-2">
-                    {t("cover.goal")}
+                    <Highlight>{t("cover.goal")}</Highlight>
                   </Display>
                 </div>
               </HeroPhoto>
@@ -338,7 +339,7 @@ export default async function StyleguidePage() {
           <div>
             <Label>{t("cover.goalLabel")}</Label>
             <Display as="p" className="mt-2">
-              {t("cover.goal")}
+              <Highlight>{t("cover.goal")}</Highlight>
             </Display>
             <p className="text-secondary mt-3">
               {t("cover.why", {

@@ -41,7 +41,8 @@
         "ink": "Text.",
         "secondary": "Secondary text.",
         "accent": "The only accent: sage. The primary action, with dark text. Nothing else.",
-        "track": "The unfinished part of the stage line."
+        "track": "The unfinished part of the stage line.",
+        "lime": "A highlight, used sparingly: under the goal and on where you are now. Always under dark text, never a button."
       }
     },
     "type": {
@@ -125,7 +126,7 @@
       "week": "W{number}",
       "columnPeriod": "Week",
       "columnValue": "Load",
-      "note": "One thin line on hairline rules. A sage dot marks the current week."
+      "note": "One thin line on hairline rules. A lime dot marks the current week."
     },
     "cover": {
       "goalLabel": "Your goal",

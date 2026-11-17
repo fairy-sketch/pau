@@ -66,7 +66,7 @@ const logItBtn = (s, cls = "btn sm") => (loggedFor(s.id) ? `<span class="sub">Lo
 function lineChart(points, hi) {
   const W = 420, H = 140, L = 34, B = 18, max = Math.max(...points.map((p) => p.v), 1) * 1.1, x = (i) => L + (i * (W - L - 8)) / (points.length - 1), y = (v) => H - B - (v / max) * (H - B - 8);
   const grid = [0, 0.5, 1].map((f) => `<line x1="${L}" x2="${W}" y1="${y((max * f) / 1.1)}" y2="${y((max * f) / 1.1)}" stroke="var(--hairline)"/><text x="0" y="${y((max * f) / 1.1) + 3}">${Math.round((max * f) / 1.1)}</text>`).join("");
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(points.map((p) => p.l + " " + p.v).join(", "))}">${grid}<polyline fill="none" stroke="var(--text)" stroke-width="1.75" stroke-linejoin="round" points="${points.map((p, i) => x(i) + "," + y(p.v)).join(" ")}"/><circle cx="${x(hi)}" cy="${y(points[hi].v)}" r="5" fill="var(--accent)" stroke="var(--text)" stroke-width="1.75"/>${points.map((p, i) => (i % 3 === 0 || i === points.length - 1 ? `<text x="${x(i) - 8}" y="${H - 4}">${p.l}</text>` : "")).join("")}</svg>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(points.map((p) => p.l + " " + p.v).join(", "))}">${grid}<polyline fill="none" stroke="var(--text)" stroke-width="1.75" stroke-linejoin="round" points="${points.map((p, i) => x(i) + "," + y(p.v)).join(" ")}"/><circle cx="${x(hi)}" cy="${y(points[hi].v)}" r="5" fill="var(--lime)" stroke="var(--text)" stroke-width="1.75"/>${points.map((p, i) => (i % 3 === 0 || i === points.length - 1 ? `<text x="${x(i) - 8}" y="${H - 4}">${p.l}</text>` : "")).join("")}</svg>`;
 }
 const isoWeek = (d) => { const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7)); return Math.ceil(((t - Date.UTC(t.getUTCFullYear(), 0, 1)) / 864e5 + 1) / 7); };
 const loadPts = (st) => st.wl.map((w) => ({ l: "W" + isoWeek(w.start), v: w.load }));
@@ -96,7 +96,7 @@ function vPath() {
   const n = nextStep(), st = stats(), T = today(), wk = monday(T), pass = passOf("pau");
   const week = [...Array(7)].map((_, i) => { const d = addDays(wk, i), done = S.entries.some((e) => ymd(e.at) === ymd(d)), bk = S.bookings.some((b) => HELD.includes(b.status) && ymd(S.sessions[b.sid].start) === ymd(d)), isToday = ymd(d) === ymd(T); return `<div class="d"><span class="eyebrow" style="${isToday ? "color:var(--text);font-weight:700" : ""}">${WD[d.getDay()][0]}</span><span class="dot ${done ? "done" : bk ? "booked" : ""}" title="${done ? "Done" : bk ? "Booked" : "Open"}"></span></div>`; }).join("");
   return `<div class="hero">${photo(HERO_IMAGE)}</div><section class="pad stack-l" style="position:relative;margin-top:-48px">
-    <div><div class="eyebrow">Your goal</div><h1 class="goal">${S.goal.title}</h1><p class="sub" style="font-size:15px">By ${S.goal.date.getDate()} ${MOL[S.goal.date.getMonth()]} ${S.goal.date.getFullYear()}. ${esc(S.goal.why)}</p>
+    <div><div class="eyebrow">Your goal</div><h1 class="goal"><span class="hl">${esc(S.goal.title)}</span></h1><p class="sub" style="font-size:15px">By ${S.goal.date.getDate()} ${MOL[S.goal.date.getMonth()]} ${S.goal.date.getFullYear()}. ${esc(S.goal.why)}</p>
       ${pathLine()}</div>
     <div class="card stack"><div><div class="eyebrow">Next step</div><p class="h2" style="font-size:22px;margin-top:6px">${esc(n.title)}</p><p class="sub" style="margin-top:4px">${n.meta}</p></div>
       <button class="btn acc full" data-a="${n.a}" data-v="${n.v || ""}">${n.cta}</button>

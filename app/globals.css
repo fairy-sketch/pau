@@ -42,6 +42,9 @@
   --color-track: #d2cec4;
   --color-accent-base: #8e9a80;
   --color-on-accent: #1c1916;
+  /* Lime: a punctual highlight, never an action colour. Only as a fill under
+     warm black: the goal highlighter, where you are on the path (V-12). */
+  --color-lime: #d2f05e;
 
   /* Shape: soft corners on controls and cards. */
   --radius-*: initial;

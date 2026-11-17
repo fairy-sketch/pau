@@ -19,7 +19,7 @@ const WIDTH = 320;
 /**
  * The path as five named stops ("Steps", decisions R34 to R36). Flat, no glow.
  * Finished stages are filled and ticked, upcoming ones are hollow, and the
- * current one is a ring that closes as the stage progresses, with the accent
+ * current one is a ring that closes as the stage progresses, with a lime
  * dot in its centre. The drawing is decorative; the list of names underneath
  * carries the meaning for screen readers.
  */
@@ -99,7 +99,7 @@ export function StageTrack({
                   transform="rotate(-90)"
                   data-stage-ring
                 />
-                <circle r="5" className="fill-accent stroke-ink" strokeWidth="2" />
+                <circle r="5" className="fill-lime stroke-ink" strokeWidth="2" />
               </>
             ) : (
               <circle r={R} className="fill-canvas stroke-track" strokeWidth="2" />
