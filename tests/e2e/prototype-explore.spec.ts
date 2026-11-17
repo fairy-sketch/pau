@@ -19,8 +19,8 @@ test("the icon top right opens a photo grid of clubs, coaches and pros", async (
   await open(page);
   await explore(page).click();
   await expect(page.getByRole("heading", { name: "Try something new" })).toBeVisible();
-  await expect(tiles(page)).toHaveCount(31);
-  await expect(page.locator("#xcount")).toHaveText("31 of 31");
+  await expect(tiles(page)).toHaveCount(38);
+  await expect(page.locator("#xcount")).toHaveText("38 of 38");
   // Every tile shows one of the supplied photos, and it loads.
   await expect
     .poll(() =>
@@ -176,18 +176,18 @@ test("filters apply to the grid and the map alike", async ({ page }) => {
   await chip(page, "Free").click();
   await expect(tiles(page)).toHaveCount(1);
   await expect(tiles(page).first()).toContainText("Swimming");
-  await expect(page.locator("#xcount")).toHaveText("1 of 31");
+  await expect(page.locator("#xcount")).toHaveText("1 of 38");
 
   // Switch to the map: the same single session, as a dot.
   await page.getByRole("button", { name: "Map", exact: true }).click();
   await expect(page.locator("#map .pin")).toHaveCount(1);
   await chip(page, "All").click();
   await chip(page, "Free").click();
-  await expect(page.locator("#map .pin")).toHaveCount(31);
+  await expect(page.locator("#map .pin")).toHaveCount(38);
   await chip(page, "Within 3 km").click();
   const near = await page.locator("#map .pin").count();
   expect(near).toBeGreaterThan(3);
-  expect(near).toBeLessThan(31);
+  expect(near).toBeLessThan(38);
   expect(await demo(page, (d) => d.exploreList().every((o: any) => d.offerKm(o) <= 3))).toBe(true);
 
   // A dot opens a small card; the card opens the provider's page.
@@ -206,7 +206,7 @@ test("filters apply to the grid and the map alike", async ({ page }) => {
   await chip(page, "Pros").click();
   await expect(page.locator("#xnone")).toContainText("Nothing matches");
   await page.getByRole("button", { name: "Clear filters" }).click();
-  await expect(page.locator("#map .pin")).toHaveCount(31);
+  await expect(page.locator("#map .pin")).toHaveCount(38);
 });
 
 test("the coach looks in Explore too: suggests, respects the guardrail, and acts only after a confirm", async ({
@@ -252,6 +252,14 @@ test("the coach looks in Explore too: suggests, respects the guardrail, and acts
   await page.evaluate(() => {
     window.PATH_DEMO.state.entries[0].pain = false;
   });
+
+  // Events: the coach lists them, and puts the 10K first because it fits her goal.
+  await say(page, "any events coming up?");
+  await expect(page.locator(".msg.coach").last()).toContainText(
+    "1. Limmat Night Run, 10K, Stadtlauf Verein: Sat 12 Dec 19:30",
+  );
+  await expect(page.locator(".msg.coach").last()).toContainText("which fits your goal");
+  await expect(page.locator("[data-picks]").last().getByRole("button")).toHaveCount(3);
 
   // Coaches and pros, and adding a plan through a confirm card.
   await say(page, "any pro athletes or coaches I could train with?");
@@ -362,4 +370,42 @@ test("the PATH logo always leads back to the start page of the role", async ({ p
   await tab(page, "Money");
   await logo.click();
   await expect(current).toHaveText("Home");
+});
+
+test("events are in Explore too: a race, a tournament, an open day, each with a get-ready plan and a sign-up", async ({
+  page,
+}) => {
+  await open(page);
+  await explore(page).click();
+  await chip(page, "Events").click();
+  await expect(tiles(page)).toHaveCount(7);
+  await expect(page.locator("#xgrid .tile .who").first()).toHaveText("Event");
+  await tiles(page).filter({ hasText: "Limmat Night Run" }).click();
+  const prov = page.locator("#provider");
+  await expect(prov.getByRole("heading", { name: "Limmat Night Run, 10K" })).toBeVisible();
+  await expect(prov).toContainText("Event · ");
+  await expect(prov).toContainText("1 · From the organisers");
+  await expect(prov).toContainText("2 · Get ready for it");
+  await expect(prov).toContainText("Two weeks to race day");
+  await expect(prov).toContainText("3 · Sign up");
+  await expect(prov).toContainText("Sat 12 Dec · 19:30");
+  await prov.getByRole("button", { name: "Add to my Path" }).click();
+  await page.getByRole("button", { name: "Dismiss message" }).click();
+  await page.locator("#booknow").getByRole("button", { name: "Book · CHF 38.00" }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Put my name down · CHF 38.00" })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Checkout" })
+    .getByRole("button", { name: "Pay with card" })
+    .click();
+  await expect(toast(page)).toContainText(
+    "You're in: Limmat Night Run, 10K at Stadtlauf Verein, Sat 12 Dec 19:30",
+  );
+  await page.getByRole("button", { name: "Back to Explore" }).click();
+  await expect(page.locator("#mylist")).toContainText("Limmat Night Run, 10K");
+  // On the map, events are dots like everything else.
+  await page.getByRole("button", { name: "Map", exact: true }).click();
+  await expect(page.locator("#map .pin")).toHaveCount(7);
 });

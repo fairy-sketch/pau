@@ -250,7 +250,7 @@ function coachReply(q) {
   }
   if (/cancel/.test(t)) return replyCancel(q);
   if (/\bevery\b|\bweekly\b|recurring|repeat|\bseries\b|all season|this season|\beach (mon|tue|wed|thu|fri|sat|sun)/.test(t)) return replySeries(q);
-  if (/explore|something (new|else|different)|suggest|recommend|new sport|other clubs?|what else|try out|train like|pro athlete|personal coach|physio|massage|recovery|nutrition/.test(t) || (namedOffer(q) && !parseOffering(q))) return replyExplore(q);
+  if (/explore|something (new|else|different)|suggest|recommend|new sport|other clubs?|what else|try out|train like|pro athlete|personal coach|physio|massage|recovery|nutrition|\bevents?\b|\braces?\b|tournament|open day/.test(t) || (namedOffer(q) && !parseOffering(q))) return replyExplore(q);
   if (/held|take (my|the) spot|accept/.test(t)) return replyOffer();
   if (/wait ?list/.test(t) && !/\bjoin\b|add me|put me|sign me/.test(t)) return replyWaitlist();
   if (/remember|know about me|memory/.test(t)) {
