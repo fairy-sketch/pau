@@ -90,7 +90,7 @@ src/config           APP_NAME and locale defaults (the product name lives only h
 src/i18n             next-intl config and messages/en.json
 src/ui               design system components and the token mirror
 public/fonts         Satoshi and Switzer (Fontshare licence in FFL.txt; private repo only)
-prototype/           single-file clickable demo with made-up data (not the real app)
+prototype/           clickable demo with made-up data (not the real app); open index.html, test with pnpm test:proto
 src/domain           pure helpers (formatting, contrast)
 src/jobs             job runner, stores and the job registry
 src/pwa, src/server  manifest builder, validated environment

@@ -101,11 +101,45 @@ test.describe("styleguide", () => {
     await expect(nav.locator('[aria-current="page"]')).toHaveText("Path");
     await expect(nav.locator("svg[data-icon]")).toHaveCount(5);
 
-    // Our own icon set: all 36 are shown, drawn as lines in the text colour.
+    // Our own icon set: all 37 are shown, drawn as lines in the text colour.
     const icons = page.locator("[data-icon-group] svg[data-icon]");
-    await expect(icons).toHaveCount(36);
+    await expect(icons).toHaveCount(37);
+    // Places carry one solid sparkle; tools stay plain line (Y-1).
+    await expect(page.locator('[data-icon-group] svg[data-icon="path"] .fill-current')).toHaveCount(
+      1,
+    );
+    await expect(
+      page.locator('[data-icon-group] svg[data-icon="close"] .fill-current'),
+    ).toHaveCount(0);
     await expect(icons.first()).toHaveCSS("fill", "none");
     await expect(icons.first()).toHaveCSS("stroke", "rgb(28, 25, 22)");
+  });
+});
+
+test.describe("logo", () => {
+  test("the lettering logo on the home page and in the styleguide, and the word as app icon", async ({
+    page,
+    request,
+  }) => {
+    await page.goto("/");
+    const logo = page.getByRole("heading", { level: 1 }).getByRole("img", { name: "PATH" });
+    await expect(logo).toBeVisible();
+    // Outlines, not live text: it needs no font. No cut, no mask, in the text colour.
+    await expect(logo.locator("text")).toHaveCount(0);
+    await expect(logo.locator("path")).toHaveCount(1);
+    await expect(logo.locator("mask")).toHaveCount(0);
+    await expect(logo).toHaveCSS("color", "rgb(28, 25, 22)");
+
+    await page.goto("/styleguide");
+    await expect(page.getByRole("heading", { level: 2, name: "Logo" })).toBeVisible();
+    await expect(page.locator("[data-logo]")).toHaveCount(3); // the header, and the two samples
+    await expect(page.getByRole("img", { name: "PATH app icon" })).toBeVisible();
+
+    // The favicon and the installed-app icons are the word on warm black.
+    const svg = await (await request.get("/icon.svg")).text();
+    expect(svg).toContain("#1c1916");
+    expect(svg).not.toContain("mask");
+    expect(svg).not.toContain("#8e9a80");
   });
 });
 

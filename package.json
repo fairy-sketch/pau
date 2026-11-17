@@ -12,6 +12,7 @@
     "test:unit": "vitest run",
     "test": "pnpm lint && pnpm typecheck && pnpm test:unit",
     "test:e2e": "playwright test",
+    "test:proto": "PW_SKIP_SERVER=1 playwright test --project=prototype",
     "test:all": "pnpm test && pnpm test:e2e",
     "icons": "node scripts/generate-icons.mjs",
     "db:start": "supabase start",

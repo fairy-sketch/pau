@@ -21,6 +21,7 @@
     "title": "Styleguide",
     "intro": "Calm and minimal, with one focal element per screen. Every screen in the app is built from these.",
     "sections": {
+      "logo": "Logo",
       "colour": "Colour",
       "type": "Type",
       "shape": "Shape and space",
@@ -136,7 +137,7 @@
       "action": "Book"
     },
     "icons": {
-      "intro": "Our own set. One round line on a 24 px grid, always in the colour of the text beside it, never the accent."
+      "intro": "Our own set. One round line on a 24 px grid, always in the colour of the text beside it, never the accent. Icons that name a place in the app carry one small solid sparkle; tools and objects stay plain."
     },
     "photos": {
       "intro": "Forty-one photos are the only imagery in the app. One photo per screen at most, always muted, and never with text on a busy area: text sits below the picture or on a soft fade.",
@@ -150,6 +151,10 @@
       "peopleLabel": "Community: a low banner, as on the club feed",
       "peopleTitle": "This week at the club",
       "peopleBody": "The Coach chat itself has no photo."
+    },
+    "logo": {
+      "intro": "{name} in Satoshi Black capitals, set tight. No symbol, no accent: the lettering is the logo. It is drawn from outlines, so it looks the same everywhere. For now the app icon is the same word on a warm black tile.",
+      "markLabel": "{name} app icon"
     }
   }
 }

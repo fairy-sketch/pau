@@ -3,6 +3,7 @@ import { getFormatter, getTranslations } from "next-intl/server";
 import { APP_NAME } from "@/src/config/app";
 import { Button } from "@/src/ui/button";
 import { Icon, iconGroups } from "@/src/ui/icons";
+import { Logo, LogoMark } from "@/src/ui/logo";
 import {
   Card,
   DataList,
@@ -79,7 +80,7 @@ export default async function StyleguidePage() {
     <div className="mx-auto max-w-2xl">
       <header className="px-screen pt-6 pb-10">
         <div className="flex items-center justify-between gap-4">
-          <span className="type-heading text-title">{APP_NAME}</span>
+          <Logo className="text-ink h-6" />
           <DemoBadge>{tc("demo")}</DemoBadge>
         </div>
         <Heading as="h1" size="lg" className="mt-10">
@@ -89,6 +90,23 @@ export default async function StyleguidePage() {
       </header>
 
       <main id="main" className="px-screen space-y-16 pb-20">
+        <section aria-labelledby="sg-logo" className="space-y-6">
+          <Heading id="sg-logo">{t("sections.logo")}</Heading>
+          <p className="text-secondary max-w-prose">{t("logo.intro", { name: APP_NAME })}</p>
+          <div className="rounded-card bg-surface border-hairline flex flex-wrap items-center gap-8 border p-8">
+            <Logo className="text-ink h-12" />
+            <div className="bg-ink text-surface rounded-[22%]" data-logo-tile>
+              <LogoMark className="size-20" title={t("logo.markLabel", { name: APP_NAME })} />
+            </div>
+            <div className="bg-ink text-surface flex items-center rounded-[22%]">
+              <LogoMark className="size-8" />
+            </div>
+          </div>
+          <div className="rounded-card bg-ink text-surface flex items-center gap-8 p-8">
+            <Logo className="h-10" />
+          </div>
+        </section>
+
         <section aria-labelledby="sg-colour" className="space-y-6">
           <Heading id="sg-colour">{t("sections.colour")}</Heading>
           <ul className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-4">

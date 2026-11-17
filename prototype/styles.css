@@ -1,0 +1,316 @@
+/* Fonts: Satoshi and Switzer (Fontshare, ITF Free Font License), self-hosted, files unmodified. */
+@font-face { font-family: "Satoshi"; src: url("fonts/Satoshi-Variable.woff2") format("woff2"); font-weight: 300 900; font-style: normal; font-display: swap; }
+@font-face { font-family: "Switzer"; src: url("fonts/Switzer-Variable.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
+@font-face { font-family: "JetBrains Mono"; src: url("fonts/JetBrainsMono-Variable.woff2") format("woff2"); font-weight: 100 800; font-style: normal; font-display: swap; }
+/*
+ * Design pass "deliberate design" (decisions D-1 to D-12).
+ * Ground #F4F3F0, white surfaces, text #111, one accent (sage) for the single primary action on a screen.
+ * Spacing on a 4/8 scale (4 8 12 16 24 32 48), 20 px side margin, 32 px between sections, no dividing lines between sections.
+ * Radius: 16 px for cards and fields, full for buttons and chips. Cards: white, no border, one barely visible shadow.
+ * Type: Display 40/44 Satoshi Bold (the goal only), Title 22/28 Satoshi Medium, Body 16/24 and Secondary 14/20 Switzer,
+ * mono only for the 11 px uppercase label.
+ */
+:root {
+  --bg: #ecebe7;
+  --surface: #ecebe7;   /* soft surfaces (S-1): everything is pressed out of the one ground */
+  --soft: #ecebe7;
+  --text: #111111;
+  --text-2: #666666;    /* a touch darker than the brief's #6B6B6B, to keep 4.5:1 on the soft ground */
+  --text-3: #a3a3a3;    /* marks only (chevrons, empty markers); too light for text */
+  --quiet: #666666;     /* inactive tab labels: the lightest grey that still passes 4.5:1 on the soft ground */
+  --hairline: #dddcd6;  /* field outlines and row dividers inside a card, never between sections */
+  --track: #d3d2cc;
+  --accent: #8e9a80;
+  --on-accent: #111111;
+  --heading: "Satoshi", "Helvetica Neue", Arial, sans-serif;
+  --body: "Switzer", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 16px;
+  --m: 20px;
+  --shadow: 6px 6px 14px rgba(0,0,0,.08), -6px -6px 14px rgba(255,255,255,.95);                 /* raised */
+  --press: inset 3px 3px 7px rgba(0,0,0,.09), inset -3px -3px 7px rgba(255,255,255,.95);     /* pressed in */
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--text); font: 400 16px/24px var(--body); -webkit-font-smoothing: antialiased; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; background: none; border: 0; padding: 0; text-align: inherit; }
+:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+h1, h2, h3, p, ul, ol { margin: 0; padding: 0; } ul, ol { list-style: none; }
+
+#app { position: relative; height: 100%; max-width: 460px; margin: 0 auto; display: flex; flex-direction: column; background: var(--bg); }
+#app.wide { max-width: 960px; }
+
+/* Header: the wordmark on the content edge, one round club button on the right. */
+.top { display: flex; align-items: center; justify-content: space-between; padding: 8px var(--m); }
+.top .name { min-height: 44px; min-width: 44px; display: flex; align-items: center; font: 700 20px/1 var(--heading); letter-spacing: -.01em; color: var(--text); }
+.clubbtn { width: 44px; height: 44px; margin-right: -4px; display: grid; place-items: center; border-radius: 999px; }
+.mono36 { flex: none; width: 36px; height: 36px; border-radius: 999px; background: var(--surface); box-shadow: var(--shadow); display: grid; place-items: center; font: 500 14px/1 var(--heading); color: var(--text); }
+.x { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 999px; color: var(--text-2); flex: none; }
+.x:hover { background: var(--soft); }
+#view { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+#view::-webkit-scrollbar, .sheet::-webkit-scrollbar { display: none; }
+
+/* Tab bar: 22 px icons, a filled pill behind the active one. */
+.tabs { display: flex; background: var(--surface); padding: 8px 8px 8px; box-shadow: 0 -1px 0 rgba(0,0,0,.04); }
+.tabs button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 52px; font-size: 11px; line-height: 16px; font-weight: 500; color: var(--quiet); border-radius: var(--r); }
+.tabs .ic { width: 56px; height: 32px; display: grid; place-items: center; border-radius: 999px; transition: background .15s ease; }
+.tabs button[aria-current="page"] { color: var(--text); }
+.tabs button[aria-current="page"] .ic { background: var(--soft); }
+
+.pad { padding: 16px var(--m) 48px; }
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.stack-l { display: flex; flex-direction: column; gap: 32px; }
+.eyebrow { font: 500 11px/16px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--text-2); }
+.sub { color: var(--text-2); font-size: 14px; line-height: 20px; }
+.goal { font: 700 40px/44px var(--heading); letter-spacing: -.02em; margin: 8px 0 8px; text-wrap: balance; }
+.h1 { font: 500 22px/28px var(--heading); letter-spacing: -.01em; margin-top: 4px; text-wrap: balance; }
+.h2 { font: 500 16px/24px var(--heading); }
+.num { font: 500 22px/28px var(--heading); letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.mono, .time { font-variant-numeric: tabular-nums; }
+.time { font-size: 14px; line-height: 20px; color: var(--text-2); }
+.strong { font-weight: 500; }
+
+/* Cards: white, no border, one barely visible shadow. Never a card inside a card. */
+.card { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); padding: 20px; }
+.card.rows { padding: 4px 20px; }
+.card .card { box-shadow: none; padding: 0; }
+
+/* Buttons: one primary (accent, 52 px, full radius) and one secondary (text only). */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 12px; border-radius: 999px; font-size: 16px; line-height: 24px; font-weight: 500; color: var(--text); white-space: nowrap; transition: background .15s ease, opacity .15s ease; }
+.btn:hover { background: var(--soft); }
+.btn.acc { min-height: 52px; padding: 0 24px; background: var(--accent); color: var(--on-accent); }
+.btn.acc:hover { opacity: .9; background: var(--accent); }
+.btn.acc.demoted { min-height: 44px; padding: 0 12px; background: none; }
+.btn.acc.demoted:hover { background: var(--soft); opacity: 1; }
+.btn.ghost { color: var(--text-2); }
+.btn.full { width: 100%; }
+.btn.sm { font-size: 14px; line-height: 20px; }
+.btn.on { background: var(--text); color: var(--surface); }
+.btn.link { padding: 0; justify-content: flex-start; align-self: flex-start; }
+.btn.link:hover { background: none; text-decoration: underline; }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.row { display: flex; align-items: center; gap: 16px; width: 100%; min-height: 56px; padding: 12px 0; }
+.rows > * + * { border-top: 1px solid var(--hairline); }
+.row .lead { flex: none; width: 56px; }
+.row .mid { flex: 1; min-width: 0; }
+.row .mid > * { display: block; }
+.row .end { flex: none; text-align: right; }
+.pill { display: inline-flex; align-items: center; gap: 4px; background: var(--soft); border-radius: 999px; padding: 4px 12px; font-size: 14px; line-height: 20px; white-space: nowrap; }
+.pill.line { background: none; padding: 0; color: var(--text-2); }
+.between { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+
+/* The path: one thin bar of five segments, filled up to today. */
+.phases { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.phases i { height: 4px; border-radius: 999px; background: var(--track); overflow: hidden; }
+.phases b { display: block; height: 100%; border-radius: 999px; background: var(--text); transition: width .6s ease; }
+
+/* "Why this?": an inline link with a small chevron that opens the explanation in place. No box. */
+details summary { cursor: pointer; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; min-width: 44px; font-size: 14px; line-height: 20px; color: var(--text-2); list-style: none; outline: none; }
+details summary::-webkit-details-marker { display: none; }
+details summary::after { content: ""; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-2px) rotate(45deg); transition: transform .15s ease; }
+details[open] summary::after { transform: translateY(2px) rotate(-135deg); }
+details summary:focus-visible { text-decoration: underline; text-underline-offset: 4px; color: var(--text); }
+details ul { font-size: 14px; line-height: 20px; color: var(--text-2); display: flex; flex-direction: column; gap: 4px; padding-left: 16px; list-style: disc; }
+
+/* This week: seven markers of one size. Filled = done, ring = booked, faint = nothing. Today is the bold letter. */
+.week7 { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
+.week7 .d { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.week7 .today { color: var(--text); font-weight: 700; }
+.dot { width: 12px; height: 12px; border-radius: 999px; border: 1.5px solid var(--track); }
+.dot.booked { border-color: var(--text); }
+.dot.done { background: var(--text); border-color: var(--text); }
+.days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.days button { display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 64px; justify-content: center; border-radius: var(--r); color: var(--text-2); }
+.days button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+/* Day letters are plain text, not mono labels: one mono label per section. */
+.days .eyebrow, .week7 .eyebrow, .card ul .eyebrow, .card ol .eyebrow, .card li .eyebrow { font: 400 12px/16px var(--body); letter-spacing: 0; text-transform: none; }
+.week7 .eyebrow.today { font-weight: 700; color: var(--text); }
+td .btn { white-space: normal; padding: 0; min-width: 48px; text-align: left; justify-content: flex-start; }
+.sheet:focus { outline: none; }
+.days .n { font: 500 16px/20px var(--heading); }
+
+.rpe { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 8px; }
+.rpe button { min-height: 44px; border-radius: 999px; background: var(--surface); box-shadow: var(--shadow); text-align: center; font-size: 14px; font-variant-numeric: tabular-nums; }
+.rpe button[aria-pressed="true"] { background: var(--text); color: var(--surface); }
+label.f { display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 20px; color: var(--text-2); }
+.f input, .f select, .inp { border: 1px solid var(--hairline); background: var(--surface); border-radius: var(--r); min-height: 48px; padding: 0 16px; width: 100%; font-size: 16px; color: var(--text); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sw { display: flex; align-items: center; gap: 16px; width: 100%; min-height: 56px; padding: 8px 0; }
+.sw .t { flex: none; width: 44px; height: 26px; border-radius: 999px; background: var(--track); position: relative; transition: background .15s ease; }
+.sw .t::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 999px; background: var(--surface); transition: transform .15s ease; }
+.sw[aria-checked="true"] .t { background: var(--text); }
+.sw[aria-checked="true"] .t::after { transform: translateX(18px); }
+.sw[disabled] { opacity: .55; cursor: default; }
+.btn:disabled { opacity: .45; cursor: default; }
+.sw .l { flex: 1; }
+.note { background: var(--soft); border-radius: var(--r); padding: 12px 16px; font-size: 14px; line-height: 20px; color: var(--text-2); }
+.card .note, .ccard .note { background: none; padding: 0; }
+/* The toast sits between the page and the tab bar and takes its own space, so it can never lie on top of a button. */
+.toast { flex: none; margin: 8px var(--m); display: flex; align-items: center; gap: 8px; background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); padding: 4px 4px 4px 16px; font-size: 14px; line-height: 20px; }
+.toast span { flex: 1; padding: 8px 0; }
+
+.chatwrap { display: flex; flex-direction: column; min-height: 100%; }
+.chatlog { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 8px var(--m) 16px; }
+.msg { max-width: 86%; padding: 12px 16px; border-radius: var(--r); white-space: pre-line; }
+.msg.me { align-self: flex-end; background: var(--soft); }
+.msg.coach { align-self: flex-start; background: var(--surface); box-shadow: var(--shadow); }
+.quick { display: flex; gap: 8px; overflow-x: auto; padding: 8px var(--m); scrollbar-width: none; }
+.quick::-webkit-scrollbar { display: none; }
+.quick button { flex: none; background: var(--surface); box-shadow: var(--shadow); border-radius: 999px; min-height: 44px; padding: 0 16px; font-size: 14px; }
+.chatform { display: flex; gap: 8px; padding: 8px var(--m) 16px; }
+.chatform input { flex: 1; min-width: 0; border: 1px solid var(--hairline); background: var(--surface); border-radius: 999px; min-height: 48px; padding: 0 20px; }
+.chatform button { width: 48px; height: 48px; border-radius: 999px; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; flex: none; }
+
+.sheetbg { position: fixed; inset: 0; background: rgba(17,17,17,.3); display: flex; align-items: flex-end; justify-content: center; z-index: 10; }
+.sheet { background: var(--bg); width: 100%; max-width: 460px; max-height: 90%; overflow-y: auto; scrollbar-width: none; border-radius: var(--r) var(--r) 0 0; padding: 12px var(--m) 32px; }
+.sheet::before { content: ""; display: block; width: 36px; height: 4px; border-radius: 999px; background: var(--track); margin: 0 auto 24px; }
+/* The club sheet: rows divided by space only, the view switch clearly secondary. */
+.clubrow { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; }
+.clubrow .mid { flex: 1; }
+.clubrow .ck { width: 22px; flex: none; color: var(--text); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; line-height: 20px; }
+th, td { text-align: left; padding: 12px 12px 12px 0; border-top: 1px solid var(--hairline); vertical-align: middle; }
+th { font-weight: 400; color: var(--text-2); border-top: 0; }
+.scroll { overflow-x: auto; scrollbar-width: none; }
+.tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+@media (min-width: 700px) { .tiles { grid-template-columns: repeat(4, 1fr); } }
+svg text { font-family: var(--body); font-size: 11px; fill: var(--text-2); }
+/* Photography: the only imagery. Muted, one photo per screen (Explore, where photos are the content, is the exception). */
+.ph { display: block; width: 100%; height: 100%; object-fit: cover; filter: saturate(.6) contrast(.96); }
+.hero { position: relative; height: 240px; overflow: hidden; }
+.hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, color-mix(in srgb, var(--bg) 0%, transparent) 40%, var(--bg) 100%); }
+.ccard { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); overflow: hidden; }
+.ccard .pic { aspect-ratio: 2 / 1; background: var(--soft); }
+.ccard .between > span:last-child { white-space: nowrap; flex: none; }
+.ccard .body { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+.tex { position: relative; overflow: hidden; border-radius: var(--r); padding: 32px 24px; text-align: center; }
+.tex img { display: none; } /* empty states carry no picture: one photo per screen at most */
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+::placeholder { color: var(--text-2); opacity: 1; }
+.resetbtn { height: 44px; padding: 0 12px; border-radius: 999px; font-size: 14px; font-weight: 500; color: var(--text); white-space: nowrap; }
+.resetbtn.armed { background: var(--text); color: var(--surface); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { min-height: 44px; min-width: 44px; padding: 0 16px; border-radius: 999px; background: var(--surface); box-shadow: var(--shadow); font-size: 14px; }
+.chip[aria-pressed="true"] { background: var(--text); color: var(--surface); }
+/* Confirm cards: pending / confirmed / declined / expired */
+.pcard { align-self: stretch; }
+.pcard.off { box-shadow: none; background: transparent; padding-left: 0; padding-right: 0; }
+.pcard.off .h2, .pcard.off li { color: var(--text-2); }
+.pcard .results { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; font-size: 14px; line-height: 20px; }
+.pcard .results li { display: flex; gap: 8px; align-items: flex-start; }
+.pcard .results svg { flex: none; margin-top: 2px; }
+.tag { display: block; font-size: 14px; line-height: 20px; color: var(--text-2); }
+.guard { background: var(--soft); border-radius: var(--r); padding: 12px 16px; font-size: 14px; line-height: 20px; }
+.guard b { display: block; font-weight: 500; margin-bottom: 4px; }
+.was { text-decoration: line-through; color: var(--text-2); }
+.scroll:focus-visible, #view:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+#weekpane { touch-action: pan-y; }
+.weeknav { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.weeknav .x:disabled { opacity: .3; }
+.wk { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.days button.past .n, .days button.none .n { font-weight: 400; }
+.days .mk { display: block; width: 4px; height: 4px; border-radius: 50%; }
+.days .mk.on { background: currentColor; }
+.filters { display: flex; gap: 8px; overflow-x: auto; margin: 0 calc(-1 * var(--m)); padding: 2px var(--m); scrollbar-width: none; }
+.filters::-webkit-scrollbar { display: none; }
+.filters .chip { flex: none; white-space: nowrap; }
+.opts { align-self: stretch; display: flex; flex-direction: column; gap: 8px; }
+
+/* ---- Explore ---- */
+.seg { display: inline-flex; background: var(--soft); border-radius: 999px; padding: 4px; }
+.seg button { min-height: 44px; min-width: 72px; padding: 0 16px; border-radius: 999px; font-size: 14px; font-weight: 500; color: var(--text-2); text-align: center; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+.seg.full { display: flex; }
+.seg.full button { flex: 1; min-width: 0; padding: 0 8px; }
+/* The grid: two across, a photo with a label and a grey sublabel underneath. Nothing on top of the photo but a tick. */
+.tiles3 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px 12px; }
+.tile { display: flex; flex-direction: column; gap: 8px; text-align: left; border-radius: var(--r); }
+.tile .pic { position: relative; display: block; aspect-ratio: 4 / 3; border-radius: var(--r); overflow: hidden; background: var(--soft); }
+.tile .cap { display: flex; flex-direction: column; }
+.tile .in { position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); color: var(--text); }
+.tile:focus-visible { outline: 2px solid var(--text); outline-offset: 4px; }
+.map { position: relative; aspect-ratio: 100 / 115; border-radius: var(--r); overflow: hidden; background: var(--soft); }
+.map svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.map .pin { position: absolute; width: 44px; height: 44px; transform: translate(-50%, -50%); display: grid; place-items: center; }
+.map .pin i { width: 20px; height: 20px; border-radius: 50%; background: var(--text); border: 2px solid var(--surface); display: grid; place-items: center; color: var(--surface); }
+.map .pin[aria-pressed="true"] i { width: 24px; height: 24px; box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--text); }
+.map .you { position: absolute; width: 16px; height: 16px; transform: translate(-50%, -50%); border-radius: 50%; background: var(--surface); border: 4px solid var(--text); }
+.mapcard { display: flex; gap: 12px; align-items: center; text-align: left; width: 100%; padding: 12px; }
+.mapcard .thumb { width: 64px; height: 64px; border-radius: 12px; overflow: hidden; flex: none; }
+.offerpic { height: 160px; flex: none; border-radius: var(--r); overflow: hidden; }
+.err { display: block; margin-top: 8px; font-size: 14px; line-height: 20px; font-weight: 500; color: var(--text); }
+.err::before { content: "! "; }
+[aria-invalid="true"] { border-color: var(--text) !important; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 14px; line-height: 20px; list-style: none; }
+.legend li { display: flex; align-items: center; gap: 8px; }
+.legend i { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+
+/* ---- Soft surfaces (decisions S-1 to S-4): raised = something you can use or read as one thing; pressed in = selected, or a place to type. ---- */
+.btn.acc, .toast { box-shadow: var(--shadow); }
+.tabs { box-shadow: none; }
+.tabs button[aria-current="page"] .ic, .seg, .note, .guard, .msg.me, .map { box-shadow: var(--press); }
+.card .note, .ccard .note { box-shadow: none; }
+.chip, .rpe button { color: var(--text-2); }
+.chip[aria-pressed="true"], .rpe button[aria-pressed="true"] { background: var(--bg); color: var(--text); font-weight: 500; box-shadow: var(--press); }
+.f input, .f select, .inp, .chatform input { border: 0; box-shadow: var(--press); }
+[aria-invalid="true"] { outline: 1.5px solid var(--text); outline-offset: -1.5px; }
+.sw .t { box-shadow: var(--press); background: var(--track); }
+.sw .t::after { box-shadow: 1px 1px 3px rgba(0,0,0,.18); }
+.sw[aria-checked="true"] .t { background: var(--text); box-shadow: none; }
+.phases i { height: 6px; background: var(--bg); box-shadow: inset 1px 1px 2px rgba(0,0,0,.14), inset -1px -1px 1px #fff; }
+.dot { border-color: #c9c8c2; }
+.tile .in { background: #fff; }
+.pcard.off { box-shadow: none; }
+/* Rows that scroll sideways clip whatever sticks out of them, top and bottom too. So they carry their own room for
+   the soft shadows of the chips inside (S-5), and give it back with a negative margin so the layout does not move. */
+.filters, .quick { padding-top: 20px; padding-bottom: 20px; }
+.filters { margin-top: -20px; margin-bottom: -20px; }
+.quick { margin-top: -12px; margin-bottom: -12px; }
+
+/* ---- Coach dashboard (milestone A) ---- */
+/* Status marks follow the week markers: filled = needs you, ring = watch, faint = on track. Never colour alone; the reason is always written out. */
+.sdot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; border: 1.5px solid #c9c8c2; vertical-align: 1px; }
+.sdot.watch { border-color: var(--text); }
+.sdot.needs { background: var(--text); border-color: var(--text); }
+.pline { display: block; height: 4px; margin: 8px 0; border-radius: 999px; background: var(--bg); box-shadow: inset 1px 1px 2px rgba(0,0,0,.14), inset -1px -1px 1px #fff; overflow: hidden; }
+.pline b { display: block; height: 100%; border-radius: 999px; background: var(--text); }
+.card .rows { margin: 0 0 -12px; }
+/* The sage button floats (S-6): a wide soft shadow underneath, light from the top left, and a faint rim of light and shade
+   on the button itself so it reads as a cushion, not a flat fill. Pressing it pushes it into the ground. No gradient. */
+.btn.acc:not(.demoted), .chatform button {
+  box-shadow: 10px 12px 24px color-mix(in srgb, color-mix(in srgb, var(--accent) 55%, #000) 34%, transparent), -8px -8px 18px rgba(255,255,255,.95), inset 1px 1.5px 1px rgba(255,255,255,.38), inset -2px -3px 6px rgba(40,48,30,.16);
+  transition: box-shadow .15s ease, transform .15s ease;
+}
+.btn.acc:not(.demoted):hover, .chatform button:hover { opacity: 1; transform: translateY(-1px); }
+.btn.acc:not(.demoted):active, .chatform button:active { transform: translateY(1px); box-shadow: 2px 3px 6px color-mix(in srgb, color-mix(in srgb, var(--accent) 55%, #000) 26%, transparent), -2px -2px 6px rgba(255,255,255,.9), inset 2px 3px 6px rgba(40,48,30,.22), inset -1px -1px 1px rgba(255,255,255,.25); }
+.btn.acc:disabled { transform: none; }
+.chatform { padding-bottom: 28px; }
+/* Your colour: six swatches, raised like every other control; the chosen one carries a tick and sits in a pressed ring. */
+.swatches { display: flex; justify-content: space-between; margin: 0 -6px; }
+.swatch { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; }
+.swatch i { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: var(--text); box-shadow: 4px 5px 10px rgba(0,0,0,.14), -4px -4px 10px rgba(255,255,255,.95), inset 1px 1.5px 1px rgba(255,255,255,.38), inset -2px -3px 5px rgba(0,0,0,.10); }
+.swatch[aria-pressed="true"] { box-shadow: var(--press); }
+/* Fine accents in your colour (S-10): the phase you are in, the days you trained, today's point in the chart and switches
+   that are on. Each keeps a black edge or a black neighbour, so none of them depends on the colour to be read. */
+.phases b.cur { background: var(--accent); }
+.dot.done { background: var(--accent); border-color: var(--text); }
+.sw[aria-checked="true"] .t { background: var(--accent); box-shadow: inset 1px 1px 3px rgba(0,0,0,.18); }
+.swatch i.light { box-shadow: 4px 5px 10px rgba(0,0,0,.14), -4px -4px 10px rgba(255,255,255,.95), inset 0 0 0 1px rgba(0,0,0,.06); }
+html, body { background: var(--bg); }
+/* ---- Plans ---- */
+textarea.inp { min-height: 168px; padding: 12px 16px; line-height: 24px; resize: vertical; border: 0; box-shadow: var(--press); font-family: var(--body); }
+.filebtn { cursor: pointer; box-shadow: var(--shadow); min-height: 52px; }
+.filebtn:has(+ input:focus-visible) { outline: 2px solid var(--text); outline-offset: 2px; }
+.card > .rows { margin: 0 0 -12px; }
+textarea.inp.big { min-height: 248px; padding: 16px; }
+.srow { display: flex; align-items: center; gap: 8px; }
+.srow .sday { flex: none; width: 76px; min-height: 44px; border: 0; border-radius: var(--r); background: var(--bg); box-shadow: var(--press); padding: 0 8px; font-size: 14px; color: var(--text); }
+.srow { align-items: flex-start; }
+.srow textarea.stext { flex: 1; min-width: 0; min-height: 44px; padding: 10px 12px; border: 0; box-shadow: var(--press); line-height: 24px; resize: none; overflow: hidden; field-sizing: content; }
+.srow .x { margin-right: -8px; }
