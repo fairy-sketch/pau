@@ -31,18 +31,20 @@ const ORGS = {
     policy: { opensDays: 60, cancelMin: 120, lateCancel: "none", waitlist: true },
     /* The coach you play in the demo at this club, their groups, and the group the playable athlete is in. */
     me: { coach: "Coach Sara", groups: ["Track", "Technique"], myGroup: "Track" },
+    coaches: [["Coach Sara", "Track and Technique groups, personal training"], ["Coach Marco", "Gym sessions"], ["Coach Nina", "Saturday community session, personal training"], ["Coach Dario", "Personal training"]],
     offerings: [
-      { id: "track", group: "Track", sport: "running", name: "Track session", days: [1, 4], time: [18, 30], dur: 90, cap: 30, loc: "Sportanlage Fronwald", coach: "Coach Sara", intensity: "high" },
+      { id: "track", group: "Track", only: ["Track", "Technique"], sport: "running", name: "Track session", days: [1, 4], time: [18, 30], dur: 90, cap: 30, loc: "Sportanlage Fronwald", coach: "Coach Sara", intensity: "high" },
       { id: "gym", group: "Gym", sport: "gym", name: "Gym session", days: [2, 5], time: [18, 0], dur: 60, cap: 15, loc: "Balboa Underground", coach: "Coach Marco", intensity: "medium" },
-      { id: "technique", group: "Technique", sport: "running", name: "Technique session", days: [3], time: [18, 30], dur: 60, cap: 20, loc: "Sportanlage Fronwald", coach: "Coach Sara", intensity: "low" },
-      { id: "community", group: "Community", sport: "running", name: "Saturday community session", days: [6], time: [10, 0], dur: 75, cap: 40, loc: "Sportanlage Fronwald", coach: "Open to everyone", intensity: "low", free: true },
+      { id: "technique", group: "Technique", only: ["Track", "Technique"], sport: "running", name: "Technique session", days: [3], time: [18, 30], dur: 60, cap: 20, loc: "Sportanlage Fronwald", coach: "Coach Sara", intensity: "low" },
+      { id: "community", group: "Community", sport: "running", name: "Saturday community session", days: [6], time: [10, 0], dur: 75, cap: 40, loc: "Sportanlage Fronwald", coach: "Coach Nina", intensity: "low", free: true },
     ],
     products: [
       { name: "Performance season pass", price: 600, rule: "Unlimited group sessions, valid for the season." },
       { name: "Regular season pass", price: 400, rule: "Unlimited group sessions, valid for the season." },
       { name: "Drop-in season pass", price: 300, rule: "Track and Gym sessions, max 4 per calendar month, valid for the season." },
       { name: "Free trial", price: 0, rule: "All group sessions for 7 days from the first booking. Once per person." },
-      { name: "PT 10-pack", price: 900, rule: "10 personal training sessions of 90 minutes." },
+      { name: "10-session pack", price: 230, rule: "10 group sessions, to use any time in the season.", buy: 10 },
+      { name: "PT 10-pack", price: 900, rule: "10 personal training sessions of 60 minutes." },
     ],
   },
   studio: {
@@ -51,12 +53,13 @@ const ORGS = {
     single: { name: "Drop-in", price: 33 },
     policy: { opensDays: 6, cancelMin: 240, lateCancel: "forfeit", waitlist: true, maxDay: 2, maxWeek: 7 },
     me: { coach: "Noor", groups: ["Yoga"], myGroup: "Yoga" },
+    coaches: [["Lena", "Strength and Ride"], ["Marco", "HIIT"], ["Aylin", "Mobility"], ["Noor", "Yoga flow"]],
     offerings: [
       { id: "strength", group: "Strength", sport: "gym", name: "Strength", days: [1, 2, 3, 4, 5], time: [7, 0], dur: 50, cap: 14, loc: "Studio One", coach: "Lena", intensity: "high" },
       { id: "hiit", group: "HIIT", sport: "crossfit", name: "HIIT", days: [1, 2, 3, 4, 5, 0], time: [12, 15], dur: 45, cap: 16, loc: "Studio One", coach: "Marco", intensity: "high" },
       { id: "mobility", group: "Mobility", sport: "pilates", name: "Mobility", days: [1, 3, 5], time: [17, 30], dur: 45, cap: 12, loc: "Studio Two", coach: "Aylin", intensity: "low" },
       { id: "yoga", group: "Yoga", sport: "yoga", name: "Yoga flow", days: [2, 4, 0, 6], time: [18, 45], dur: 60, cap: 20, loc: "Studio Two", coach: "Noor", intensity: "low" },
-      { id: "ride", group: "Ride", sport: "cycling", name: "Ride", days: [1, 2, 3, 4], time: [19, 0], dur: 45, cap: 18, loc: "Studio One", coach: "Tim", intensity: "high" },
+      { id: "ride", group: "Ride", sport: "cycling", name: "Ride", days: [1, 2, 3, 4], time: [19, 0], dur: 45, cap: 18, loc: "Studio One", coach: "Lena", intensity: "high" },
     ],
     products: [
       { name: "Drop-in", price: 33, rule: "1 class." },
@@ -76,9 +79,38 @@ const policyText = (org) => {
   out.push(set.waitlistMode === "offer" ? `Waitlist: a freed spot is held for the next person for ${set.offerHoldMin / 60} h, then offered on.` : "Waitlist: the next person is booked automatically.");
   return out.join(" ");
 };
-/* Made-up members. Each session's roster is a deterministic slice of this list. */
-const NAMES = [];
-for (const last of ["Brunner", "Meier", "Rossi", "Frei", "Sutter", "Aziz"]) for (const first of ["Lea", "Jonas", "Sofia", "Noah", "Elin", "Tariq", "Mara", "Ben"]) NAMES.push(`${first} ${last}`);
+/* ---------- members: ONE list per club (QA-06). The coach's athletes, every session roster, the admin's table and the
+   invoices all read it, so the same people and the same numbers show on every layer. All names are invented.
+   120 members a club, plus the athlete you play, who is a member of both. ---------- */
+const NAME_PARTS = {
+  pau: [["Brunner", "Meier", "Rossi", "Frei", "Sutter", "Aziz", "Huber", "Schmid", "Weber", "Vogel", "Graf", "Moser", "Kunz", "Arslan", "Fontana"], ["Lea", "Jonas", "Sofia", "Noah", "Elin", "Tariq", "Mara", "Ben"]],
+  studio: [["Steiner", "Gerber", "Bianchi", "Wenger", "Hofer", "Lang", "Marti", "Bachmann", "Egli", "Kaya", "Berger", "Ammann", "Costa", "Stalder", "Nguyen"], ["Anna", "Luca", "Nora", "David", "Yara", "Emil", "Zoe", "Milan"]],
+};
+/* Which pass a member holds: [product name, share of members, credits a pack starts with]. The shares add up to 1. */
+const PASS_MIX = {
+  pau: [["Regular season pass", 0.38], ["Drop-in season pass", 0.24], ["Performance season pass", 0.12], ["10-session pack", 0.16, 10], ["Free trial", 0.1]],
+  studio: [["Monthly 15 classes", 0.34], ["10 classes", 0.28, 10], ["50 classes", 0.14, 50], ["Starter 7 classes", 0.1, 7], ["Drop-in", 0.14]],
+};
+/* PAU members who also hold a PT 10-pack, with the sessions they have left: personal training is in use, not only on the price list. */
+const PT_LEFT = { 0: 6, 9: 3, 27: 8, 50: 10, 61: 1, 73: 7, 88: 4, 97: 9, 104: 2, 115: 5 };
+const MEMBER_CACHE = {};
+function members(org) {
+  if (MEMBER_CACHE[org]) return MEMBER_CACHE[org];
+  const [lasts, firsts] = NAME_PARTS[org], out = [], studioGroups = ["Strength", "HIIT", "Mobility", "Yoga", "Ride"];
+  for (const last of lasts) for (const first of firsts) {
+    const i = out.length, name = `${first} ${last}`, h = hash(name + org), h2 = hash(org + name + "s");
+    let acc = 0; const mix = PASS_MIX[org].find((m) => (acc += m[1]) > h) || PASS_MIX[org][0];
+    const trial = /trial|starter/i.test(mix[0]);
+    out.push({ id: `${org}-m${i}`, i, name, first,
+      group: org === "pau" ? (i < 48 ? (i % 3 === 2 ? "Technique" : "Track") : i < 96 ? "Gym" : "Community") : studioGroups[i % 5],
+      status: trial ? "Trial" : h2 > 0.9 ? "Paused" : "Active", product: mix[0], left: mix[2] ? 1 + Math.floor(h2 * (mix[2] - 1)) : null,
+      pt: org === "pau" && PT_LEFT[i] != null ? { left: PT_LEFT[i], of: 10 } : null });
+  }
+  return (MEMBER_CACHE[org] = out);
+}
+const memberPass = (m) => `${m.product}${m.left != null ? ` · ${m.left} left` : ""}${m.pt ? ` · PT 10-pack, ${m.pt.left} of ${m.pt.of} left` : ""}`;
+/* Who can be on the roster of a session: the groups that train in it, or the whole club. */
+function poolOf(s) { const off = offOf(s), all = members(s.org); return (off.only ? all.filter((m) => off.only.includes(m.group)) : all).map((m) => m.name); }
 
 /* ---------- state ---------- */
 const STORE_KEY = "path-demo-v5", WEEKS = 4, PER = 12, LOAD_LIMIT = 1.1, CARD_TTL_MIN = 15;
@@ -97,6 +129,17 @@ function ensureSessions() {
     S.sessions[id] = { id, org: oid, off: off.id, start: new Date(d.getFullYear(), d.getMonth(), d.getDate(), off.time[0], off.time[1]), cap: off.cap, others, waitOthers: others >= off.cap ? 1 + Math.floor(h2 * 3) : 0, left: 0 };
   }
 }
+/* The other members' invoices: per club a few open, a few overdue and a few paid, each for the pass that member holds. */
+function seedInvoices(T) {
+  const out = [], plan = { pau: [[9, 6, "open"], [11, 12, "open"], [22, 3, "open"], [40, -6, "open"], [57, -13, "open"], [73, -31, "open"], [84, -20, "paid"], [99, -9, "paid"], [112, -2, "paid"]], studio: [[5, 5, "open"], [18, 10, "open"], [39, -4, "open"], [57, -18, "open"], [3, -12, "paid"], [66, -3, "paid"]] };
+  for (const org of Object.keys(plan)) plan[org].forEach(([i, due, status], k) => {
+    const m = members(org)[i], prod = ORGS[org].products.find((p) => p.name === m.product), pt = m.pt && k % 2 === 0;
+    out.push({ id: `${org === "pau" ? "PAU" : "STU"}-2026-${String(org === "pau" ? 43 + k : 18 + k).padStart(4, "0")}`, org, member: m.name, what: pt ? "PT 10-pack" : `${m.product}${org === "pau" ? ", winter season" : ""}`, amount: pt ? 900 : prod.price || ORGS[org].single.price, due: addDays(T, due), status });
+  });
+  return out;
+}
+const myInvoices = (org) => S.invoices.filter((i) => i.member === S.me.name && (!org || i.org === org));
+const overdue = (i) => i.status === "open" && i.due < today();
 function seed() {
   const T = today();
   S = {
@@ -114,7 +157,7 @@ function seed() {
       { id: "p-pau", org: "pau", name: "Drop-in season pass", kind: "limit", max: 4, covers: ["track", "gym"], until: ORGS.pau.season.end },
       { id: "p-studio", org: "studio", name: "10 classes", kind: "credits", until: null },
     ],
-    invoices: [{ id: "PAU-2026-0042", org: "pau", what: "Drop-in season pass, winter season", amount: 300, due: addDays(T, 9), status: "open" }],
+    invoices: [{ id: "PAU-2026-0042", org: "pau", member: "Mia Keller", what: "Drop-in season pass, winter season", amount: 300, due: addDays(T, 9), status: "open" }, ...seedInvoices(T)],
     consent: { pau: { "profile.basic": true, "path.read": true, "log.read": true, "log.comment": true, "plan.write": true, "alerts.pain": false }, studio: { "profile.basic": true, "path.read": false, "log.read": false, "log.comment": false, "plan.write": false, "alerts.pain": false } },
     /* The memory is the person's, but every item says which club it came from (null = general). */
     memory: [
@@ -189,8 +232,11 @@ const myWait = (sid) => S.waitlist.find((w) => w.sid === sid);
 const booked = (s) => s.others + (myBooking(s.id) ? 1 : 0);
 const spots = (s) => Math.max(0, s.cap - booked(s) - (s.held || 0)); // a spot held for a waitlist offer is not free
 const deadline = (s) => new Date(s.start.getTime() - ORGS[s.org].policy.cancelMin * 60000);
-const passOf = (org) => S.passes.find((p) => p.org === org && !p.single);
+const passOf = (org) => S.passes.find((p) => p.org === org && !p.single && !p.pack);
 const ticketOf = (org) => S.passes.find((p) => p.org === org && p.single); // single sessions bought one at a time
+const packOf = (org) => S.passes.find((p) => p.org === org && p.pack); // a pack of sessions bought on top of a season pass
+/* Credits the member holds next to her main pass. A single ticket is used before a pack. */
+const sparePass = (s) => [ticketOf(s.org), packOf(s.org)].find((p) => p && !passEnded(p, s.start) && passState(p).left > 0) || null;
 const opensAt = (s) => addDays(sod(s.start), -ORGS[s.org].policy.opensDays);
 const coveredByMe = (s) => { const p = passOf(s.org); return !!offOf(s).free || (!!p && (!p.covers || p.covers.includes(s.off))); };
 const heldIn = (org) => S.bookings.filter((b) => HELD.includes(b.status) && S.sessions[b.sid].org === org);
@@ -283,7 +329,7 @@ function check(s, opts = {}) {
   const fine = (pass, note) => ({ ok: true, pass, note, clash: clashAt(s.start, endOf(s), s.id) });
   if (off.free) return fine(null, "Free session. No pass needed.");
   // From here on, only the pass can say no. Those refusals are marked `blocked`: they can be solved by buying something.
-  const pass = passOf(s.org), ticket = ticketOf(s.org);
+  const pass = passOf(s.org), ticket = sparePass(s);
   let block = null;
   if (!pass) block = err("NO_VALID_PASS", "You have no pass for this club.");
   else if (passEnded(pass, s.start)) block = err("PASS_EXPIRED", passEnded(pass) ? `Your ${pass.name} ended on ${fDate(pass.until)}.` : `Your ${pass.name} is valid until ${fDate(pass.until)}. This session is after that.`);
@@ -294,7 +340,7 @@ function check(s, opts = {}) {
     else if (pass.kind === "credits" && st.left <= 0) block = err("NO_VALID_PASS", `No credits left on your ${pass.name} pack.`);
     else return fine(pass, `${pass.name}: ${st.text}.`);
   }
-  if (ticket && passState(ticket).left > 0) return fine(ticket, `${ticket.name}: ${passState(ticket).text}.`);
+  if (ticket) return fine(ticket, `${ticket.name}: ${passState(ticket).text}.`);
   block.blocked = true;
   return block;
 }
@@ -323,7 +369,12 @@ function purchase(kind, org) {
   } else if (kind === "renew") {
     const r = renewalOf(pass); if (!r) return;
     pass.until = r.season.end; S.ledger.push({ pass: pass.id, delta: 0, kind: "renew", reason: `Renewed for ${r.season.name}, valid until ${fDate(r.season.end)}`, at: now() });
-  } else if (kind === "pack") S.ledger.push({ pass: pass.id, delta: pack.buy, kind: "grant", reason: `Bought ${pack.name}`, at: now() });
+  } else if (kind === "pack") {
+    /* A pack tops up a credit pass. Next to a season pass it is a pass of its own, so the season pass's rules stay as they are. */
+    let to = pass && pass.kind === "credits" ? pass : packOf(org);
+    if (!to) { to = { id: `k-${org}`, org, name: pack.name, kind: "credits", pack: true, until: o.season.end }; S.passes.push(to); }
+    S.ledger.push({ pass: to.id, delta: pack.buy, kind: "grant", reason: `Bought ${pack.name}`, at: now() });
+  }
 }
 /* Every state-changing call takes an idempotency key. The same key always returns the first result and changes nothing. */
 function remember(key, r) { if (key) S.idem[key] = { ok: r.ok, status: r.status || null, code: r.code || null, msg: r.msg, bid: r.bid || null, blocked: !!r.blocked }; return r; }
@@ -379,7 +430,7 @@ function leaveWait(sid) {
 function freeSpot(sid) {
   const s = S.sessions[sid]; if (s.others <= 0) return "Nobody else is booked.";
   s.left = (s.left || 0) + 1; s.others--;
-  return passSpotOn(s, "A spot opened");
+  return passSpotOn(s, "A spot opened", true);
 }
 /* A free spot goes down the queue: people ahead of the member first, then the member.
    Auto mode books her through the same checks. Offer mode (a club setting) holds the spot for her for a set time. */
@@ -392,14 +443,15 @@ function settleOther(s) {
   const w = myWait(s.id); if (w && !w.offer) w.pos = Math.max(1, w.pos - 1);
   syncHeld(s); return true;
 }
-function passSpotOn(s, lead) {
+/* `named` is for the club's own screens. What a member reads never names another member on the waitlist. */
+function passSpotOn(s, lead, named) {
   settleOther(s); // a spot still held for someone else is taken by them before the next spot moves
   const w = myWait(s.id), set = S.settings[s.org];
   const short = lead === "It" || lead === "The spot" || lead === "Your spot"; // "It went to the next person." rather than "A spot opened and went to ..."
   if (s.waitOthers > 0 && set.waitlistMode === "offer") {
     /* Offer mode holds the spot for the next person, whoever that is, and it runs out (QA-01). */
     s.offerTo = { name: rosterNames(s).waiting[0] || "the next person", expiresAt: new Date(now().getTime() + set.offerHoldMin * 60000) }; syncHeld(s);
-    return `${lead}${short ? " is" : ". It is"} held for ${s.offerTo.name}, next on the waitlist, until ${fTime(s.offerTo.expiresAt)}. If they pass, it goes to the person after them.`;
+    return `${lead}${short ? " is" : ". It is"} held for ${named ? s.offerTo.name + ", next" : "the next person"} on the waitlist, until ${fTime(s.offerTo.expiresAt)}. If they pass, it goes to the person after them.`;
   }
   if (s.waitOthers > 0) { s.waitOthers--; s.others++; if (w) w.pos = Math.max(1, w.pos - 1); return `${lead}${short ? "" : " and"} went to the next person on the waitlist.` + (w ? ` ${S.me.name} moved up to #${w.pos}.` : ""); }
   if (!w) return short ? `${lead} is open again for anyone to book.` : `${lead}.`;
@@ -517,7 +569,7 @@ function endSeries(id) { const se = S.series.find((x) => x.id === id); S.series 
 
 /* ---------- roster: confirmed bookings of that session, plus explicit walk-ins. Nothing else. ---------- */
 function rosterNames(s) {
-  const off = Math.floor(hash(s.id + "n") * NAMES.length), base = NAMES.slice(off).concat(NAMES.slice(0, off)), left = (s.left || 0) % NAMES.length;
+  const pool = poolOf(s), off = Math.floor(hash(s.id + "n") * pool.length), base = pool.slice(off).concat(pool.slice(0, off)), left = (s.left || 0) % pool.length;
   const w = myWait(s.id), ahead = base.slice(left + s.others, left + s.others + s.waitOthers), behind = w ? base.slice(left + s.others + s.waitOthers, left + s.others + s.waitOthers + (w.behind || 0)) : [];
   return { booked: base.slice(left, left + s.others), waiting: ahead, queue: w ? [...ahead, S.me.name, ...behind] : ahead };
 }
@@ -632,7 +684,7 @@ function applyDraft(d) {
 
 /* ---------- the rule-based next step ---------- */
 function nextStep() {
-  const st = stats(), T = today(), over = S.invoices.find((i) => i.status === "open" && i.due < T);
+  const st = stats(), T = today(), over = myInvoices().find(overdue);
   const held = S.waitlist.find((w) => w.offer);
   if (held) { const s = S.sessions[held.sid], can = check(s, { ignoreWait: true }).ok; return { kind: "offer", title: `A spot is held for you: ${offOf(s).name}`, meta: `${fDay(s.start)} ${fTime(s.start)} · ${ORGS[s.org].name} · held until ${fTime(held.offer.expiresAt)}`, cta: can ? "Take the spot" : "See your options", a: can ? "offer-accept" : "sheet", v: s.id, reason: "You were next on the waitlist and a spot opened. It is yours until the hold runs out, then it goes to the next person.", factors: [`Held until ${fDay(held.offer.expiresAt)} ${fTime(held.offer.expiresAt)}`, can ? "Nothing is charged until you take it" : "Your pass is used up, so taking it needs a drop-in or an upgrade"] }; }
   const gone = openNotice();

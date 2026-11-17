@@ -175,6 +175,9 @@ table { border-collapse: collapse; width: 100%; font-size: 14px; line-height: 20
 th, td { text-align: left; padding: 12px 12px 12px 0; border-top: 1px solid var(--hairline); vertical-align: middle; }
 th { font-weight: 400; color: var(--text-2); border-top: 0; }
 .scroll { overflow-x: auto; scrollbar-width: none; }
+/* A long table (the member list) scrolls inside its card, so what follows it stays within reach. */
+.scroll.tall { max-height: 480px; overflow-y: auto; }
+.scroll.tall thead th { position: sticky; top: 0; background: var(--surface); }
 .tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 @media (min-width: 700px) { .tiles { grid-template-columns: repeat(4, 1fr); } }
 svg text { font-family: var(--body); font-size: 11px; fill: var(--text-2); }

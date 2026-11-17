@@ -108,7 +108,7 @@ test.describe("Booking rules under pressure", () => {
               }
             } else if (op < 0.86) {
               if (rnd() < 0.5) d.purchase("dropin", rnd() < 0.5 ? "pau" : "studio");
-              else d.purchase("pack", "studio"); // only the studio sells a pack
+              else d.purchase("pack", rnd() < 0.5 ? "pau" : "studio");
               what = "purchase";
             } else if (op < 0.93) {
               s.others = Math.min(
@@ -304,7 +304,8 @@ test.describe("Booking rules under pressure", () => {
         again = d.book(s.id, "t").status;
       return { msg, held, again, to: s.offerTo.name, names: d.rosterNames(s).waiting };
     });
-    expect(r.msg).toMatch(/Your spot is held for .+, next on the waitlist, until 14:00/);
+    expect(r.msg).toContain("Your spot is held for the next person on the waitlist, until 14:00");
+    expect(r.msg, "a member is never told who else is waiting").not.toContain(r.to);
     expect(r.held).toEqual({ others: 17, waiting: 2, held: 1, spots: 0 });
     expect(r.again, "the member cannot book past the people waiting").toBe("waitlisted");
     expect(r.names[0]).toBe(r.to);
@@ -399,7 +400,14 @@ test.describe("Booking rules under pressure", () => {
     expect(path).toMatch(/Cancelled by the club: (Track|Gym) session/);
     expect(path).toContain("3 of 4 used in November");
     const week = await screen(page, "athlete", "week");
-    expect(week).toMatch(/Thu 19 Track session[^]*?Cancelled by the club/);
+    expect(week).toMatch(/Thu 19 Track session[^]*?Cancelled/);
+    await sim(page, (d) => {
+      d.state.day = "2026-11-19";
+      d.render();
+    });
+    await expect(page.locator("#gone-card")).toContainText(
+      "The club cancelled this session. It no longer counts towards November.",
+    );
     expect(await sim(page, (d) => d.state.waitlist.length)).toBe(0);
     expect(await screen(page, "athlete", "coach")).toContain(
       "PAU Trackrunning cancelled Track session on Thu 19 Nov at 18:30. Your booking is gone",
@@ -439,9 +447,11 @@ test.describe("Booking rules under pressure", () => {
           code: d.check(s).code,
           offers: d.offersFor(s).map((o: any) => o.kind),
           free: d.book(
-            Object.values(d.state.sessions).find(
-              (x: any) => x.org === "pau" && x.off === "community" && x.start > new Date(),
-            )!.id,
+            (
+              Object.values(d.state.sessions).find(
+                (x: any) => x.org === "pau" && x.off === "community" && x.start > new Date(),
+              ) as any
+            ).id,
             "t",
           ).ok,
         };

@@ -588,6 +588,162 @@ test.describe("PT coach: one-to-one work", () => {
   });
 });
 
+test.describe("The demo data: one member list per club, the same on every layer", () => {
+  test("each club has about 120 members and four coaches, and the two clubs are different people", async ({
+    page,
+  }) => {
+    await start(page);
+    const d = await sim(page, (d) => {
+      const pau = d.members("pau").map((m: any) => m.name),
+        studio = d.members("studio").map((m: any) => m.name);
+      return {
+        pau: pau.length,
+        studio: studio.length,
+        unique: new Set([...pau, ...studio]).size,
+        coaches: [d.ORGS.pau.coaches.length, d.ORGS.studio.coaches.length],
+        offCoaches: ["pau", "studio"].map((o) => [
+          ...new Set(d.ORGS[o].offerings.map((x: any) => x.coach)),
+        ]),
+        teams: ["pau", "studio"].map((o) => d.ORGS[o].coaches.map((c: any) => c[0])),
+      };
+    });
+    expect(d).toMatchObject({ pau: 120, studio: 120, unique: 240, coaches: [4, 4] });
+    // Every coach on a session is on the club's coach list.
+    (d.offCoaches as string[][]).forEach((list, i) =>
+      list.forEach((c) => expect(d.teams[i]).toContain(c)),
+    );
+    for (const org of ["pau", "studio"] as const) {
+      const text = await screen(page, "admin", "members", org);
+      expect(text).toMatch(/121 members: \d+ active, \d+ on trial, \d+ paused\./);
+      expect(text).toContain("COACHES · 4");
+      expect(await page.locator("#member-table tbody tr").count()).toBe(121);
+    }
+  });
+  test("the coach's athletes, every session roster and the waitlists are people from the club's member list", async ({
+    page,
+  }) => {
+    await start(page);
+    for (const org of ["pau", "studio"] as const) {
+      const r = await sim(
+        page,
+        (d, org) => {
+          const S = d.state;
+          S.org = org;
+          const all = new Set([S.me.name, ...d.members(org).map((m: any) => m.name)]),
+            strangers: string[] = [];
+          for (const a of d.athletes()) if (!all.has(a.name)) strangers.push(`athlete ${a.name}`);
+          for (const s of d.sessList(org)) {
+            const n = d.rosterNames(s);
+            for (const name of [...n.booked, ...n.queue])
+              if (!all.has(name)) strangers.push(`${s.id}: ${name}`);
+            if (n.booked.length !== s.others)
+              strangers.push(`${s.id}: ${n.booked.length} names for ${s.others} booked`);
+            if (new Set(n.booked).size !== n.booked.length) strangers.push(`${s.id}: a name twice`);
+          }
+          return { strangers, athletes: d.athletes().length, groups: d.ORGS[org].me.groups };
+        },
+        org,
+      );
+      expect(r.strangers, org).toEqual([]);
+      expect(r.athletes, org).toBe(org === "pau" ? 49 : 25);
+      const text = await screen(page, "coach", "athletes", org);
+      expect(text).toContain(
+        org === "pau"
+          ? "Your groups: Track and Technique, 49 of 121 members."
+          : "Your group: Yoga, 25 of 121 members.",
+      );
+    }
+    // Someone on a studio session opens as a person, with what they share, from the coach's session view.
+    await sim(page, (d) => {
+      const S = d.state;
+      S.role = "coach";
+      S.org = "studio";
+      S.tab.coach = "week";
+      d.render();
+    });
+    await page.locator('#coach-week [data-kind="group"]').first().click();
+    await page.locator("#attendees .row").nth(1).click();
+    await expect(page.locator("#athlete-detail")).toBeVisible();
+    await expect(page.locator("#member-pass")).toContainText(
+      /Monthly 15 classes|10 classes|50 classes|Starter 7 classes|Drop-in/,
+    );
+  });
+  test("invoices: open, overdue and paid at both clubs, each for a member of that club; a member sees only her own", async ({
+    page,
+  }) => {
+    await start(page);
+    const r = await sim(page, (d) =>
+      ["pau", "studio"].map((org) => {
+        const inv = d.state.invoices.filter((i: any) => i.org === org),
+          names = new Set(["Mia Keller", ...d.members(org).map((m: any) => m.name)]);
+        return {
+          open: inv.filter((i: any) => i.status === "open" && i.due >= new Date()).length,
+          overdue: inv.filter((i: any) => i.status === "open" && i.due < new Date()).length,
+          paid: inv.filter((i: any) => i.status === "paid").length,
+          strangers: inv.filter((i: any) => !names.has(i.member)).length,
+        };
+      }),
+    );
+    expect(r).toEqual([
+      { open: 4, overdue: 3, paid: 3, strangers: 0 },
+      { open: 2, overdue: 2, paid: 2, strangers: 0 },
+    ]);
+    const money = await screen(page, "admin", "money");
+    expect(money).toMatch(/7 open, 3 of them overdue \(CHF [\d’',.]+\), 3 paid\./);
+    expect(money).toMatch(/overdue by 31 days/);
+    // Overdue first.
+    expect(await page.locator("#invoice-list .row").first().innerText()).toContain("overdue");
+    const me = await screen(page, "athlete", "me");
+    expect(
+      me.match(/CHF /g)!.length,
+      "Mia sees her one invoice and the pack price, not the club's",
+    ).toBeLessThan(4);
+    expect(me).not.toMatch(/overdue|Brunner|Meier|Huber/);
+    expect(await sim(page, (d) => d.nextStep().kind)).not.toBe("pay");
+  });
+  test("personal training is in use, and PAU sells a 10-session pack that books when the season pass is used up", async ({
+    page,
+  }) => {
+    await start(page);
+    expect(await sim(page, (d) => d.members("pau").filter((m: any) => m.pt).length)).toBe(10);
+    expect(await screen(page, "coach", "week")).toMatch(
+      /One-to-one · 60 min[^]*?PT 10-pack: \d+ of 10 left/,
+    );
+    expect(await screen(page, "admin", "members")).toMatch(/PT 10-pack, \d+ of 10 left/);
+    expect(await screen(page, "admin", "products")).toContain("10-session pack");
+    // Mia's drop-in pass is at 3 of 4. One more uses it up; the pack takes over after that.
+    await screen(page, "athlete", "me");
+    await page.getByRole("button", { name: "Buy 10-session pack · CHF 230.00" }).click();
+    await page.getByRole("button", { name: "Pay with TWINT" }).click();
+    await expect(page.locator("#pack")).toContainText("10-session pack: 10 credits left.");
+    const r = await sim(page, (d) => {
+      const a = d.book("pau-track-2026-11-19", "t"),
+        b = d.book("pau-gym-2026-11-20", "t");
+      return {
+        a: a.status,
+        b: b.status,
+        season: d.passState(d.passOf("pau")).text,
+        pack: d.passState(d.packOf("pau")).text,
+        usedPack: d.state.bookings.find((x: any) => x.id === b.bid).pass,
+      };
+    });
+    expect(r).toEqual({
+      a: "confirmed",
+      b: "confirmed",
+      season: "4 of 4 used in November",
+      pack: "9 credits left",
+      usedPack: "k-pau",
+    });
+    // Cancelling gives the pack credit back.
+    expect(
+      await sim(page, (d) => {
+        d.cancel(d.myBooking("pau-gym-2026-11-20").id);
+        return d.passState(d.packOf("pau")).text;
+      }),
+    ).toBe("10 credits left");
+  });
+});
+
 test.describe("Admin: running the club", () => {
   test("changes the waitlist rule, and the engine follows it", async ({ page }) => {
     await start(page);
@@ -614,11 +770,11 @@ test.describe("Admin: running the club", () => {
   }) => {
     await start(page);
     await screen(page, "admin", "money");
-    await page.getByRole("button", { name: /Mark paid/ }).click();
+    expect(await screen(page, "admin", "dash")).toMatch(/7 Open invoices, 3 overdue/);
+    await screen(page, "admin", "money");
+    await page.getByRole("button", { name: "Mark paid: CHF 300.00, Mia Keller" }).click();
     expect(await screen(page, "athlete", "me")).toMatch(/INVOICES CHF 300.00 [^]*? Paid/);
-    expect(await screen(page, "admin", "dash")).toMatch(
-      /0 Open invoices CHF 300.00 Paid in test mode/,
-    );
+    expect(await screen(page, "admin", "dash")).toMatch(/6 Open invoices, 3 overdue/);
     expect(await screen(page, "admin", "money")).toMatch(
       /AUDIT LOG [^]*(paid|Paid)[^]*Mia Keller|AUDIT LOG [^]*PAU-2026-0042/,
     );
@@ -646,7 +802,7 @@ test.describe("Admin: running the club", () => {
     // Not built (dashboard milestone C, retention radar).
   });
   test.fixme("sends payment reminders for open and overdue invoices", () => {
-    // Not built: there is one open invoice and "Mark paid". No overdue state, no reminders.
+    // Not built: open and overdue invoices are listed and can be marked paid. Sending a reminder is not built.
   });
   test.fixme("imports members from a CSV file", () => {
     // Not built.

@@ -239,7 +239,7 @@ test.describe("Waitlist: offer with expiry", () => {
     await page.clock.setFixedTime(minutesLater(121));
     await tab(page, "Coach");
     await expect(page.locator(".msg.coach").last()).toContainText(
-      /ran out at 14:00\. It is held for \w+ \w+, next on the waitlist, until 16:01/,
+      "ran out at 14:00. It is held for the next person on the waitlist, until 16:01",
     );
     const after = await demo(page, (d) => {
       const s = d.state.sessions["studio-yoga-2026-11-19"];
@@ -304,7 +304,7 @@ test.describe("Waitlist: offer with expiry", () => {
     );
     await page.getByRole("dialog").getByRole("button", { name: "Pass it on" }).click();
     await expect(toast(page)).toContainText(
-      /You passed on the spot\. It is held for \w+ \w+, next on the waitlist, until \d\d:\d\d/,
+      /You passed on the spot\. It is held for the next person on the waitlist, until \d\d:\d\d/,
     );
     expect(
       await demo(page, (d) => {
