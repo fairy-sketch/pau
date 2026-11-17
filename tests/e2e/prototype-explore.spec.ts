@@ -22,6 +22,13 @@ test("the icon top right opens a photo grid of clubs, coaches and pros", async (
   await expect(tiles(page)).toHaveCount(31);
   await expect(page.locator("#xcount")).toHaveText("31 of 31");
   // Every tile shows one of the supplied photos, and it loads.
+  await expect
+    .poll(() =>
+      page
+        .locator("#xgrid img")
+        .evaluateAll((els) => els.every((e) => (e as HTMLImageElement).complete)),
+    )
+    .toBe(true);
   const imgs = await page.locator("#xgrid img").evaluateAll((els) =>
     els.map((e) => ({
       ok: (e as HTMLImageElement).naturalWidth > 0,
@@ -324,4 +331,35 @@ test("Explore passes axe (WCAG A and AA), has 44 px targets and names on every c
   await say(page, "Suggest something new for me");
   await check("coach suggestions");
   expect(problems).toEqual([]);
+});
+
+test("the PATH logo always leads back to the start page of the role", async ({ page }) => {
+  await open(page);
+  const logo = page.getByRole("button", { name: "PATH, back to your start page" });
+  const current = page.locator('nav [aria-current="page"]');
+  // From deep inside Explore, with a sheet open.
+  await explore(page).click();
+  await tiles(page).filter({ hasText: "First climb" }).click();
+  await page.locator("#booknow").getByRole("button", { name: "Book, free" }).click();
+  await page.keyboard.press("Escape");
+  await logo.click();
+  await expect(current).toHaveText("Path");
+  await expect(page.locator("#view")).toContainText("Your goal");
+  await expect(page.locator("#view")).toHaveJSProperty("scrollTop", 0);
+  // From any tab, and it keeps the club you are in.
+  await page.getByLabel("Club").selectOption("studio");
+  await tab(page, "Me");
+  await logo.click();
+  await expect(current).toHaveText("Path");
+  await expect(page.getByLabel("Club")).toHaveValue("studio");
+  // Coach: from an open roster back to Today. Admin: back to Home.
+  await page.getByLabel("View as").selectOption("coach");
+  await page.locator('[data-a="roster"]').first().click();
+  await logo.click();
+  await expect(current).toHaveText("Today");
+  await expect(page.getByRole("heading", { name: "Your sessions" })).toBeVisible();
+  await page.getByLabel("View as").selectOption("admin");
+  await tab(page, "Money");
+  await logo.click();
+  await expect(current).toHaveText("Home");
 });

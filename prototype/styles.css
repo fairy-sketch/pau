@@ -31,7 +31,7 @@ h1, h2, h3, p, ul, ol { margin: 0; padding: 0; } ul, ol { list-style: none; }
 #app { position: relative; height: 100%; max-width: 460px; margin: 0 auto; display: flex; flex-direction: column; background: var(--bg); }
 #app.wide { max-width: 960px; }
 .top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 24px 8px; }
-.top .name { font: 800 18px/1 var(--heading); letter-spacing: -.01em; margin-right: auto; }
+.top .name { font: 800 18px/1 var(--heading); letter-spacing: -.01em; margin-right: auto; min-height: 44px; min-width: 44px; text-align: left; }
 .top select { appearance: none; background: var(--surface); border: 1px solid var(--hairline); border-radius: 999px; height: 44px; padding: 0 12px; font-size: 13px; font-weight: 500; max-width: 29%; text-overflow: ellipsis; }
 .banner { margin: 0 24px 8px; display: flex; align-items: center; gap: 8px; background: var(--soft); border-radius: var(--r-control); padding: 0 0 0 12px; font-size: 12px; color: var(--text-2); }
 .banner span { flex: 1; }
