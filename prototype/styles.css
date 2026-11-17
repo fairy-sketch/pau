@@ -274,3 +274,12 @@ svg text { font-family: var(--body); font-size: 11px; fill: var(--text-2); }
 .filters, .quick { padding-top: 20px; padding-bottom: 20px; }
 .filters { margin-top: -20px; margin-bottom: -20px; }
 .quick { margin-top: -12px; margin-bottom: -12px; }
+
+/* ---- Coach dashboard (milestone A) ---- */
+/* Status marks follow the week markers: filled = needs you, ring = watch, faint = on track. Never colour alone; the reason is always written out. */
+.sdot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; border: 1.5px solid #c9c8c2; vertical-align: 1px; }
+.sdot.watch { border-color: var(--text); }
+.sdot.needs { background: var(--text); border-color: var(--text); }
+.pline { display: block; height: 4px; margin: 8px 0; border-radius: 999px; background: var(--bg); box-shadow: inset 1px 1px 2px rgba(0,0,0,.14), inset -1px -1px 1px #fff; overflow: hidden; }
+.pline b { display: block; height: 100%; border-radius: 999px; background: var(--text); }
+.card .rows { margin: 0 0 -12px; }

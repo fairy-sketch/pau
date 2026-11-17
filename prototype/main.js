@@ -7,7 +7,7 @@ const mono = (o) => esc(ORGS[o].name.trim()[0].toUpperCase());
 let lastKey = "", swipeClickGuard = -1e9;
 function render() {
   ensureSessions(); sweep(); sweepProposals(); sweepOffers(); runSeries();
-  const app = document.getElementById("app"), tab = S.tab[S.role], key = S.role + tab + S.org + (S.rosterSid || "") + (tab === "explore" ? S.explore.open || "" : ""), old = document.getElementById("view"), top = old && key === lastKey ? old.scrollTop : 0;
+  const app = document.getElementById("app"), tab = S.tab[S.role], key = S.role + tab + S.org + (S.rosterSid || "") + ((S.dash && S.dash.athlete) || "") + (tab === "explore" ? S.explore.open || "" : ""), old = document.getElementById("view"), top = old && key === lastKey ? old.scrollTop : 0;
   const body = S.role === "athlete" ? { path: vPath, coach: vCoachChat, log: vLog, week: vWeek, me: vMe, explore: vExplore }[tab]() : S.role === "coach" ? vCoach() : vAdmin();
   const badge = S.role === "coach" ? S.alerts.filter((a) => a.status === "open" && (a.info || shares("alerts.pain"))).length : 0;
   app.className = S.role === "admin" ? "wide" : "";
@@ -172,9 +172,12 @@ document.addEventListener("pointerup", (e) => {
 });
 document.addEventListener("pointercancel", () => { swipe = null; });
 
+/* The coach and club dashboard brings its own actions (dash.js). Leaving a tab or going home also leaves an open athlete. */
+Object.assign(ACT, DASH_ACT);
+for (const k of ["home", "tab"]) { const f = ACT[k]; ACT[k] = (v) => { const r = f(v); if (S.dash) S.dash.athlete = null; return r; }; }
 /* For the tests and for poking around in the console. */
 window.PATH_DEMO = {
-  get state() { return S; }, ui: UI, ORGS, LOAD_LIMIT, CARD_TTL_MIN, STORE_KEY,
+  get state() { return S; }, athletes, statusOf, roster, ui: UI, ORGS, LOAD_LIMIT, CARD_TTL_MIN, STORE_KEY,
   render, seed, save, load, resetDemo, book, cancel, check, freeSpot, leaveWait, passState, passOf, stats, guard, guardDraft, currentDraft, RAW_DRAFT,
   newForm, toLog, ask, confirmProposal, toggleAct, runAct, planLocked, nextChangeable, applyDraft, shiftWeek, weekIndex,
   parseClub, agenda, openPain, OFFERS, openOffers, exploreList, tryPlan, dropPlan, tryToday, providerOf, signUp, dropSignup, signedUp, offerStart, offerKm, offersFor, purchase, acceptOffer, declineOffer, sweepOffers, waitTotal, createSeries, previewSeries, pauseSeries, endSeries, runSeries, seriesRows, seriesSummary, findSeries, sweepProposals, parseWhen, parseOffering, rosterRows, rosterNames, addWalkin, markAttendance, memoryFor, upcomingBookings, sessList, myBooking, myWait, spots, nextStep,

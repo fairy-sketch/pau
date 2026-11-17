@@ -262,6 +262,7 @@ test("B2 one pass balance: Path, Coach and Me agree before a booking, after it, 
   await page.keyboard.press("Escape");
   await asRole(page, "coach");
   await tab(page, "Athletes");
+  await page.locator('[data-a="athlete"][data-v="mia"]').click(); // the roster first, then her page
   await expect(page.locator("#view [data-pass]")).toHaveAttribute(
     "data-text",
     "3 of 4 used in November",

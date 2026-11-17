@@ -31,7 +31,7 @@ const ORGS = {
     policy: { opensDays: 60, cancelMin: 120, lateCancel: "none", waitlist: true },
     offerings: [
       { id: "track", sport: "running", name: "Track session", days: [1, 4], time: [18, 30], dur: 90, cap: 30, loc: "Sportanlage Fronwald", coach: "Coach Sara", intensity: "high" },
-      { id: "gym", sport: "gym", name: "Gym session", days: [2, 5], time: [18, 0], dur: 60, cap: 15, loc: "Balboa Underground", coach: "Coach Jonas", intensity: "medium" },
+      { id: "gym", sport: "gym", name: "Gym session", days: [2, 5], time: [18, 0], dur: 60, cap: 15, loc: "Balboa Underground", coach: "Coach Marco", intensity: "medium" },
       { id: "technique", sport: "running", name: "Technique session", days: [3], time: [18, 30], dur: 60, cap: 20, loc: "Sportanlage Fronwald", coach: "Coach Sara", intensity: "low" },
       { id: "community", sport: "running", name: "Saturday community session", days: [6], time: [10, 0], dur: 75, cap: 40, loc: "Sportanlage Fronwald", coach: "Open to everyone", intensity: "low", free: true },
     ],

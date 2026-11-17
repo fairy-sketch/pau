@@ -374,7 +374,7 @@ test("the PATH logo always leads back to the start page of the role", async ({ p
   await page.locator('[data-a="roster"]').first().click();
   await logo.click();
   await expect(current).toHaveText("Today");
-  await expect(page.getByRole("heading", { name: "Your sessions" })).toBeVisible();
+  await expect(page.locator("#coach-today")).toBeVisible();
   await asRole(page, "admin");
   await tab(page, "Money");
   await logo.click();
