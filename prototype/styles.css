@@ -44,7 +44,7 @@ h1, h2, h3, p, ul, ol { margin: 0; padding: 0; } ul, ol { list-style: none; }
 
 /* Header: the wordmark on the content edge, one round club button on the right. */
 .top { display: flex; align-items: center; justify-content: space-between; padding: calc(8px + env(safe-area-inset-top, 0px)) var(--m) 8px; }
-.top .name { min-height: 44px; min-width: 44px; display: flex; align-items: center; font: 700 20px/1 var(--heading); letter-spacing: -.01em; color: var(--text); }
+.top .name { min-height: 44px; min-width: 44px; display: flex; align-items: center; font: 900 20px/1 var(--heading); letter-spacing: -.02em; color: var(--text); }
 .clubbtn { width: 44px; height: 44px; margin-right: -4px; display: grid; place-items: center; border-radius: 999px; }
 .mono36 { flex: none; width: 36px; height: 36px; border-radius: 999px; background: var(--surface); box-shadow: var(--shadow); display: grid; place-items: center; font: 500 14px/1 var(--heading); color: var(--text); }
 .x { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 999px; color: var(--text-2); flex: none; }
