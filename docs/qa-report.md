@@ -101,7 +101,7 @@ Numbers 1, 2, 3 and 6 are done in phase 4; 7 and 8 in part (focus, empty states)
 
 ## Three things to build next to beat Kenko and Eversports
 
-Both are booking and payment tools for the club. Neither knows what the member is training for. PATH's edge is that the booking, the plan and the coach are one thing.
+Both are booking and payment tools for the club. Neither knows what the member is training for. PATH's edge is that the booking, the plan and the coach are one thing. (This is a general picture of the two products; they were not looked up for this report.)
 
 1. **The model behind the coach chat, on the one plan.** "Move my long run to Saturday and book me into track instead" as one confirm card that changes the plan and the bookings together. The rules, the confirm cards and the single plan are in place; this is the step from a script to the product.
 2. **The coach's day in five minutes** (dashboard B: live session, per-athlete note at check-in, group recap, edit and bulk approve in Review). A booking tool tells a coach who is coming. PATH tells them who needs what today and drafts the follow-up.
