@@ -1,0 +1,642 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- the demo is plain browser JS; its test hook (window.PATH_DEMO) has no types. */
+import { expect, test } from "@playwright/test";
+
+import {
+  ALL_SCREENS,
+  BROKEN_TEXT,
+  ZURICH,
+  clock,
+  layoutProblems,
+  screen,
+  sim,
+  start,
+} from "./harness";
+
+/** Stress and edge cases: the booking rules under pressure, time, empty and extreme data, and the device. */
+
+test.describe("Booking rules under pressure", () => {
+  test("thirty attempts on the last spot: one booking, one debit; a repeated request returns its first answer", async ({
+    page,
+  }) => {
+    await start(page);
+    const r = await sim(page, (d) => {
+      const S = d.state,
+        sid = "pau-track-2026-11-19",
+        s = S.sessions[sid];
+      s.others = s.cap - 1;
+      const res = [...Array(30)].map((_, i) => d.book(sid, "sheet", `burst-${i}`));
+      const first = d.book(sid, "sheet", "burst-0"),
+        again = d.book(sid, "sheet", "burst-7");
+      return {
+        confirmed: res.filter((x) => x.status === "confirmed").length,
+        refused: res.filter((x) => x.code === "ALREADY_BOOKED").length,
+        bookings: S.bookings.filter((b: any) => b.sid === sid && b.status === "confirmed").length,
+        debits: S.ledger.filter((l: any) => l.kind === "debit_booking" && /19 Nov/.test(l.reason))
+          .length,
+        spots: d.spots(s),
+        first: first.status,
+        again: again.code,
+        over: s.others + 1 > s.cap,
+      };
+    });
+    expect(r).toEqual({
+      confirmed: 1,
+      refused: 29,
+      bookings: 1,
+      debits: 1,
+      spots: 0,
+      first: "confirmed",
+      again: "ALREADY_BOOKED",
+      over: false,
+    });
+  });
+  test.fixme("thirty different members on the last spot at the same moment", () => {
+    // Cannot be tested here: the demo is one person's phone with no server. This belongs to the real backend
+    // (one database transaction per booking), which is not built yet (M1).
+  });
+
+  test("two thousand random actions over five days never break the books", async ({ page }) => {
+    test.setTimeout(120_000);
+    await start(page);
+    let seed = 20261116;
+    const problems: string[] = [];
+    for (let batch = 0; batch < 40 && problems.length < 5; batch++) {
+      const found = await sim(
+        page,
+        (d, seed) => {
+          let a = seed;
+          const rnd = () => {
+            a |= 0;
+            a = (a + 0x6d2b79f5) | 0;
+            let t = Math.imul(a ^ (a >>> 15), 1 | a);
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+          };
+          const S = d.state,
+            pick = (xs: any[]) => xs[Math.floor(rnd() * xs.length)],
+            out: string[] = [],
+            HELD = ["confirmed", "attended", "no_show"];
+          const upcoming = () =>
+            Object.values(S.sessions).filter(
+              (s: any) => s.start > new Date() && s.start < new Date(Date.now() + 9 * 864e5),
+            );
+          for (let i = 0; i < 50; i++) {
+            const op = rnd(),
+              s: any = pick(upcoming());
+            let what = "";
+            if (op < 0.34) {
+              d.book(s.id, "sim", null, { wait: rnd() < 0.6 });
+              what = `book ${s.id}`;
+            } else if (op < 0.5) {
+              const b: any = pick(S.bookings.filter((x: any) => x.status === "confirmed"));
+              if (b) {
+                d.cancel(b.id);
+                what = `cancel ${b.sid}`;
+              }
+            } else if (op < 0.72) {
+              d.freeSpot(s.id);
+              what = `free ${s.id}`;
+            } else if (op < 0.8) {
+              const w: any = pick(S.waitlist);
+              if (w) {
+                if (w.offer && rnd() < 0.6) d.acceptOffer(w.sid);
+                else if (w.offer) d.declineOffer(w.sid);
+                else d.leaveWait(w.sid);
+                what = `waitlist ${w.sid}`;
+              }
+            } else if (op < 0.86) {
+              if (rnd() < 0.5) d.purchase("dropin", rnd() < 0.5 ? "pau" : "studio");
+              else d.purchase("pack", "studio"); // only the studio sells a pack
+              what = "purchase";
+            } else if (op < 0.93) {
+              s.others = Math.min(
+                s.cap - (d.myBooking(s.id) ? 1 : 0) - (s.held || 0),
+                s.others + 1 + Math.floor(rnd() * 3),
+              );
+              what = `others book ${s.id}`;
+            } else {
+              const b: any = pick(S.bookings.filter((x: any) => HELD.includes(x.status)));
+              if (b) {
+                d.markAttendance(b.sid, S.me.name, pick(["present", "late", "absent"]));
+                what = `attendance ${b.sid}`;
+              }
+            }
+            // The books, after every single action.
+            for (const x of Object.values(S.sessions) as any[]) {
+              const mine = S.bookings.filter(
+                  (b: any) => b.sid === x.id && HELD.includes(b.status),
+                ).length,
+                w = S.waitlist.filter((q: any) => q.sid === x.id);
+              if (mine > 1) out.push(`${what}: booked twice into ${x.id}`);
+              if (x.others + mine + (x.held || 0) > x.cap)
+                out.push(
+                  `${what}: ${x.id} over capacity (${x.others}+${mine}+${x.held || 0} of ${x.cap})`,
+                );
+              if (x.others < 0 || x.waitOthers < 0 || d.spots(x) < 0)
+                out.push(`${what}: negative count in ${x.id}`);
+              if (w.length > 1) out.push(`${what}: on the waitlist twice for ${x.id}`);
+              if (w.length && mine) out.push(`${what}: booked and waiting for ${x.id}`);
+              if (w.some((q: any) => q.pos < 1))
+                out.push(`${what}: waitlist position below 1 in ${x.id}`);
+              if (w.some((q: any) => q.offer) !== !!x.held)
+                out.push(`${what}: held spot and offer disagree in ${x.id}`);
+            }
+            for (const p of S.passes) {
+              const st = d.passState(p);
+              if (p.kind === "credits" && st.left < 0)
+                out.push(`${what}: ${p.name} has ${st.left} credits`);
+              if (p.kind === "limit" && st.used > st.max)
+                out.push(`${what}: ${p.name} at ${st.used} of ${st.max}`);
+            }
+            for (const b of S.bookings as any[]) {
+              if (!b.pass) continue;
+              const net = S.ledger
+                .filter((l: any) => l.bid === b.id)
+                .reduce((n: number, l: any) => n + l.delta, 0);
+              if (HELD.includes(b.status) && net !== -1)
+                out.push(`${what}: booking ${b.id} (${b.status}) nets ${net} on the pass`);
+              if (b.status === "cancelled" && net !== 0)
+                out.push(`${what}: cancelled booking ${b.id} nets ${net}`);
+            }
+            if (out.length) break;
+          }
+          return { out: out.slice(0, 3), next: Math.floor(rnd() * 1e9) };
+        },
+        seed,
+      );
+      problems.push(...found.out);
+      seed = found.next;
+      await clock(
+        page,
+        new Date(ZURICH("2026-11-16T12:00").getTime() + (batch + 1) * 3 * 3600_000),
+      ); // three hours on: sessions start, holds run out
+    }
+    expect(problems).toEqual([]);
+  });
+
+  test("a double tap on Book books once", async ({ page }) => {
+    await start(page);
+    await screen(page, "athlete", "week");
+    await page.locator("#classcard .btn.acc").first().dblclick();
+    expect(
+      await sim(page, (d) => ({
+        n: d.state.bookings.filter(
+          (b: any) => b.sid === "pau-track-2026-11-16" && b.status === "confirmed",
+        ).length,
+        toast: d.ui.toast,
+      })),
+    ).toEqual({
+      n: 1,
+      toast: "Booked: Track session, Mon 16 Nov 18:30. Free cancel until Mon 16 Nov 16:30.",
+    });
+  });
+
+  test("no booking in the past, none before the window opens, and the studio's daily limit holds", async ({
+    page,
+  }) => {
+    await start(page);
+    const r = await sim(page, (d) => {
+      const S = d.state,
+        day = Object.values(S.sessions)
+          .filter((s: any) => s.org === "studio" && s.id.endsWith("2026-11-18"))
+          .sort((a: any, b: any) => a.start - b.start) as any[];
+      return {
+        past: d.book("pau-track-2026-11-12", "t").code,
+        early: d.book("studio-hiit-2026-11-25", "t").msg,
+        day: day.map((s) => {
+          const x = d.book(s.id, "t");
+          return x.ok ? x.status : x.code;
+        }),
+      };
+    });
+    expect(r.past).toBe("WINDOW_CLOSED");
+    expect(r.early).toBe("Booking opens 6 days before. This one opens on Thu 19 Nov.");
+    expect(r.day).toEqual(["confirmed", "confirmed", "LIMIT_REACHED", "LIMIT_REACHED"]);
+  });
+
+  test("a late cancel at the studio keeps the credit, and says so", async ({ page }) => {
+    await start(page);
+    await clock(page, ZURICH("2026-11-17T16:00")); // yoga is at 18:45, the deadline was 14:45
+    const r = await sim(page, (d) => {
+      const b = d.state.bookings.find((x: any) => x.sid === "studio-yoga-2026-11-17"),
+        before = d.passState(d.passOf("studio")).left,
+        c = d.cancel(b.id);
+      return {
+        msg: c.msg,
+        same: d.passState(d.passOf("studio")).left === before,
+        status: c.status,
+      };
+    });
+    expect(r).toEqual({
+      msg: "Cancelled: Yoga flow, Tue 17 Nov. This was inside the cancel deadline, so the credit is not returned.",
+      same: true,
+      status: "late_cancelled",
+    });
+  });
+
+  test("when a member cancels out of a full session, the spot goes to the next person waiting", async ({
+    page,
+  }) => {
+    test.fail(
+      true,
+      "QA-01: a member's own cancel leaves the spot open; the people waiting are skipped, and the member can rebook past them",
+    );
+    await start(page);
+    const r = await sim(page, (d) => {
+      const S = d.state,
+        s = S.sessions["pau-track-2026-11-19"];
+      s.others = s.cap - 1;
+      s.waitOthers = 2;
+      const b = d.book(s.id, "t");
+      d.cancel(b.bid);
+      return { others: s.others, waiting: s.waitOthers, spots: d.spots(s) };
+    });
+    expect(r).toEqual({ others: 30, waiting: 1, spots: 0 });
+  });
+  test("two bookings at the same time in two clubs are not made without a word", async ({
+    page,
+  }) => {
+    test.fail(
+      true,
+      "QA-02: overlapping bookings are accepted silently (Track 18:30 to 20:00 at PAU and Ride 19:00 at the studio)",
+    );
+    await start(page);
+    const r = await sim(page, (d) => {
+      d.book("pau-track-2026-11-19", "t");
+      return d.book("studio-ride-2026-11-19", "t");
+    });
+    expect(r.ok ? r.msg : "refused").toMatch(/refused|same time|overlap|clash/i);
+  });
+  test("when the club cancels a session, booked members are told and get the session back", async ({
+    page,
+  }) => {
+    test.fail(
+      true,
+      "QA-03: a cancelled session leaves the booking confirmed and the credit used; only the Week card says Cancelled",
+    );
+    await start(page);
+    const r = await sim(page, (d) => {
+      const S = d.state,
+        b = d.book("pau-track-2026-11-19", "t");
+      S.sessions["pau-track-2026-11-19"].cancelled = true;
+      d.render();
+      return {
+        status: S.bookings.find((x: any) => x.id === b.bid).status,
+        pass: d.passState(d.passOf("pau")).text,
+      };
+    });
+    expect(r).toEqual({ status: "cancelled", pass: "3 of 4 used in November" });
+  });
+  test("a pass that has run out cannot book", async ({ page }) => {
+    test.fail(
+      true,
+      'QA-04: "Valid until 31 Mar 2027" is only a line of text; on 6 April the pass still books',
+    );
+    await start(page, new Date("2027-04-06T12:00:00+02:00"));
+    const r = await sim(page, (d) => {
+      const s: any = Object.values(d.state.sessions)
+        .filter((x: any) => x.org === "pau" && x.off === "track" && x.start > new Date())
+        .sort((a: any, b: any) => a.start - b.start)[0];
+      return d.book(s.id, "t").ok;
+    });
+    expect(r).toBe(false);
+  });
+});
+
+test.describe("Time: Europe/Zurich", () => {
+  test("the monthly pass turns over at midnight, and a December session booked in November counts in December", async ({
+    page,
+  }) => {
+    await start(page, ZURICH("2026-11-30T23:58"));
+    const a = await sim(page, (d) => ({
+      now: d.passState(d.passOf("pau")).text,
+      dec: d.book("pau-track-2026-12-03", "t").ok,
+      stillNov: d.passState(d.passOf("pau")).text,
+    }));
+    expect(a).toEqual({
+      now: "3 of 4 used in November",
+      dec: true,
+      stillNov: "3 of 4 used in November",
+    });
+    await clock(page, ZURICH("2026-12-01T00:02"));
+    expect(await sim(page, (d) => d.passState(d.passOf("pau")).text)).toBe(
+      "1 of 4 used in December",
+    );
+    expect(await screen(page, "athlete", "me")).toMatch(/1 \/ 4 used in December/);
+  });
+  test("across the switch to summer time, sessions keep their clock time and their cancel deadline", async ({
+    page,
+  }) => {
+    await start(page, ZURICH("2027-03-22T12:00"));
+    const r = await sim(page, (d) => {
+      const f = (id: string) =>
+        d.state.sessions[id].start.toLocaleString("en-GB", {
+          timeZone: "Europe/Zurich",
+          weekday: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      return {
+        before: f("pau-track-2027-03-25"),
+        after: f("pau-track-2027-03-29"),
+        msg: d.book("pau-track-2027-03-29", "t").msg,
+      };
+    });
+    expect(r).toEqual({
+      before: "Thu 18:30",
+      after: "Mon 18:30",
+      msg: "Booked: Track session, Mon 29 Mar 18:30. Free cancel until Mon 29 Mar 16:30.",
+    });
+  });
+  test("across the switch back to winter time too", async ({ page }) => {
+    await start(page, new Date("2027-10-25T12:00:00+02:00"));
+    const r = await sim(page, (d) => {
+      const f = (id: string) =>
+        d.state.sessions[id] &&
+        d.state.sessions[id].start.toLocaleString("en-GB", {
+          timeZone: "Europe/Zurich",
+          weekday: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      return [f("pau-track-2027-10-28"), f("pau-track-2027-11-01")];
+    });
+    expect(r).toEqual(["Thu 18:30", "Mon 18:30"]);
+  });
+});
+
+test.describe("Empty, extreme and broken data", () => {
+  test("a brand-new member with no bookings, logs or bests: no screen breaks or prints nonsense", async ({
+    page,
+  }) => {
+    await start(page);
+    await sim(page, (d) => {
+      const S = d.state;
+      Object.assign(S, {
+        entries: [],
+        bookings: [],
+        pbs: [],
+        ledger: [],
+        signups: [],
+        tryPlans: [],
+        waitlist: [],
+        series: [],
+      });
+      S.chat = S.chat.slice(0, 1);
+      S.dash = undefined;
+    });
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    for (const org of ["pau", "studio"] as const)
+      for (const [role, tab] of ALL_SCREENS)
+        expect(await screen(page, role, tab, org), `${org}/${role}/${tab}`).not.toMatch(
+          BROKEN_TEXT,
+        );
+    expect(errors).toEqual([]);
+  });
+  test("empty lists say what goes there", async ({ page }) => {
+    test.fail(
+      true,
+      "QA-17: Personal bests and Recent (in Log) show a bare heading when empty; the load chart draws an axis of 0, 1, 1",
+    );
+    await start(page);
+    await sim(page, (d) => {
+      const S = d.state;
+      Object.assign(S, { entries: [], bookings: [], pbs: [], ledger: [] });
+    });
+    expect(await screen(page, "athlete", "path")).not.toMatch(/PERSONAL BESTS\s*$/);
+    expect(await screen(page, "athlete", "log")).not.toMatch(/RECENT\s*$/);
+  });
+  test("very long names and titles wrap; nothing is cut off or pushed off the screen, at 360, 390 and 430 px", async ({
+    page,
+  }) => {
+    await start(page);
+    await sim(page, (d) => {
+      const S = d.state,
+        long = "Maximiliane-Alexandra Hohenzollern-Sigmaringen von und zu Liechtenstein";
+      S.me.name = long;
+      S.goal.title = "Sub-40 10K and the Jungfrau Marathon after it";
+      S.entries[0].title =
+        "Long run with the whole Saturday community group around the lake and back";
+      d.book("pau-track-2026-11-16", "t");
+    });
+    const bad: string[] = [];
+    for (const w of [360, 390, 430]) {
+      await page.setViewportSize({ width: w, height: 844 });
+      for (const [role, tab] of ALL_SCREENS) {
+        await screen(page, role, tab);
+        for (const p of await layoutProblems(page)) bad.push(`${w}px ${role}/${tab}: ${p}`);
+      }
+      await sim(page, (d) => {
+        const S = d.state;
+        S.role = "coach";
+        S.tab.coach = "athletes";
+        S.dash.athlete = "mia";
+        d.render();
+      });
+      for (const p of await layoutProblems(page)) bad.push(`${w}px coach/athlete page: ${p}`);
+      await sim(page, (d) => {
+        const S = d.state;
+        S.role = "coach";
+        S.tab.coach = "today";
+        S.rosterSid = "pau-track-2026-11-16";
+        d.render();
+      });
+      for (const p of await layoutProblems(page)) bad.push(`${w}px coach/check-in: ${p}`);
+    }
+    expect(bad).toEqual([]);
+  });
+  test("a log of 99,999 minutes is not accepted", async ({ page }) => {
+    test.fail(
+      true,
+      "QA-15: minutes have no upper limit; one typo (99999) is saved and distorts the load chart",
+    );
+    await start(page);
+    await screen(page, "athlete", "log");
+    await page.locator("#view input").first().fill("Run");
+    await page.locator("#log-dur").fill("99999");
+    await page.locator(".rpe button").nth(4).click();
+    const n = await sim(page, (d) => d.state.entries.length);
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    expect(await sim(page, (d) => d.state.entries.length)).toBe(n);
+  });
+  test("what people type is shown as text, never run as code", async ({ page }) => {
+    await start(page);
+    const X = '<img src=x onerror="window.__hit=1"><i id=inj>i</i>';
+    await screen(page, "athlete", "log");
+    await page.locator("#view input").first().fill(X);
+    await page.locator("#log-dur").fill("30");
+    await page.locator(".rpe button").nth(4).click();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await sim(
+      page,
+      (d, X) => {
+        d.ask(X);
+        d.addWalkin("pau-track-2026-11-16", X);
+        d.state.dash.notes = { mia: X };
+      },
+      X,
+    );
+    for (const [role, tab] of ALL_SCREENS) {
+      await screen(page, role, tab);
+      expect(await page.locator("#inj, img[src='x']").count(), `${role}/${tab}`).toBe(0);
+    }
+    expect(await page.evaluate(() => (window as any).__hit)).toBeUndefined();
+  });
+  test("a member's name is shown as text everywhere too", async ({ page }) => {
+    test.fail(
+      true,
+      "QA-05: the member's name is put into the page unescaped on Coach Review, Admin Members and Admin Money",
+    );
+    await start(page);
+    await sim(page, (d) => {
+      d.state.me.name = 'Mia <img src=x onerror="window.__hit=1">';
+    });
+    for (const [role, tab] of ALL_SCREENS) {
+      await screen(page, role, tab);
+      expect(await page.locator("img[src='x']").count(), `${role}/${tab}`).toBe(0);
+    }
+  });
+});
+
+test.describe("The device", () => {
+  test("offline: booking and logging still work, and everything is there after a reload", async ({
+    page,
+    context,
+  }) => {
+    await start(page);
+    await context.setOffline(true);
+    await sim(page, (d) => {
+      d.book("pau-track-2026-11-19", "t");
+      d.render();
+    });
+    await screen(page, "athlete", "log");
+    await page.locator("#view input").first().fill("Easy run");
+    await page.locator("#log-dur").fill("30");
+    await page.locator(".rpe button").nth(3).click();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await page.waitForTimeout(1300);
+    const before = await sim(page, (d) =>
+      JSON.stringify([d.state.bookings, d.state.ledger, d.state.entries.length]),
+    );
+    await context.setOffline(false);
+    await page.reload();
+    expect(
+      await sim(page, (d) =>
+        JSON.stringify([d.state.bookings, d.state.ledger, d.state.entries.length]),
+      ),
+    ).toBe(before);
+  });
+  test("a reload in the middle of a log keeps what was typed", async ({ page }) => {
+    await start(page);
+    await screen(page, "athlete", "log");
+    await page.locator("#view input").first().fill("Half-typed session");
+    await page.locator(".rpe button").nth(6).click();
+    await page.reload();
+    await expect(page.locator("#view input").first()).toHaveValue("Half-typed session");
+    await expect(page.locator('.rpe [aria-pressed="true"]')).toHaveText("7");
+  });
+  test("no screen scrolls sideways or pushes anything off screen at 360, 390 and 430 px, in both clubs", async ({
+    page,
+  }) => {
+    await start(page);
+    const bad: string[] = [];
+    for (const w of [360, 390, 430]) {
+      await page.setViewportSize({ width: w, height: 844 });
+      for (const org of ["pau", "studio"] as const)
+        for (const [role, tab] of ALL_SCREENS) {
+          await screen(page, role, tab, org);
+          for (const p of await layoutProblems(page))
+            bad.push(`${w}px ${org}/${role}/${tab}: ${p}`);
+        }
+    }
+    expect(bad).toEqual([]);
+  });
+  test("every control is at least 44 px at 360 px wide", async ({ page }) => {
+    test.fail(true, "QA-14: at 360 px the seven day buttons in Week are 42 px wide");
+    await start(page);
+    await page.setViewportSize({ width: 360, height: 844 });
+    await screen(page, "athlete", "week");
+    const small = await page.evaluate(
+      () =>
+        [...document.querySelectorAll<HTMLElement>("#app button")].filter((b) => {
+          const r = b.getBoundingClientRect();
+          return r.width && (r.width < 44 || r.height < 44);
+        }).length,
+    );
+    expect(small).toBe(0);
+  });
+  test("with a keyboard: the focus stays where the person is, and a sheet keeps it inside", async ({
+    page,
+  }) => {
+    test.fail(
+      true,
+      "QA-09: every action redraws the screen and drops the keyboard focus; sheets do not hold the focus or give it back",
+    );
+    await start(page);
+    await screen(page, "athlete", "week");
+    await page.locator(".filters .chip").nth(1).focus();
+    await page.keyboard.press("Enter");
+    expect(await page.evaluate(() => document.activeElement?.tagName)).toBe("BUTTON");
+    await page.locator('#classcard [data-a="sheet"]').first().click();
+    for (let i = 0; i < 12; i++) {
+      await page.keyboard.press("Tab");
+      expect(await page.evaluate(() => !!document.activeElement?.closest(".sheet"))).toBe(true);
+    }
+  });
+  test("Escape closes a sheet", async ({ page }) => {
+    await start(page);
+    await screen(page, "athlete", "week");
+    await page.locator('#classcard [data-a="sheet"]').first().click();
+    await expect(page.locator(".sheet")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".sheet")).toHaveCount(0);
+  });
+  test("the phone's Back button closes the sheet or goes one screen back; it does not leave the app", async ({
+    page,
+  }) => {
+    test.fail(true, "QA-10: the app keeps no history; Back leaves PATH from any screen");
+    await start(page);
+    await screen(page, "athlete", "week");
+    await page.locator('#classcard [data-a="sheet"]').first().click();
+    await page.goBack().catch(() => {});
+    await expect(page.getByRole("navigation", { name: "Sections" })).toBeVisible({ timeout: 1500 });
+    await expect(page.locator(".sheet")).toHaveCount(0);
+  });
+  test("screens draw fast: under 16 ms each, the heaviest list included", async ({ page }) => {
+    await start(page);
+    const ms = await sim(page, (d) => {
+      const S = d.state,
+        out: Record<string, number> = {};
+      for (const [r, t] of [
+        ["athlete", "path"],
+        ["athlete", "explore"],
+        ["coach", "athletes"],
+        ["admin", "sched"],
+      ] as [string, string][]) {
+        S.role = r;
+        S.tab[r] = t;
+        const t0 = performance.now();
+        for (let i = 0; i < 20; i++) d.render();
+        out[`${r}/${t}`] = (performance.now() - t0) / 20;
+      }
+      return out;
+    });
+    for (const [k, v] of Object.entries(ms)) expect(v, k).toBeLessThan(16);
+  });
+  test("Explore loads its photos as they come into view", async ({ page }) => {
+    test.fail(
+      true,
+      "QA-18: Explore requests all 38 photos at once (about 3 MB); none is lazy-loaded",
+    );
+    await start(page);
+    await screen(page, "athlete", "explore");
+    const lazy = await page.evaluate(
+      () =>
+        [...document.querySelectorAll<HTMLImageElement>("#xgrid img")].filter(
+          (i) => i.loading === "lazy",
+        ).length,
+    );
+    expect(lazy).toBeGreaterThan(20);
+  });
+});
