@@ -67,6 +67,8 @@ const P = {
   up: '<path d="M12 19V5M6 11l6-6 6 6"/>',
   tick: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   back: '<path d="M14.5 5.5 8 12l6.5 6.5"/>',
+  /* Settings (B-24): three sliders, drawn on the set's 24 grid with its 1.5 stroke and round ends. No sparkle: it is a tool, not a place. */
+  sliders: '<path d="M4 5.5h3.7M12.3 5.5H20M4 12h9.2M17.8 12H20M4 18.5h1.7M10.3 18.5H20"/><circle cx="10" cy="5.5" r="2.3"/><circle cx="15.5" cy="12" r="2.3"/><circle cx="8" cy="18.5" r="2.3"/>',
   fwd: '<path d="M9.5 5.5 16 12l-6.5 6.5"/>',
   clock: '<circle cx="10.5" cy="13.5" r="7"/><path d="M10.5 9.5v4l2.7 1.8"/><path fill="currentColor" stroke="none" d="M19.4 1.8Q20.1 4.5 22.8 5.2Q20.1 5.9 19.4 8.6Q18.7 5.9 16 5.2Q18.7 4.5 19.4 1.8Z"/>',
   hold: '<circle cx="12" cy="12" r="3.2"/><path d="M12 3.5a8.5 8.5 0 0 1 8.5 8.5M12 20.5A8.5 8.5 0 0 1 3.5 12"/>',

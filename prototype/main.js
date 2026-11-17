@@ -23,7 +23,7 @@ function render() {
   app.className = S.role === "admin" ? "wide" : "";
   const behind = UI.sheet ? "inert" : ""; // with a sheet open, what is behind it can't be reached by keyboard or screen reader
   app.innerHTML = `<header class="top" ${behind}><button class="name" data-a="home" aria-label="PATH, back to your start page">PATH</button>
-      <button class="clubbtn" data-a="clubs" data-org="${S.org}" aria-label="${esc(ORGS[S.org].name)}: your clubs and the demo view" aria-haspopup="dialog"><span class="mono36" aria-hidden="true">${mono(S.org)}</span></button></header>
+      <button class="clubbtn" data-a="clubs" data-org="${S.org}" aria-label="Settings: your clubs, colours and the demo view. You are at ${esc(ORGS[S.org].name)}" aria-haspopup="dialog"><span class="mono36" aria-hidden="true">${I(P.sliders, 20)}</span></button></header>
     <main id="view" tabindex="0" ${behind}>${body}</main>
     ${vGuide()}${UI.toast ? `<div class="toast" role="status"><span>${esc(UI.toast)}</span>${UI.undo ? `<button class="btn sm" data-a="undo">Undo</button>` : ""}${xBtn("hide-toast", "Dismiss message")}</div>` : ""}
     <nav class="tabs" aria-label="Sections" ${behind} ${welcome ? "hidden" : ""}>${TABS[S.role].map(([v, l, ic]) => `<button data-a="tab" data-v="${v}" aria-label="${l}${v === "alerts" && badge ? ` (${badge}), ${badge} open` : ""}" ${tab === v ? 'aria-current="page"' : ""}><span class="ic">${I(P[ic])}</span>${l}${v === "alerts" && badge ? ` (${badge})` : ""}</button>`).join("")}</nav>${vSheet()}`;
