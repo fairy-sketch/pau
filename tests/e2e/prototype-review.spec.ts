@@ -151,21 +151,28 @@ test("2 a toast never lies on a primary button", async ({ page }) => {
   const clear = async () => {
     const t = await toast(page).boundingBox();
     expect(t).not.toBeNull();
-    const hits = await page
-      .locator("#view .btn.acc, #view .btn.full")
-      .evaluateAll(
-        (els, t) =>
-          els
-            .map((e) => e.getBoundingClientRect())
-            .filter(
-              (r) =>
-                r.width &&
-                r.bottom > t!.y &&
-                r.top < t!.y + t!.height &&
-                r.bottom <= window.innerHeight,
-            ).length,
-        t,
-      );
+    const hits = await page.locator("#view .btn.acc, #view .btn.full").evaluateAll(
+      (els, t) =>
+        els
+          .map((e) => e.getBoundingClientRect())
+          // Only the part of a button that shows counts: the page clips whatever is scrolled below it.
+          .map((r) => ({
+            width: r.width,
+            top: r.top,
+            bottom: Math.min(
+              r.bottom,
+              document.getElementById("view")!.getBoundingClientRect().bottom,
+            ),
+          }))
+          .filter(
+            (r) =>
+              r.width &&
+              r.bottom > t!.y &&
+              r.top < t!.y + t!.height &&
+              r.bottom <= window.innerHeight,
+          ).length,
+      t,
+    );
     expect(hits).toBe(0);
     // It sits right above the tab bar.
     const nav = await page.getByRole("navigation", { name: "Sections" }).boundingBox();
@@ -174,7 +181,10 @@ test("2 a toast never lies on a primary button", async ({ page }) => {
   await tab(page, "Week");
   await page.locator("#classcard").getByRole("button", { name: "Book", exact: true }).click();
   await clear();
-  await page.getByRole("button", { name: "Explore: try something new" }).click();
+  await page
+    .getByRole("navigation", { name: "Sections" })
+    .getByRole("button", { name: "Explore" })
+    .click();
   await page.locator("#xgrid .tile").filter({ hasText: "Slow flow" }).click();
   await page.getByRole("button", { name: "Add to my Path" }).click();
   await clear();
@@ -188,7 +198,10 @@ test.describe("3 one booking source of truth, and the coach stays in the active 
     page,
   }) => {
     await open(page);
-    await page.getByRole("button", { name: "Explore: try something new" }).click();
+    await page
+      .getByRole("navigation", { name: "Sections" })
+      .getByRole("button", { name: "Explore" })
+      .click();
     await page.locator("#xgrid .tile").filter({ hasText: "First climb" }).click();
     await page.locator("#booknow").getByRole("button", { name: "Book, free" }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Put my name down" }).click();
@@ -431,7 +444,10 @@ test("6 Explore: dots coloured by kind with a legend, Reset filters, and what bo
   page,
 }) => {
   await open(page);
-  await page.getByRole("button", { name: "Explore: try something new" }).click();
+  await page
+    .getByRole("navigation", { name: "Sections" })
+    .getByRole("button", { name: "Explore" })
+    .click();
   await expect(page.getByRole("button", { name: "Reset filters" })).toHaveCount(0);
   await page
     .locator("#explore .filters")
@@ -468,4 +484,73 @@ test("6 Explore: dots coloured by kind with a legend, Reset filters, and what bo
   await expect(c).toContainText("It uses none of your passes or credits.");
   await expect(c).toContainText("You pay CHF 15.00 once, in the test checkout.");
   await expect(c).toContainText("It shows up in your Week");
+});
+
+test.describe("Design pass (D-1 to D-12)", () => {
+  test("one club button opens the sheet: clubs with a check, and the demo view switch", async ({
+    page,
+  }) => {
+    await open(page);
+    await expect(page.locator(".top select")).toHaveCount(0);
+    await expect(page.locator(".top button")).toHaveCount(2);
+    await page.locator(".clubbtn").click();
+    const sheet = page.getByRole("dialog", { name: "Your clubs" });
+    await expect(sheet.locator(".clubrow")).toHaveText(["PPAU Trackrunning", "SStudio Demo"]);
+    await expect(sheet.locator('.clubrow[aria-current="true"] .ck svg')).toHaveCount(1);
+    await expect(
+      sheet.getByRole("group", { name: "Demo: view as" }).getByRole("button"),
+    ).toHaveText(["Athlete", "Coach", "Admin"]);
+    await sheet.getByRole("button", { name: "Coach" }).click();
+    await expect(page.locator('nav [aria-current="page"]')).toHaveText("Today");
+  });
+
+  test("everything sits on the 20 px edge, and the path is one bar of five segments", async ({
+    page,
+  }) => {
+    await open(page);
+    const left = (sel: string) =>
+      page
+        .locator(sel)
+        .first()
+        .evaluate((el) => Math.round(el.getBoundingClientRect().left));
+    expect(await left(".top .name")).toBe(20);
+    expect(await left(".goal")).toBe(20);
+    expect(await left("#phases")).toBe(20);
+    expect(await left("#view .card")).toBe(20);
+    await expect(page.locator("#phases .phases i")).toHaveCount(5);
+    await expect(page.locator("#phases")).toContainText("Build · session 5 of 12");
+    // The hero runs edge to edge, and no scrollbar shows.
+    const hero = await page.locator(".hero").boundingBox();
+    expect(hero!.x).toBe(0);
+    expect(hero!.height).toBe(240);
+    expect(await page.locator("#view").evaluate((el) => getComputedStyle(el).scrollbarWidth)).toBe(
+      "none",
+    );
+    // Tabs in the new order; Log is reached from Path.
+    await expect(page.locator("nav.tabs button")).toHaveText([
+      "Path",
+      "Week",
+      "Explore",
+      "Coach",
+      "Me",
+    ]);
+    await page.getByRole("button", { name: "Log a session" }).click();
+    await expect(page.getByRole("heading", { name: "How did it go?" })).toBeVisible();
+  });
+
+  test("no label is cut off, on any main screen", async ({ page }) => {
+    await open(page);
+    for (const name of ["Path", "Week", "Explore", "Coach", "Me"]) {
+      await tab(page, name);
+      const cut = await page.evaluate(() =>
+        [...document.querySelectorAll<HTMLElement>("#app button, #app .h1, #app .h2, #app .strong")]
+          .filter(
+            (el) =>
+              getComputedStyle(el).textOverflow === "ellipsis" && el.scrollWidth > el.clientWidth,
+          )
+          .map((el) => el.textContent),
+      );
+      expect(cut, name).toEqual([]);
+    }
+  });
 });

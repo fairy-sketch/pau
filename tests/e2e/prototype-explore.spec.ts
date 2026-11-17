@@ -2,13 +2,14 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
-import { cards, lastCard, open, say, tab, toast } from "../helpers/demo";
+import { asRole, atClub, cards, lastCard, open, say, tab, toast } from "../helpers/demo";
 
 /**
  * Explore: clubs, personal coaches and pro athletes with something open. A photo grid or a map, filters,
  * a page per provider (what they say, try their plan, book), and the coach can look there too.
  */
-const explore = (page: Page) => page.getByRole("button", { name: "Explore: try something new" });
+const explore = (page: Page) =>
+  page.getByRole("navigation", { name: "Sections" }).getByRole("button", { name: "Explore" });
 const tiles = (page: Page) => page.locator("#xgrid .tile");
 const chip = (page: Page, name: string) =>
   page.locator("#explore .filters").getByRole("button", { name, exact: true });
@@ -70,7 +71,7 @@ test("the icon top right opens a photo grid of clubs, coaches and pros", async (
   // Only the athlete has Explore; the bottom tabs still lead back.
   await tab(page, "Path");
   await expect(page.getByRole("heading", { name: "Try something new" })).toHaveCount(0);
-  await page.getByLabel("View as").selectOption("coach");
+  await asRole(page, "coach");
   await expect(explore(page)).toHaveCount(0);
 });
 
@@ -349,8 +350,8 @@ test("Explore passes axe (WCAG A and AA), has 44 px targets and names on every c
 
 test("the PATH logo always leads back to the start page of the role", async ({ page }) => {
   await open(page);
-  // The logo is the lettering, drawn as outlines.
-  await expect(page.locator(".top .name svg.logo path")).toHaveCount(1);
+  // The wordmark sits on the content edge, 20 px from the left.
+  await expect(page.locator(".top .name")).toHaveText("PATH");
   const logo = page.getByRole("button", { name: "PATH, back to your start page" });
   const current = page.locator('nav [aria-current="page"]');
   // From deep inside Explore, with a sheet open.
@@ -363,18 +364,18 @@ test("the PATH logo always leads back to the start page of the role", async ({ p
   await expect(page.locator("#view")).toContainText("Your goal");
   await expect(page.locator("#view")).toHaveJSProperty("scrollTop", 0);
   // From any tab, and it keeps the club you are in.
-  await page.getByLabel("Club").selectOption("studio");
+  await atClub(page, "studio");
   await tab(page, "Me");
   await logo.click();
   await expect(current).toHaveText("Path");
-  await expect(page.getByLabel("Club")).toHaveValue("studio");
+  await expect(page.locator(".clubbtn")).toHaveAttribute("data-org", "studio");
   // Coach: from an open roster back to Today. Admin: back to Home.
-  await page.getByLabel("View as").selectOption("coach");
+  await asRole(page, "coach");
   await page.locator('[data-a="roster"]').first().click();
   await logo.click();
   await expect(current).toHaveText("Today");
   await expect(page.getByRole("heading", { name: "Your sessions" })).toBeVisible();
-  await page.getByLabel("View as").selectOption("admin");
+  await asRole(page, "admin");
   await tab(page, "Money");
   await logo.click();
   await expect(current).toHaveText("Home");

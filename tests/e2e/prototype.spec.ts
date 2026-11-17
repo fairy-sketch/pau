@@ -596,7 +596,7 @@ test("B8 coach memory: a club only sees its own items plus general ones, labelle
 test("B10 switching club keeps the current tab, in every role", async ({ page }) => {
   await open(page);
   const all = {
-    athlete: ["Path", "Coach", "Log", "Week", "Me"],
+    athlete: ["Path", "Week", "Explore", "Coach", "Me"],
     coach: ["Today", "Athletes", "Review", "Alerts"],
     admin: ["Home", "Schedule", "Members", "Products", "Money"],
   } as const;
@@ -607,7 +607,7 @@ test("B10 switching club keeps the current tab, in every role", async ({ page })
       for (const club of ["studio", "pau"] as const) {
         await atClub(page, club);
         await expect(page.locator('nav [aria-current="page"]')).toHaveText(name);
-        await expect(page.getByLabel("Club")).toHaveValue(club);
+        await expect(page.locator(".clubbtn")).toHaveAttribute("data-org", club);
       }
     }
   }
@@ -634,7 +634,7 @@ test("B13 the demo survives a reload, and Reset demo starts over", async ({ page
   await page.reload();
   // Same tab, same club, same booking, same pending card, real dates after the round trip.
   await expect(page.locator('nav [aria-current="page"]')).toHaveText("Coach");
-  await expect(page.getByLabel("Club")).toHaveValue("studio");
+  await expect(page.locator(".clubbtn")).toHaveAttribute("data-org", "studio");
   await expect(lastCard(page)).toHaveAttribute("data-state", "pending");
   await expect(lastCard(page)).toContainText("Yoga flow, Thu 19 Nov 18:45");
   const kept = await page.evaluate(() => {
@@ -700,7 +700,7 @@ test.describe("B11 and B12 accessibility", () => {
     await page.getByRole("button", { name: "Add details" }).click();
     await page.getByRole("switch", { name: "Something hurt" }).click();
     await check("log with pain");
-    await page.getByRole("button", { name: "Progress" }).click();
+    await tab(page, "Path"); // progress lives on Path now (D-3)
     await check("progress");
 
     // Coach chat with a card in each state.

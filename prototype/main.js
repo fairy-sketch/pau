@@ -1,9 +1,9 @@
 "use strict";
 /* PATH clickable demo, part 4 of 4: the shell. Top bar, tabs, actions, events, start-up. */
 
-const TABS = { athlete: [["path", "Path", "flag"], ["coach", "Coach", "chat"], ["log", "Log", "plus"], ["week", "Week", "cal"], ["me", "Me", "user"]], coach: [["today", "Today", "clock"], ["athletes", "Athletes", "users"], ["review", "Review", "check"], ["alerts", "Alerts", "bell"]], admin: [["dash", "Home", "home"], ["sched", "Schedule", "cal"], ["members", "Members", "users"], ["products", "Products", "tag"], ["money", "Money", "card"]] };
-/* The logo (decision L-9): PATH in Satoshi Black capitals, set tight, as outlines. */
-const LOGO = '<svg viewBox="77 -740 2419 740" width="66" height="20" aria-hidden="true" class="logo"><path d="M239 -740V0H77V-740ZM377 -246H199V-390H341Q400 -390 429.0 -415.5Q458 -441 458 -493Q458 -545 429.0 -570.5Q400 -596 341 -596H199V-740H377Q453 -740 509.5 -709.0Q566 -678 597.5 -622.5Q629 -567 629 -493Q629 -419 597.5 -363.5Q566 -308 509.5 -277.0Q453 -246 377 -246Z M767.0 0H598.0L862.0 -740H1020.0L1283.0 0H1111.0L1059.0 -156H820.0ZM920.0 -450 867.0 -292H1013.0L960.0 -450Q954.0 -469 948.0 -489.0Q942.0 -509 940.0 -522Q938.0 -509 932.5 -489.5Q927.0 -470 920.0 -450Z M1599.0 -662V0H1437.0V-662ZM1227.0 -590V-740H1809.0V-590Z M2048.0 0H1886.0V-740H2048.0V-448H2334.0V-740H2496.0V0H2334.0V-298H2048.0Z" fill="currentColor"></path></svg>';
+const TABS = { athlete: [["path", "Path", "flag"], ["week", "Week", "cal"], ["explore", "Explore", "compass"], ["coach", "Coach", "chat"], ["me", "Me", "user"]], coach: [["today", "Today", "clock"], ["athletes", "Athletes", "users"], ["review", "Review", "check"], ["alerts", "Alerts", "bell"]], admin: [["dash", "Home", "home"], ["sched", "Schedule", "cal"], ["members", "Members", "users"], ["products", "Products", "tag"], ["money", "Money", "card"]] };
+/* The wordmark in the header (decision D-2): PATH in Satoshi Bold, 20 px, on the content edge. */
+const mono = (o) => esc(ORGS[o].name.trim()[0].toUpperCase());
 let lastKey = "", swipeClickGuard = -1e9;
 function render() {
   ensureSessions(); sweep(); sweepProposals(); sweepOffers(); runSeries();
@@ -11,22 +11,25 @@ function render() {
   const body = S.role === "athlete" ? { path: vPath, coach: vCoachChat, log: vLog, week: vWeek, me: vMe, explore: vExplore }[tab]() : S.role === "coach" ? vCoach() : vAdmin();
   const badge = S.role === "coach" ? S.alerts.filter((a) => a.status === "open" && (a.info || shares("alerts.pain"))).length : 0;
   app.className = S.role === "admin" ? "wide" : "";
-  app.innerHTML = `<header class="top"><button class="name" data-a="home" aria-label="PATH, back to your start page">${LOGO}</button>
-      <select id="role" aria-label="View as">${[["athlete", "Athlete"], ["coach", "Coach"], ["admin", "Admin"]].map(([v, l]) => `<option value="${v}" ${S.role === v ? "selected" : ""}>${l}</option>`).join("")}</select>
-      <select id="org" aria-label="Club">${Object.entries(ORGS).map(([v, o]) => `<option value="${v}" ${S.org === v ? "selected" : ""}>${o.name}</option>`).join("")}</select>
-      ${S.role === "athlete" ? `<button class="x explorebtn" data-a="tab" data-v="explore" aria-label="Explore: try something new" aria-pressed="${tab === "explore"}">${I(P.compass, 22)}</button>` : ""}</header>
+  app.innerHTML = `<header class="top"><button class="name" data-a="home" aria-label="PATH, back to your start page">PATH</button>
+      <button class="clubbtn" data-a="clubs" data-org="${S.org}" aria-label="${esc(ORGS[S.org].name)}: your clubs and the demo view" aria-haspopup="dialog"><span class="mono36" aria-hidden="true">${mono(S.org)}</span></button></header>
     ${S.banner ? `<div class="banner"><span>Made-up data, saved on this device.</span><button class="resetbtn ${UI.resetArmed ? "armed" : ""}" data-a="reset">${UI.resetArmed ? "Tap again" : "Reset demo"}</button>${xBtn("hide-banner", "Hide this notice. Reset demo stays under Me.")}</div>` : ""}
     <main id="view" tabindex="0">${body}</main>
     ${UI.toast ? `<div class="toast" role="status"><span>${esc(UI.toast)}</span>${UI.undo ? `<button class="btn sm" data-a="undo">Undo</button>` : ""}${xBtn("hide-toast", "Dismiss message")}</div>` : ""}
     <nav class="tabs" aria-label="Sections">${TABS[S.role].map(([v, l, ic]) => `<button data-a="tab" data-v="${v}" aria-label="${l}${v === "alerts" && badge ? ` (${badge}), ${badge} open` : ""}" ${tab === v ? 'aria-current="page"' : ""}><span class="ic">${I(P[ic])}</span>${l}${v === "alerts" && badge ? ` (${badge})` : ""}</button>`).join("")}</nav>${vSheet()}`;
   const view = document.getElementById("view"); view.scrollTop = tab === "coach" && S.role === "athlete" ? view.scrollHeight : top; lastKey = key;
-  if (UI.sheet) { const b = app.querySelector(".sheet .btn"); if (b) b.focus(); }
+  if (UI.sheet) { const b = app.querySelector(".sheet .btn") || app.querySelector(".sheet[tabindex]"); if (b) b.focus(); }
+  /* One accent per screen (D-7): only the first primary button in the page, and in a sheet, keeps the accent. */
+  for (const box of [view, app.querySelector(".sheet")]) if (box) [...box.querySelectorAll(".btn.acc")].slice(1).forEach((el) => el.classList.add("demoted"));
   flowLine(); save();
 }
 
 const ACT = {
   /* The logo always leads to the start page of the role you are in. */
   home: () => { S.tab[S.role] = { athlete: "path", coach: "today", admin: "dash" }[S.role]; S.rosterSid = null; S.explore.open = null; UI.sheet = null; lastKey = ""; },
+  clubs: () => { UI.sheet = { type: "clubs" }; },
+  org: (v) => { S.org = v; S.rosterSid = null; S.filter.cat = "all"; UI.toast = ""; UI.sheet = null; }, // kinds of training differ per club; "My pass only" stays
+  role: (v) => { S.role = v; S.rosterSid = null; UI.toast = ""; UI.sheet = null; },
   tab: (v) => { S.tab[S.role] = v; S.rosterSid = null; if (v === "explore") S.explore.open = null; if (v === "log" && S.role === "athlete" && S.form.pristine && !S.form.editId) S.form = newForm(); }, day: (v) => { S.day = v; }, logtab: (v) => { S.logTab = v; },
   /* Explore */
   "prov-open": (v) => { S.explore.open = v || null; S.tab.athlete = "explore"; UI.sheet = null; }, xkind: (v) => { S.explore.kind = S.explore.kind === v ? "all" : v; S.explore.pin = null; },

@@ -24,12 +24,29 @@ export async function open(page: Page) {
   await page.goto(DEMO);
   await expect(page.getByRole("navigation", { name: "Sections" })).toBeVisible();
 }
-export const tab = (page: Page, name: string) =>
+const nav = (page: Page, name: string) =>
   page.getByRole("navigation", { name: "Sections" }).getByRole("button", { name }).click();
-export const asRole = (page: Page, role: "athlete" | "coach" | "admin") =>
-  page.getByLabel("View as").selectOption(role);
-export const atClub = (page: Page, club: "pau" | "studio") =>
-  page.getByLabel("Club").selectOption(club);
+/** Log has no tab of its own (design pass, D-3): it is reached from "Log a session" on Path. */
+export async function tab(page: Page, name: string) {
+  if (name !== "Log") return nav(page, name);
+  await nav(page, "Path");
+  await page.getByRole("button", { name: "Log a session" }).click();
+}
+/** The round club button in the header opens the sheet with the clubs and the demo view switch. */
+export const clubSheet = async (page: Page) => {
+  await page.locator(".clubbtn").click();
+  return page.getByRole("dialog", { name: "Your clubs" });
+};
+export async function asRole(page: Page, role: "athlete" | "coach" | "admin") {
+  const sheet = await clubSheet(page);
+  await sheet
+    .getByRole("button", { name: { athlete: "Athlete", coach: "Coach", admin: "Admin" }[role] })
+    .click();
+}
+export async function atClub(page: Page, club: "pau" | "studio") {
+  const sheet = await clubSheet(page);
+  await sheet.locator(`.clubrow[data-v="${club}"]`).click();
+}
 export async function say(page: Page, text: string) {
   await page.getByLabel("Message your coach").fill(text);
   await page.getByRole("button", { name: "Send message" }).click();
