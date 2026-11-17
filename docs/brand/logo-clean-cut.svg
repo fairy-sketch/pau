@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 290 110" role="img" aria-label="PATH">
+  <!-- PATH logo, "Clean cut" (chosen 17 Nov 2026). Satoshi Black 104, letter-spacing -2, one cut 6 high at y 56 (baseline 92).
+       Needs the Satoshi font; convert the text to outlines before using it outside the app. -->
+  <defs><mask id="cut" maskUnits="userSpaceOnUse" x="-40" y="-20" width="370" height="150">
+    <rect x="-40" y="-20" width="370" height="150" fill="#fff"/><rect x="-10" y="56" width="310" height="6" fill="#000"/></mask></defs>
+  <text x="4" y="92" font-family="Satoshi" font-weight="900" font-size="104" letter-spacing="-2" fill="#1C1916" mask="url(#cut)">PATH</text>
+</svg>
