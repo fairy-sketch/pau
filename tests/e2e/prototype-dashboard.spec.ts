@@ -455,11 +455,11 @@ test("the athlete's Path shows the plan they follow, and it mirrors what the coa
   await expect(monday).toContainText("Booked · 18:30");
   // A day with no club session is done on your own and logged.
   await plan.locator("#plan-days .row", { hasText: "Long run" }).click();
-  await expect(page.getByRole("dialog", { name: "Saturday, week 1" })).toContainText(
+  await expect(page.getByRole("dialog", { name: "Sunday, week 1" })).toContainText(
     "Do it on your own, then log it",
   );
   await page
-    .getByRole("dialog", { name: "Saturday, week 1" })
+    .getByRole("dialog", { name: "Sunday, week 1" })
     .getByRole("button", { name: "Close" })
     .click();
   // The other weeks are one step away, each day just as open.
@@ -496,6 +496,14 @@ test("the athlete's Path shows the plan they follow, and it mirrors what the coa
   await tab(page, "Path");
   await expect(plan.locator("[data-plan] .h2")).toHaveText("Race week taper");
   await expect(page.locator("#also-shared")).toHaveText("Also from your coach: Base block.");
+  // One plan: the newer plan's days replace the older plan's, and the days it leaves free are her own again.
+  await expect(plan.locator("#plan-days")).toContainText(
+    "Track: 4 × 400 m at race pace, long rests",
+  );
+  await expect(plan.locator("#plan-days")).not.toContainText("4 × 1 km at 10K pace");
+  await expect(plan.locator("#plan-days .row", { hasText: "Easy run 40 min" })).toContainText(
+    "Your own day",
+  );
 });
 
 test.describe("Build with PATH, with the real model behind it (K-23)", () => {

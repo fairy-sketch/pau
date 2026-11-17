@@ -231,24 +231,85 @@ test.describe("Athlete Jonas: a regular's week at PAU (played on the demo athlet
   });
 
   test("after the week is eased, Path shows the eased sessions in his plan", async ({ page }) => {
-    test.fail(
-      true,
-      "QA-13: three plans do not know each other: the eased week changes his own plan, Path shows the coach's shared plan unchanged",
-    );
     await start(page);
     await screen(page, "athlete", "coach");
     await say(page, "I need an easy week");
+    await sim(page, (d) => d.book("pau-track-2026-11-19", "t"));
+    const before = await screen(page, "athlete", "path");
+    expect(before).toMatch(/Mon Track: 4 × 1 km at 10K pace, 2 min jog Club session · 18:30/);
+    expect(before).toMatch(/Thu Tempo run: 20 min steady Booked · 18:30/);
+    expect(before).toMatch(/Tue Easy run 40 min @ RPE 4 Your own day/);
+    await screen(page, "athlete", "coach");
+    await say(page, "I need an easy week");
     await lastCard(page).getByRole("button", { name: "Confirm", exact: true }).click();
-    expect(await screen(page, "athlete", "path")).not.toMatch(/Mon Track: 4 × 1 km at 10K pace/);
+    const path = await screen(page, "athlete", "path");
+    expect(path).not.toMatch(/Mon Track: 4 × 1 km at 10K pace/);
+    // One plan, one name, and it says what was changed and by whom.
+    expect(path).toMatch(/YOUR PLAN Base block Coach Sara shared this with the Track group/);
+    expect(path).toContain("3 days eased by you");
+    expect(path).toMatch(/Mon Easy 30 min @ RPE 3 Eased by you/);
+    expect(path).toMatch(/Thu Easy 30 min @ RPE 3 Eased by you/);
+    expect(path).toMatch(/Sun Easy 30 min @ RPE 3 Eased by you/);
+    expect(path).not.toMatch(/Build block|Sharpen block/);
+    // The day itself says what it was, and the booking that went with it is gone.
+    await page.locator("#plan-days .row", { hasText: "Thu" }).click();
+    await expect(page.locator("#planday-source")).toHaveText(
+      "Eased by you. It was: Tempo run: 20 min steady.",
+    );
+    await page.keyboard.press("Escape");
+    expect(await sim(page, (d) => !!d.myBooking("pau-track-2026-11-19"))).toBe(false);
+    // Week says the same on Thursday's session, and the coach sees the same on her page.
+    await sim(page, (d) => {
+      d.state.day = "2026-11-19";
+    });
+    await screen(page, "athlete", "week");
+    await expect(page.locator("#plan-note")).toHaveText(
+      "Your plan: Easy 30 min @ RPE 3 (eased by you)",
+    );
+    await sim(page, (d) => {
+      const S = d.state;
+      S.role = "coach";
+      S.tab.coach = "athletes";
+      d.render();
+      S.dash.athlete = "mia";
+      d.render();
+    });
+    await expect(page.locator("#plan-from-you")).toContainText("Base block");
+    await expect(page.locator("#plan-changes-coach")).toHaveText("3 days eased by Mia");
+  });
+  test("a change the coach approves lands in the same plan, under the same name", async ({
+    page,
+  }) => {
+    await start(page);
+    await screen(page, "coach", "review");
+    await page.getByRole("button", { name: "Approve", exact: true }).click();
+    await screen(page, "athlete", "path");
+    await page.getByRole("button", { name: "Review plan" }).click();
+    await expect(page.locator(".toast")).toContainText(
+      /Coach Sara approved "Sharpen block": \d upcoming days? of your plan changed/,
+    );
+    const path = await screen(page, "athlete", "path");
+    expect(path).toMatch(/YOUR PLAN Base block/);
+    expect(path).toMatch(/\d days? changed by Coach Sara/);
+    expect(await sim(page, (d) => d.planName())).toBe("Base block");
+    // When the coach stops sharing, her own days come back, and the changed days keep their change.
+    const own = await sim(page, (d) => {
+      d.state.coach.pau.plans.forEach((p: any) => (p.shared = []));
+      d.render();
+      return d.state.plan.items
+        .filter((i: any) => i.date >= "2026-11-16" && i.date <= "2026-11-22")
+        .map((i: any) => `${i.title}${i.src ? " (review)" : ""}`);
+    });
+    expect(own).toContain("Easy run 40 min @ RPE 4");
+    expect(own.some((t: string) => t.endsWith("(review)"))).toBe(true);
+    expect(await screen(page, "athlete", "path")).toContain(
+      "Coach Sara has not shared a plan with the Track group yet. These are your own days.",
+    );
   });
 
   test("turning on pain sharing later also shows the open flag under the coach's Alerts", async ({
     page,
   }) => {
-    test.fail(
-      true,
-      "QA-08: pain has two sources: Athletes reads the log, Alerts only knows flags that were shared at the moment of logging",
-    );
     await start(page);
     await sim(page, (d) => {
       d.state.entries.unshift({

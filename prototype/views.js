@@ -250,6 +250,12 @@ function vMe() {
 const shares = (k) => S.consent[S.org][k];
 /* The coach sees the guardrail reason, but never more of the athlete's data than she shares with this club. */
 const guardReasonForCoach = (r) => (r.kind === "pain" ? (shares("alerts.pain") ? r.text : `${S.me.name} has an open recovery signal that is not shared with this club.`) : shares("log.read") ? r.text : "Recent training load is above the limit (the log is not shared with this club).");
+/* What the coach is alerted to: the athlete's open pain flags (only if she shares them with this club), read from the flags
+   themselves, and the notes written when she eased her own plan or mentioned pain in the chat. */
+function coachAlerts() {
+  const flags = shares("alerts.pain") ? openPains().map((e) => ({ id: "e" + e.id, kind: `Pain flag: ${e.painWhere}, level ${e.painLevel}`, at: e.at, status: e.seenByCoach ? "seen" : "open" })) : [];
+  return [...flags, ...S.alerts.filter((a) => a.info || shares("alerts.pain"))].sort((a, b) => b.at - a.at);
+}
 function vCoach() {
   const t = S.tab.coach;
   if (S.rosterSid && S.sessions[S.rosterSid]) {
@@ -274,7 +280,7 @@ function vCoach() {
         <div class="btns"><button class="btn acc" style="flex:1" data-a="draft" data-v="approved">Approve</button><button class="btn" data-a="draft" data-v="rejected">Reject</button></div><p class="sub">A drafted plan never reaches the athlete until a coach approves it. Guardrails are applied in code before you see it, and again on approval.</p></div>`;
     return `<section class="pad stack-l"><h1 class="h1">Review queue</h1>${body}</section>`;
   }
-  const al = S.alerts.filter((a) => a.info || shares("alerts.pain"));
+  const al = coachAlerts();
   return `<section class="pad stack-l"><h1 class="h1">Alerts</h1>${al.length ? `<div class="card rows">${al.map((a) => `<div class="row"><span class="mid"><span class="strong">${esc(a.kind)}</span><span class="sub">${S.me.name} · ${fDay(a.at)}</span></span>${a.status === "open" ? `<button class="btn sm" data-a="ack" data-v="${a.id}">Got it</button>` : `<span class="sub">Seen</span>`}</div>`).join("")}</div>` : texture(`<p class="h2">No alerts</p><p class="sub" style="margin-top:6px">Pain alerts appear only for athletes who share them.</p>`)}</section>`;
 }
 

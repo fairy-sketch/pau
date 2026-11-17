@@ -90,6 +90,7 @@ function runAct(a, key) {
     if (S.idem[key]) return S.idem[key];
     const it = S.plan.items.find((i) => i.date === a.date); if (!it) return remember(key, err("NOT_FOUND", "That plan day no longer exists."));
     const locked = planLocked(it); if (locked) return remember(key, err("PLAN_LOCKED", `${fDay(new Date(a.date + "T12:00"))} can't be changed any more: ${locked}.`));
+    it.was = planText(it);
     if (a.t === "ease") { it.kind = "rest"; it.title = "Rest, or an easy 20 min walk"; it.off = null; it.status = "eased"; return remember(key, { ok: true, msg: `Plan: today is now rest, or an easy 20 min walk.` }); }
     it.kind = "workout"; it.title = "Easy 30 min @ RPE 3"; it.off = null; it.status = "swapped";
     return remember(key, { ok: true, msg: `Plan: ${fDay(new Date(a.date + "T12:00"))} is now an easy 30 min at RPE 3.` });

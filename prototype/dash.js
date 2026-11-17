@@ -42,7 +42,7 @@ function roster(org = S.org) {
 }
 /* Mia, as her coach is allowed to see her. */
 function liveAthlete() {
-  const st = stats(), op = shares("alerts.pain") ? S.entries.find((e) => e.pain && !e.cleared) : null, last = S.entries[0];
+  const st = stats(), op = shares("alerts.pain") ? openPain() : null, last = S.entries[0];
   return { id: "mia", live: true, name: S.me.name, first: S.me.name.split(" ")[0], group: ORGS[S.org].me.myGroup, goal: S.goal.title, goalKind: "10K", stage: S.stage, inSt: S.stageSessions,
     away: last ? Math.max(0, Math.round((today() - new Date(last.at)) / 864e5)) : 30, back: false, load: st.ratio, pain: op ? { where: op.painWhere, level: op.painLevel } : null, ask: null, attend: 88,
     shares: { path: shares("path.read"), log: shares("log.read"), pain: shares("alerts.pain") }, draft: shares("plan.write") && S.draftStatus === "pending_review" };
@@ -116,7 +116,7 @@ function vAthleteDetail(a) {
       <div class="rows"><div class="row"><span class="mid sub">Next step</span><span class="strong" style="text-align:right">${esc(nextStep)}</span></div><div class="row"><span class="mid sub">Attendance this season</span><span class="strong">${a.attend}%</span></div>${a.shares.log ? (M ? S.pbs.map((p) => [p.metric, p.value, p.unit]) : a.pbs).slice(0, 2).map((p) => `<div class="row"><span class="mid sub">Best ${p[0]}</span><span class="strong">${p[1]} ${p[2]}</span></div>`).join("") : ""}</div></div>` : `<p class="sub">Goal and progress are not shared.</p>`}</div>
     ${a.shares.log ? `<div class="stack"><div class="between"><span class="eyebrow">Weekly load</span><span class="sub">${Math.round(a.load * 100)}% of usual</span></div>${M ? lineChart(loadPts(stats()), stats().wl.length - 1) : lineChart(a.pts, a.pts.length - 1)}</div>
     <div class="stack"><div class="eyebrow">Training log</div><div class="card rows" id="detail-logs">${logs.map(logRow).join("")}</div></div>` : `<p class="sub" id="log-private">Training log not shared.</p>`}
-    <div class="stack"><div class="eyebrow">Plan</div><div class="card stack"><p class="sub" id="plan-from-you">From you: <span class="strong" style="color:var(--text)">${esc(planNames(a))}</span></p>${M ? `<p class="sub">Own plan: <span class="strong" style="color:var(--text)">${esc(S.plan.title)}</span></p>` : ""}${proposal}</div></div>
+    <div class="stack"><div class="eyebrow">Plan</div><div class="card stack"><p class="sub" id="plan-from-you">From you: <span class="strong" style="color:var(--text)">${esc(planNames(a))}</span></p>${M && shares("path.read") ? `<p class="sub" id="plan-changes-coach">${(() => { const ch = S.plan.items.filter((x) => planWeekOf(x.date) >= 1 && planChanged(x)), you = ch.filter((x) => planChanged(x) === "you").length; return ch.length ? [you ? `${you} ${you === 1 ? "day" : "days"} eased by ${esc(a.first)}` : "", ch.length - you ? `${ch.length - you} changed by you in review` : ""].filter(Boolean).join(" · ") : `${esc(a.first)} follows it as you set it.`; })()}</p>` : ""}${proposal}</div></div>
     <form class="stack" data-f="cnote" data-ath="${a.id}" style="gap:8px"><label class="f">Your private notes<input id="cnote" value="${esc(clubData().notes[a.id] || "")}" placeholder="Only you see this" autocomplete="off"></label><div class="between" style="align-items:center"><span class="sub">${esc(a.first)} never sees these notes.</span><button class="btn sm" type="submit">Save note</button></div></form>
     <p class="note" id="sharing">${esc(a.first)} shares with ${org}: ${shared.filter((x) => x[1]).map((x) => x[0].toLowerCase()).join(", ") || "name only"}. ${shared.some((x) => !x[1]) ? `Private: ${shared.filter((x) => !x[1]).map((x) => x[0].toLowerCase()).join(", ")}.` : "Nothing is held back."}</p></section>`;
 }
@@ -179,7 +179,7 @@ function genPlan({ kind, weeks, level, fun, days = [] }) {
     else if (kind === "strength") { add(w, "Tue", `Gym: squats, lunges, calf raises, ${3 + Math.min(k, 2)} × 8`); add(w, "Thu", `Core circuit, ${15 + 5 * Math.min(k, 3)} min`); add(w, "Sat", "Hops and bounds on grass, 15 min, full rest between sets"); }
     else if (kind === "5k") { add(w, "Mon", `Track: ${Math.max(4, 6 + 2 * k)} × 400 m at 5K pace, 90 s jog`); add(w, "Thu", `Hills: ${Math.max(4, 6 + k)} × 60 s, walk down`); add(w, "Sat", `Easy run ${40 + 5 * k} min, then strides`); }
     else if (kind === "half") { add(w, "Tue", `Tempo run: ${Math.max(15, 20 + 5 * k)} min steady`); add(w, "Thu", `Track: ${Math.max(3, 4 + k)} × 1 km at 10K pace, 2 min jog`); add(w, "Sun", `Long run: ${Math.max(60, 75 + 10 * k)} min easy`); }
-    else { add(w, "Mon", `Track: ${Math.max(3, 4 + k)} × 1 km at 10K pace, 2 min jog`); add(w, "Thu", `Tempo run: ${Math.max(15, 20 + 5 * k)} min steady`); add(w, "Sat", `Long run: ${Math.max(50, 60 + 10 * k)} min easy`); }
+    else { add(w, "Mon", `Track: ${Math.max(3, 4 + k)} × 1 km at 10K pace, 2 min jog`); add(w, "Thu", `Tempo run: ${Math.max(15, 20 + 5 * k)} min steady`); add(w, "Sun", `Long run: ${Math.max(50, 60 + 10 * k)} min easy`); }
     if (days.length && kind !== "taper") {
       const base = out.filter((x) => x.week === w), keep = days.length >= base.length ? base : days.length === 1 ? [base[0]] : [base[0], ...base.slice(-(days.length - 1))];
       out.splice(out.length - base.length, base.length, ...keep.map((x, i) => ({ ...x, day: days[i] })));
@@ -247,48 +247,77 @@ function vPlanDetail(p) {
     <div class="stack"><div class="between" style="align-items:center"><span class="eyebrow">Sessions</span><button class="btn sm" data-a="plan-edit">Edit plan</button></div>${sessionRows(p.sessions)}</div>
     ${p.shared.length ? "" : `<button class="btn full ghost" data-a="plan-del">Delete plan</button>`}</section>`;
 }
-/* ---- The athlete's side of it (K-19 to K-21): the plan you follow, as your coach set it ----
-   Mia is in the Track group at PAU. The newest plan her coach shared with that group is the plan she follows;
-   the coach sees the same thing under "From you" on her page and on every session of the week. */
+/* ---- ONE plan (QA-13, replaces K-19 to K-21's separate card) ----
+   S.plan.items is the athlete's plan, day by day, and the only place a plan lives on her side. Three layers go into it:
+   1. the days her coach set: the newest plan shared with her group at PAU (week 1 of it is this week);
+   2. her own days in between (what each day is without a coach's plan is kept in `base`);
+   3. changes on top: a day she eased herself, or a change her coach approved in Review. A changed day keeps its change.
+   Path, Week, the next step, the easy week, the guardrails and the coach's view of her all read these same items. */
 const MY_GROUP = ORGS.pau.me.myGroup, MY_COACH = ORGS.pau.me.coach;
 const myPlans = () => plansOf(MY_GROUP, "pau");
-/* The club session that belongs to a line of the plan: same group, same weekday, this week. */
-function sessionForPlanDay(day) {
-  const mon = monday(today()), end = addDays(mon, 7);
-  return sessList("pau").find((x) => x.start >= mon && x.start < end && WD[x.start.getDay()] === day && groupOf(x) === MY_GROUP) || null;
+const planName = () => (myPlans()[0] ? myPlans()[0].title : S.plan.title);
+const planWeekOf = (date) => Math.floor((sod(new Date(date + "T12:00")) - monday(today())) / 6048e5) + 1;
+/* Lays the coach's plan over the days nobody changed. Runs before every draw, so sharing, unsharing or editing a plan shows at once. */
+function syncPlan() {
+  const p = myPlans()[0];
+  for (const it of S.plan.items) {
+    if (!it.base) it.base = { kind: it.kind, title: it.title, off: it.off };
+    if (planChanged(it) || it.date < ymd(today())) continue;
+    const wk = planWeekOf(it.date), line = p && wk >= 1 && wk <= weeksOf(p) ? p.sessions.find((x) => x.week === wk && x.day === WD[new Date(it.date + "T12:00").getDay()]) : null;
+    if (!line) { Object.assign(it, { ...it.base, what: "", from: "" }); continue; }
+    const s = sessList("pau").find((x) => ymd(x.start) === it.date && groupOf(x) === MY_GROUP);
+    if (s) Object.assign(it, { kind: "club", off: s.off, title: offOf(s).name, what: line.text, from: p.id }); // her group trains that day: the coach's line is what happens in that session
+    else Object.assign(it, { kind: /^rest\b/i.test(line.text) ? "rest" : "workout", off: null, title: line.text, what: "", from: p.id });
+  }
 }
-/* Where a line of the plan stands for the athlete: tied to its club session when there is one this week. */
-function planDayState(x, n) {
-  const s = n === 1 && x.day ? sessionForPlanDay(x.day) : null, mineB = s && myBooking(s.id), done = s && S.entries.some((e) => ymd(e.at) === ymd(s.start));
-  const label = n !== 1 ? "" : done ? "Done" : mineB ? `Booked · ${fTime(s.start)}` : s ? (s.start < today() ? "Missed" : `Club session · ${fTime(s.start)}`) : "On your own";
-  return { s, mineB, done, label };
+/* One week of the plan as rows: the stored days, then (further out than the stored days) the coach's lines, then lines with no day. */
+function planWeekRows(n) {
+  const p = myPlans()[0], mon = addDays(monday(today()), 7 * (n - 1)), rows = [];
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(mon, i), it = S.plan.items.find((x) => x.date === ymd(d));
+    if (it) { rows.push({ key: it.date, day: WD[d.getDay()], date: d, it, text: planText(it), n }); continue; }
+    const line = p && n <= weeksOf(p) ? p.sessions.find((x) => x.week === n && x.day === WD[d.getDay()]) : null;
+    if (line) rows.push({ key: `w${n}-${WD[d.getDay()]}`, day: WD[d.getDay()], date: d, it: null, text: line.text, n });
+  }
+  if (p) p.sessions.forEach((x, i) => { if (x.week === n && !x.day) rows.push({ key: `any-${i}`, day: "", date: null, it: null, text: x.text, n }); });
+  return rows;
 }
-/* Your plan on Path: one week at a time, every day a row you can open. No folded-away "whole plan": the weeks are a step apart. */
+/* Where a day stands: changed and by whom, or tied to its club session, or on her own. */
+function planRowState(r) {
+  const it = r.it, who = it ? planChanged(it) : "";
+  const base = it && it.base && it.base.kind === "club" ? it.base.off : null, s = it && (it.off || (who && base)) ? S.sessions[`pau-${it.off || base}-${it.date}`] : null, mineB = s && myBooking(s.id);
+  const done = it && S.entries.some((e) => ymd(e.at) === it.date);
+  const label = who === "you" ? "Eased by you" : who === "coach" ? `Changed by ${MY_COACH}` : !it ? "" : done ? "Done" : it.kind === "rest" ? "" : s && it.kind === "club" ? (mineB ? `Booked · ${fTime(s.start)}` : s.start < now() ? "Missed" : `Club session · ${fTime(s.start)}`) : it.from ? "On your own" : "Your own day";
+  return { s: it && it.kind === "club" ? s : null, was: who && s ? s : null, mineB, done, label, who };
+}
+/* Your plan on Path: one week at a time, every day a row you can open. */
 function coachPlansCard() {
-  const mine = myPlans();
-  if (!mine.length) return `<div class="stack" id="from-coach" style="gap:8px"><div class="eyebrow">Your plan</div><p class="sub">${MY_COACH} has not shared a plan with the ${MY_GROUP} group yet.</p></div>`;
-  const p = mine[0], N = weeksOf(p), n = Math.min(N, Math.max(1, dash().myWeek || 1));
-  const rows = p.sessions.map((x, i) => ({ x, i })).filter(({ x }) => x.week === n).map(({ x, i }) => { const st = planDayState(x, n); return `<button class="row" data-a="planday" data-v="${i}" style="align-items:flex-start"><span class="lead time" style="width:40px">${x.day || "·"}</span><span class="mid"><span>${esc(x.text)}</span>${st.label ? `<span class="sub">${st.label}</span>` : ""}</span></button>`; }).join("");
-  return `<div class="stack" id="from-coach"><div class="eyebrow">Your plan</div><div class="card stack" data-plan="${p.id}" style="gap:12px"><div><p class="h2">${esc(p.title)}</p><p class="sub">${MY_COACH} shared this with the ${MY_GROUP} group · ${esc(ORGS.pau.name)}</p></div>
+  const mine = myPlans(), p = mine[0], N = Math.max(p ? weeksOf(p) : 1, Math.ceil(S.plan.items.filter((x) => planWeekOf(x.date) >= 1).length / 7)), n = Math.min(N, Math.max(1, dash().myWeek || 1));
+  const changed = S.plan.items.filter((x) => planWeekOf(x.date) >= 1 && planChanged(x)), byYou = changed.filter((x) => planChanged(x) === "you").length, byCoach = changed.length - byYou;
+  const rows = planWeekRows(n).map((r) => { const st = planRowState(r); return `<button class="row" data-a="planday" data-v="${r.key}" style="align-items:flex-start"><span class="lead time" style="width:40px">${r.day || "·"}</span><span class="mid"><span>${esc(r.text)}</span>${st.label ? `<span class="sub">${st.label}</span>` : ""}</span></button>`; }).join("");
+  return `<div class="stack" id="from-coach"><div class="eyebrow">Your plan</div><div class="card stack" data-plan="${p ? p.id : "own"}" style="gap:12px"><div><p class="h2">${esc(planName())}</p><p class="sub">${p ? `${MY_COACH} shared this with the ${MY_GROUP} group · ${esc(ORGS.pau.name)}` : `${MY_COACH} has not shared a plan with the ${MY_GROUP} group yet. These are your own days.`}</p>${changed.length ? `<p class="sub" id="plan-changes">${[byYou ? `${byYou} ${byYou === 1 ? "day" : "days"} eased by you` : "", byCoach ? `${byCoach} ${byCoach === 1 ? "day" : "days"} changed by ${MY_COACH}` : ""].filter(Boolean).join(" · ")}</p>` : ""}</div>
     <div class="weeknav" style="margin:0 -12px"><button class="x" data-a="myweek" data-v="-1" aria-label="Previous week of the plan" ${n <= 1 ? "disabled" : ""}>${I(P.back, 18)}</button><span class="sub" id="plan-week" aria-live="polite"><span class="strong" style="color:var(--text)">Week ${n} of ${N}</span>${n === 1 ? " · this week" : ""}</span><button class="x" data-a="myweek" data-v="1" aria-label="Next week of the plan" ${n >= N ? "disabled" : ""}>${I(P.fwd, 18)}</button></div>
-    <div class="rows" id="plan-days" style="margin-top:-12px">${rows}</div></div>
+    <div class="rows" id="plan-days" style="margin-top:-12px">${rows || `<p class="sub" style="padding:12px 0">Nothing planned this week.</p>`}</div></div>
     ${mine.length > 1 ? `<p class="sub" id="also-shared">Also from your coach: ${mine.slice(1).map((x) => esc(x.title)).join(", ")}.</p>` : ""}</div>`;
 }
-/* One day of the plan, opened: what to do, who set it, and the one thing to do next. */
+/* One day of the plan, opened: what to do, where it comes from, and the one thing to do next. */
 function vPlanDaySheet() {
-  const p = myPlans()[0], x = p && p.sessions[UI.sheet.i]; if (!x) return "";
-  const st = planDayState(x, x.week), s = st.s, full = { Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday", Sat: "Saturday", Sun: "Sunday" }[x.day] || "Any day";
-  const next = st.done ? `<p class="sub">Logged. Well done.</p>` : s && st.mineB ? `<button class="btn acc full" data-a="sheet" data-v="${s.id}">Manage booking</button>` : s && s.start >= today() ? `<button class="btn acc full" data-a="sheet" data-v="${s.id}">Book this session</button>` : x.week === 1 ? `<button class="btn acc full" data-a="tab" data-v="log">Log it</button>` : "";
-  return `<div class="sheetbg" data-a="close"><div class="sheet stack-l" id="planday" role="dialog" aria-modal="true" aria-label="${full}, week ${x.week}"><div><div class="eyebrow">${full} · week ${x.week} of ${weeksOf(p)}</div><p class="h1" style="margin-top:8px">${esc(x.text)}</p><p class="sub" style="margin-top:8px">${esc(p.title)} · from ${MY_COACH}</p></div>
-    ${s ? `<div class="card stack" style="gap:4px"><p class="h2">${offOf(s).name}, ${fTime(s.start)}</p><p class="sub">${fDay(s.start)} · ${offOf(s).loc} · ${offOf(s).coach}</p><p class="sub">${st.label}</p></div>` : x.week === 1 ? `<p class="sub">The club has no session for this one. Do it on your own, then log it.</p>` : `<p class="sub">Comes up in week ${x.week}.</p>`}
+  const p = myPlans()[0], N = Math.max(p ? weeksOf(p) : 1, 2), all = [...Array(N)].flatMap((_, k) => planWeekRows(k + 1)), r = all.find((x) => x.key === UI.sheet.key); if (!r) return "";
+  const st = planRowState(r), s = st.s, it = r.it, full = r.date ? WDL[r.date.getDay()] : "Any day";
+  const source = st.who === "you" ? `Eased by you.${it.was ? ` It was: ${esc(it.was)}.` : ""}` : st.who === "coach" ? `Changed by ${MY_COACH} after review.${it.was ? ` It was: ${esc(it.was)}.` : ""}` : (it && it.from) || (!it && p) ? `${esc(p.title)} · from ${MY_COACH}` : "Your own day, not set by your coach";
+  const upcoming = s && s.start > now();
+  const next = st.done ? `<p class="sub">Logged. Well done.</p>` : s && st.mineB ? `<button class="btn acc full" data-a="sheet" data-v="${s.id}">Manage booking</button>` : upcoming ? `<button class="btn acc full" data-a="sheet" data-v="${s.id}">Book this session</button>` : it && it.kind !== "rest" && r.n === 1 ? `<button class="btn acc full" data-a="tab" data-v="log">Log it</button>` : "";
+  const still = st.was && myBooking(st.was.id) && st.was.start > now() ? `<div class="card stack" style="gap:8px"><p class="sub">You are still booked for ${offOf(st.was).name} at ${fTime(st.was.start)}.</p><button class="btn full" data-a="sheet" data-v="${st.was.id}">Manage booking</button></div>` : "";
+  return `<div class="sheetbg" data-a="close"><div class="sheet stack-l" id="planday" role="dialog" aria-modal="true" aria-label="${full}, week ${r.n}"><div><div class="eyebrow">${full} · week ${r.n} of ${N}</div><p class="h1" style="margin-top:8px">${esc(r.text)}</p><p class="sub" style="margin-top:8px" id="planday-source">${source}</p></div>
+    ${s ? `<div class="card stack" style="gap:4px"><p class="h2">${offOf(s).name}, ${fTime(s.start)}</p><p class="sub">${fDay(s.start)} · ${offOf(s).loc} · ${offOf(s).coach}</p><p class="sub">${st.label}</p></div>` : still || (it && it.kind === "rest" ? "" : r.n === 1 ? `<p class="sub">The club has no session for this one. Do it on your own, then log it.</p>` : `<p class="sub">Comes up in week ${r.n}.</p>`)}
     <div class="stack" style="gap:8px">${next}<button class="btn full ghost" data-a="planday-close">Close</button></div></div></div>`;
 }
-/* On a session in the athlete's Week: what the plan says for it. */
+/* On a session in the athlete's Week: what the plan says for it, changes included. */
 function myPlanNote(s) {
-  if (s.org !== "pau" && !String(s.id).startsWith("pau")) return "";
-  const p = myPlans()[0]; if (!p || groupOf(s) !== MY_GROUP) return "";
-  const hit = p.sessions.find((x) => x.week === 1 && x.day === WD[s.start.getDay()]);
-  return hit ? `<p class="note" id="plan-note" style="margin-top:-4px"><span class="strong" style="color:var(--text)">Your plan:</span> ${esc(hit.text)}</p>` : "";
+  if (s.org !== "pau") return "";
+  const it = S.plan.items.find((x) => x.date === ymd(s.start) && (x.off === s.off || (planChanged(x) && x.base && x.base.off === s.off)));
+  if (!it || !(it.what || planChanged(it))) return "";
+  return `<p class="note" id="plan-note" style="margin-top:-4px"><span class="strong" style="color:var(--text)">Your plan:</span> ${esc(planText(it))}${planChanged(it) === "you" ? " (eased by you)" : planChanged(it) === "coach" ? ` (changed by ${MY_COACH})` : ""}</p>`;
 }
 /* The real language model (K-23): on the hosted demo, "Draft it" asks PATH's server function, which holds the key.
    Anywhere else (opened as a file, in tests, in the Claude artifact) there is no server, and the written rules below draft instead. */
@@ -418,8 +447,8 @@ function vCoachSession(s, wk) {
     ${names.waiting.length ? `<p class="sub">Waiting: ${names.waiting.map(esc).join(", ")}.</p>` : ""}</div></section>`;
 }
 Object.assign(DASH_ACT, {
-  planday: (v) => { UI.sheet = { type: "planday", i: Number(v) }; }, "planday-close": () => { UI.sheet = null; },
-  myweek: (v) => { const d = dash(), p = myPlans()[0]; d.myWeek = Math.min(p ? weeksOf(p) : 1, Math.max(1, (d.myWeek || 1) + Number(v))); },
+  planday: (v) => { UI.sheet = { type: "planday", key: v }; }, "planday-close": () => { UI.sheet = null; },
+  myweek: (v) => { const d = dash(); d.myWeek = Math.max(1, (d.myWeek || 1) + Number(v)); }, // the card clamps it to the weeks there are
   sess: (v) => { dash().sess = v || null; S.tab.coach = "week"; lastKey = ""; },
   cwk: (v) => { const d = dash(); d.wk = Math.min(WEEKS - 1, Math.max(0, (d.wk || 0) + Number(v))); },
   wkind: (v) => { dash().wkind = v; },

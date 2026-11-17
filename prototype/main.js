@@ -12,10 +12,10 @@ let lastKey = "", swipeClickGuard = -1e9;
 function render() {
   document.documentElement.style.setProperty("--accent", (ACCENTS[S.accent] || ACCENTS.sage)[1]);
   for (const v of ["--bg", "--surface", "--soft"]) document.documentElement.style.setProperty(v, (GROUNDS[S.ground] || GROUNDS.stone)[1]);
-  ensureSessions(); sweepCancelled(); sweep(); sweepProposals(); sweepOffers(); runSeries();
+  ensureSessions(); syncPlan(); sweepCancelled(); sweep(); sweepProposals(); sweepOffers(); runSeries();
   const app = document.getElementById("app"), tab = S.tab[S.role], key = S.role + tab + S.org + (S.rosterSid || "") + ((S.dash && (S.dash.athlete || S.dash.planView || S.dash.sess)) || "") + (tab === "explore" ? S.explore.open || "" : ""), old = document.getElementById("view"), top = old && key === lastKey ? old.scrollTop : 0;
   const body = S.role === "athlete" ? { path: vPath, coach: vCoachChat, log: vLog, week: vWeek, me: vMe, explore: vExplore }[tab]() : S.role === "coach" ? vCoach() : vAdmin();
-  const badge = S.role === "coach" ? S.alerts.filter((a) => a.status === "open" && (a.info || shares("alerts.pain"))).length : 0;
+  const badge = S.role === "coach" ? coachAlerts().filter((a) => a.status === "open").length : 0;
   app.className = S.role === "admin" ? "wide" : "";
   app.innerHTML = `<header class="top"><button class="name" data-a="home" aria-label="PATH, back to your start page">PATH</button>
       <button class="clubbtn" data-a="clubs" data-org="${S.org}" aria-label="${esc(ORGS[S.org].name)}: your clubs and the demo view" aria-haspopup="dialog"><span class="mono36" aria-hidden="true">${mono(S.org)}</span></button></header>
@@ -66,7 +66,7 @@ const ACT = {
   /* A session the club cancelled: "Find another session" opens Week on that day, at that club. */
   "notice-ok": (v) => { const n = (S.notices || []).find((x) => x.id === Number(v)); if (!n) return; n.seen = true; const s = S.sessions[n.sid]; S.org = s.org; S.tab.athlete = "week"; S.filter = { cat: "all", mine: false }; if (s.start < addDays(monday(today()), 7 * WEEKS)) S.day = ymd(s.start); },
   renew: (v) => { const p = S.passes.find((x) => x.id === v) || passOf(S.org), r = p && renewalOf(p); if (r) UI.sheet = { type: "pay", what: `${p.name}, ${r.season.name}`, amount: r.price, note: `Valid until ${fDate(r.season.end)}.`, buy: "renew", org: p.org }; },
-  "review-plan": () => { S.planNews = false; const r = applyDraft(currentDraft()); UI.toast = `Your plan is now "${S.plan.title}", approved by Coach Sara. ${r.applied} upcoming ${r.applied === 1 ? "day" : "days"} changed${r.skipped ? `, ${r.skipped} left alone because ${r.skipped === 1 ? "it was" : "they were"} already under way or done` : ""}. Nothing in the past was touched.`; },
+  "review-plan": () => { S.planNews = false; const r = applyDraft(currentDraft()); UI.toast = `Coach Sara approved "${currentDraft().title}": ${r.applied} upcoming ${r.applied === 1 ? "day" : "days"} of your plan changed${r.skipped ? `, ${r.skipped} left alone because ${r.skipped === 1 ? "it was" : "they were"} already under way or done` : ""}. Nothing in the past was touched.`; },
   "clear-pain": () => { S.entries.forEach((e) => { if (e.pain) e.cleared = true; }); UI.toast = "Pain flag cleared. Hard sessions can be suggested again."; },
   logit: (v) => { S.form = newForm(v); S.logTab = "log"; S.tab.athlete = "log"; UI.sheet = null; },
   "log-clear": () => { S.form = { rpe: 0, pain: false, title: "", dur: "" }; },
@@ -96,7 +96,7 @@ const ACT = {
   mark: (v) => { const [sid, i, st] = v.split("|"), r = rosterRows(S.sessions[sid])[Number(i)]; if (r) markAttendance(sid, r.name, st); },
   "all-present": (v) => { for (const r of rosterRows(S.sessions[v])) markAttendance(v, r.name, "present"); UI.toast = "Everyone on the roster marked present."; },
   draft: (v) => { if (v === "approved") { S.draftApproved = guardDraft(RAW_DRAFT); S.planNews = true; } S.draftStatus = v; UI.toast = v === "approved" ? `Approved. ${S.me.name} now sees it as the next step.` : "Rejected. The athlete keeps the current plan."; },
-  ack: (v) => { S.alerts.find((a) => a.id === Number(v)).status = "seen"; },
+  ack: (v) => { if (String(v)[0] === "e") { const e = S.entries.find((x) => x.id === Number(String(v).slice(1))); if (e) e.seenByCoach = true; } else S.alerts.find((a) => a.id === Number(v)).status = "seen"; },
   free: (v) => { UI.toast = freeSpot(v); }, "mark-paid": (v) => { S.invoices.find((x) => x.id === v).status = "paid"; S.audit.unshift({ what: `Marked invoice ${v} paid (bank transfer)`, at: now() }); UI.toast = "Invoice marked paid and recorded in the audit log."; },
 };
 document.addEventListener("click", (e) => {
@@ -150,7 +150,7 @@ function submitLog() {
     const val = Number(d.value), pb = d.metric && val > 0 && S.pbs.find((p) => p.metric === d.metric);
     if (pb && (pb.better === "lower" ? val < pb.value : val > pb.value)) { msg += ` New personal best: ${pb.metric} ${val} ${pb.unit} (was ${pb.value}).`; pb.value = val; pb.at = now(); pb.isNew = true; }
     if (e2.pain) {
-      if (S.consent.pau["alerts.pain"]) { S.alerts.push({ id: S.seq++, kind: `Pain flag: ${e2.painWhere}, level ${e2.painLevel}`, at: now(), status: "open" }); msg += " Coach Sara was alerted."; } else msg += " The pain flag stays private.";
+      msg += S.consent.pau["alerts.pain"] ? " Coach Sara was alerted." : " The pain flag stays private."; // the alert is read from the flag itself, so it follows every later change
       if (e2.painLevel >= 7) msg += " That is a high level: please see a doctor or physio.";
     }
     UI.lineFrom = { stage: S.stage, inSt: S.stageSessions }; S.stageSessions++;
@@ -184,11 +184,11 @@ document.addEventListener("pointercancel", () => { swipe = null; });
 
 /* The coach and club dashboard brings its own actions (dash.js). Leaving a tab or going home also leaves an open athlete. */
 Object.assign(ACT, DASH_ACT);
-for (const k of ["home", "tab"]) { const f = ACT[k]; ACT[k] = (v) => { const r = f(v); if (S.dash) Object.assign(S.dash, { athlete: null, planView: null, pdraft: null, sess: null }); return r; }; }
+for (const k of ["home", "tab"]) { const f = ACT[k]; ACT[k] = (v) => { const r = f(v); if (S.dash) Object.assign(S.dash, { athlete: null, planView: null, pdraft: null, sess: null, myWeek: 1 }); return r; }; }
 /* For the tests and for poking around in the console. */
 window.PATH_DEMO = {
   get state() { return S; }, disciplines, ACCENTS, GROUNDS, athletes, statusOf, roster, members, memberPass, ui: UI, ORGS, LOAD_LIMIT, CARD_TTL_MIN, STORE_KEY,
-  render, seed, save, load, resetDemo, book, cancel, cancelSession, clashAt, passEnded, renewalOf, check, freeSpot, leaveWait, passState, passOf, stats, guard, guardDraft, currentDraft, RAW_DRAFT,
+  render, seed, save, load, resetDemo, syncPlan, planText, planName, coachAlerts, openPains, book, cancel, cancelSession, clashAt, passEnded, renewalOf, check, freeSpot, leaveWait, passState, passOf, stats, guard, guardDraft, currentDraft, RAW_DRAFT,
   newForm, toLog, ask, confirmProposal, toggleAct, runAct, planLocked, nextChangeable, applyDraft, shiftWeek, weekIndex,
   parseClub, agenda, openPain, OFFERS, openOffers, exploreList, tryPlan, dropPlan, tryToday, providerOf, signUp, dropSignup, signedUp, offerStart, offerKm, offersFor, purchase, acceptOffer, declineOffer, sweepOffers, waitTotal, createSeries, previewSeries, pauseSeries, endSeries, runSeries, seriesRows, seriesSummary, findSeries, sweepProposals, parseWhen, parseOffering, rosterRows, rosterNames, addWalkin, markAttendance, memoryFor, upcomingBookings, sessList, myBooking, myWait, spots, nextStep, offerById, packOf, ticketOf, myInvoices,
 };

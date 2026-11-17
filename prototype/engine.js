@@ -201,7 +201,7 @@ function seed() {
   S.entries[1].comments.push({ by: "Coach Sara", text: "Strong last two reps. Keep the first lap calmer next time." });
   S.pbs = [{ metric: "400 m", value: 63.2, unit: "s", better: "lower", at: addDays(T, -23) }, { metric: "5K", value: 20.4, unit: "min", better: "lower", at: addDays(T, -44) }, { metric: "Squat 1RM", value: 82.5, unit: "kg", better: "higher", at: addDays(T, -31) }];
   const tpl = { 1: ["club", "Track session", "track"], 2: ["workout", "Easy run 40 min @ RPE 4"], 3: ["rest", "Rest day"], 4: ["club", "Track session", "track"], 5: ["club", "Gym session", "gym"], 6: ["club", "Saturday community session", "community"], 0: ["workout", "Long run 75 min @ RPE 5"] };
-  for (let i = 0; i < 14; i++) { const d = addDays(monday(T), i), t = tpl[d.getDay()]; S.plan.items.push({ date: ymd(d), kind: t[0], title: t[1], off: t[2] || null, status: "planned" }); }
+  for (let i = 0; i < 14; i++) { const d = addDays(monday(T), i), t = tpl[d.getDay()]; S.plan.items.push({ date: ymd(d), kind: t[0], title: t[1], off: t[2] || null, status: "planned", base: { kind: t[0], title: t[1], off: t[2] || null } }); }
   S.form = newForm();
   S.chat = [{ who: "coach", text: "Hi Mia. I can book or cancel sessions, look at your week, ease your plan or tell you how you are doing. I always ask before I change anything." }];
 }
@@ -610,7 +610,10 @@ function weeklyLoad() {
   for (let w = 9; w >= 0; w--) { const a = addDays(T, -7 * w - 6), b = addDays(a, 7); const es = S.entries.filter((e) => e.at >= a && e.at < b); out.push({ start: a, load: es.reduce((n, e) => n + e.dur * e.rpe, 0), count: es.length }); }
   return out;
 }
-const openPain = () => S.entries.find((e) => e.pain && !e.cleared && e.at >= addDays(today(), -4)) || null;
+/* THE pain flag (QA-08): a log entry with pain that has not been cleared, from the last four days. The guardrails, Path, the coach
+   chat, the coach's athlete list and the coach's alerts all ask here; nothing keeps its own copy. */
+const openPains = () => S.entries.filter((e) => e.pain && !e.cleared && e.at >= addDays(today(), -4));
+const openPain = () => openPains()[0] || null;
 function stats() {
   const wl = weeklyLoad(), cur = wl[wl.length - 1], avg = wl.slice(-5, -1).reduce((n, w) => n + w.load, 0) / 4;
   return { wl, cur, avg, ratio: avg ? cur.load / avg : 0, hard: S.entries.filter((e) => e.at >= addDays(today(), -7) && e.rpe >= 9).length, pain: openPain() };
@@ -628,6 +631,10 @@ const RAW_DRAFT = {
     { wd: 3, from: "Rest day", to: "Rest day", intensity: "none", load: 0 },
   ],
 };
+/* What a day of the plan says, wherever it is shown: the coach's words for that session if the coach set it, else the day's own title.
+   A day that was changed (eased by the athlete, or changed by the coach after review) says what it was changed to. */
+const planText = (it) => (it.status === "planned" && !it.src && it.what ? it.what : it.title);
+const planChanged = (it) => (it.status === "swapped" || it.status === "eased" ? "you" : it.src === "review" ? "coach" : "");
 /* A plan day that may no longer be changed: it is in the past, its session has started, or it was attended or logged.
    Every plan change (a coach-approved draft, the easy week, "make today easy") asks this first. */
 function planLocked(it) {
@@ -660,9 +667,10 @@ function guard() {
 function guardDraft(raw) {
   const g = guard();
   const items = raw.items.map((it) => {
-    const date = nextChangeable(it.wd), dated = { ...it, date, day: fDay(date) };
+    const date = nextChangeable(it.wd), on = S.plan.items.find((x) => x.date === ymd(date)), from = on ? planText(on) : it.from;
+    const dated = { ...it, from, to: it.intensity === "none" ? from : it.to, date, day: fDay(date) };
     if (!g.active || (it.intensity !== "high" && it.load <= 0)) return { ...dated, changed: false };
-    const to = it.intensity === "high" ? "Easy 30 min @ RPE 3" : it.from.replace(/(\d+) min/, (m, n) => `${Math.round((n * 0.8) / 5) * 5} min`) + " @ RPE 4";
+    const to = it.intensity === "high" ? "Easy 30 min @ RPE 3" : from.replace(/(\d+) min/, (m, n) => `${Math.round((n * 0.8) / 5) * 5} min`).replace(/ easy$/, "") + " @ RPE 4";
     return { ...dated, was: it.to, to, intensity: "low", load: -1, changed: true };
   });
   return { title: raw.title, rationale: g.active ? "Changed before anyone saw it: with these signals a plan may only reduce load." : raw.rationale, items, guard: g.active ? g : null };
@@ -675,11 +683,10 @@ function applyDraft(d) {
     if (it.from === it.to) continue;
     const pi = S.plan.items.find((x) => x.date === ymd(it.date)); if (!pi) continue;
     if (planLocked(pi)) { skipped++; continue; }
-    pi.title = it.to; pi.status = "planned"; applied++;
+    pi.title = it.to; pi.status = "planned"; pi.src = "review"; pi.was = planText({ ...pi, title: pi.base ? pi.base.title : pi.title, src: "" }); pi.what = ""; applied++;
     if (!/^(Track|Gym) session/.test(it.to)) { pi.kind = /rest/i.test(it.to) ? "rest" : "workout"; pi.off = null; }
   }
-  S.plan.title = d.title;
-  return { applied, skipped };
+  return { applied, skipped }; // the plan keeps its name: an approved change is a change to the one plan, not a second plan
 }
 
 /* ---------- the rule-based next step ---------- */
@@ -703,7 +710,7 @@ function nextStep() {
     const c = check(s), full = spots(s) === 0;
     if (!c.ok) continue; // never suggest a step the rules would refuse
     const o = offOf(s);
-    return { kind: "book", title: `Book ${o.name.includes(WDL[s.start.getDay()]) ? "the " + o.name.toLowerCase().replace("saturday", "Saturday") : WDL[s.start.getDay()] + " " + o.name.replace(" session", "").toLowerCase()}, ${fTime(s.start)}`, meta: `${full ? "Full, waitlist open" : spots(s) + " spots left"} · ${c.pass ? o.loc : "Free, no pass needed"}`, cta: full ? "Join waitlist" : "Book", a: "book", v: s.id, reason: "It is the next club session in your plan and you are not booked yet.", factors: [`In your plan: ${S.plan.title}, approved by ${S.plan.by}`, "You usually train " + WDL[s.start.getDay()] + "s", `${spots(s)} of ${s.cap} spots left`] };
+    return { kind: "book", title: `Book ${o.name.includes(WDL[s.start.getDay()]) ? "the " + o.name.toLowerCase().replace("saturday", "Saturday") : WDL[s.start.getDay()] + " " + o.name.replace(" session", "").toLowerCase()}, ${fTime(s.start)}`, meta: `${full ? "Full, waitlist open" : spots(s) + " spots left"} · ${c.pass ? o.loc : "Free, no pass needed"}`, cta: full ? "Join waitlist" : "Book", a: "book", v: s.id, reason: "It is the next club session in your plan and you are not booked yet.", factors: [`In your plan: ${planName()}, from ${S.plan.by}`, "You usually train " + WDL[s.start.getDay()] + "s", `${spots(s)} of ${s.cap} spots left`] };
   }
   const t = S.plan.items.find((i) => i.date === ymd(T));
   return { kind: "do", title: t ? "Today: " + t.title : "You are all set", meta: "Nothing to book right now", cta: "Log a session", a: "tab", v: "log", reason: "Your upcoming club sessions are booked.", factors: ["All plan sessions for the coming days are booked"] };
