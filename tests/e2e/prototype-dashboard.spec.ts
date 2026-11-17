@@ -442,7 +442,7 @@ test("the athlete's Path shows the plan they follow, and it mirrors what the coa
   const plan = page.locator("#from-coach");
   await expect(plan).toContainText("Your plan");
   // Closed, the card shows today and the next two days (B-25); the whole week is one tap away.
-  await expect(page.locator("#plan-week")).toHaveText("Week 1 of 4 · today and the next two days");
+  await expect(page.locator("#plan-week")).toHaveText("From Coach Sara · week 1 of 4"); // one quiet line, nothing more (B-26)
   await expect(plan.locator("#plan-days .row")).toHaveCount(3);
   await expect(plan.locator("#plan-days .row").first()).toContainText("Today");
   await plan.getByRole("button", { name: "Show the whole week" }).click();
