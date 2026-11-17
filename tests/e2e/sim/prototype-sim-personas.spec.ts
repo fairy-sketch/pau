@@ -560,6 +560,35 @@ test.describe("Athlete Lea: new to PATH", () => {
     await say(page, "What's on this week?");
     await expect(page.locator(".msg").last()).toContainText(offer.club);
   });
+  test("says she would like to learn yoga: the coach suggests the beginners' class from Explore, and books nothing until she confirms", async ({
+    page,
+  }) => {
+    await start(page);
+    await screen(page, "athlete", "coach");
+    await say(page, "i kinda would like to learn yoga");
+    const reply = page.locator(".msg").last();
+    await expect(reply).toContainText("Explore has a beginners' yoga class");
+    await expect(reply).toContainText("Slow flow at sunrise, Yoga am Fenster");
+    await expect(reply).toContainText("Studio Demo, your other club, has Yoga flow too.");
+    await expect(reply).not.toContainText("not at PAU Trackrunning"); // the old answer sent her away
+    await expect(page.getByRole("button", { name: "View: Slow flow at sunrise" })).toBeVisible();
+    expect(await sim(page, (d) => d.state.signups.length)).toBe(0); // a suggestion is not a sign-up
+    // "Yes" is still only a confirm card.
+    await say(page, "yes");
+    const card = page.locator(".pcard").last();
+    await expect(card).toContainText("Put your name down?");
+    await expect(card).toContainText("Yoga am Fenster sees your name, nothing else.");
+    expect(await sim(page, (d) => d.state.signups.length)).toBe(0);
+    await card.getByRole("button", { name: "Confirm", exact: true }).click();
+    expect(await sim(page, (d) => d.signedUp("yoga"))).toBeTruthy();
+    // Other wordings and German reach the same class; a booking request is still a booking.
+    for (const q of ["I want to try yoga", "ich möchte Yoga lernen"]) {
+      await say(page, q);
+      await expect(page.locator(".msg").last()).toContainText("Slow flow at sunrise");
+    }
+    await say(page, "book yoga flow at Studio Demo");
+    await expect(page.locator(".pcard").last()).toContainText("Yoga flow");
+  });
 
   test("switches clubs: nothing from PAU shows at Studio Demo, and nothing from the studio at PAU", async ({
     page,
