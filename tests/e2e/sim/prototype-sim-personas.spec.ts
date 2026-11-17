@@ -373,10 +373,6 @@ test.describe("Athlete Mia: a member of both clubs", () => {
   });
 
   test("a coach's own notes and plans stay in the club they were written in", async ({ page }) => {
-    test.fail(
-      true,
-      "QA-07: coach notes and plans are not scoped to a club; PAU's show in the Studio Demo coach view",
-    );
     await start(page);
     await sim(page, (d) => {
       const S = d.state;
@@ -384,18 +380,57 @@ test.describe("Athlete Mia: a member of both clubs", () => {
       S.org = "pau";
       S.tab.coach = "athletes";
       d.render();
-      S.dash.notes = { mia: "Starts too fast (PAU note)" };
+      S.dash.athlete = "mia";
+      d.render();
     });
+    await page.locator("#cnote").fill("Starts too fast (PAU note)");
+    await page.getByRole("button", { name: "Save note" }).click();
+    await expect(page.locator("#athlete-detail")).toContainText("Track group");
     const plans = await screen(page, "coach", "plans", "studio");
+    expect(plans).not.toContain("Base block");
+    expect(plans).not.toContain("Race week taper");
     await sim(page, (d) => {
       const S = d.state;
       S.tab.coach = "athletes";
       S.dash.athlete = "mia";
       d.render();
     });
-    expect(plans).not.toContain("Base block");
     await expect(page.locator("#cnote")).toHaveValue("");
     await expect(page.locator("#athlete-detail")).not.toContainText("Track group");
+    await expect(page.locator("#athlete-detail")).toContainText("Yoga group");
+    // The other club's coach is a different person, and the note is still there back at PAU.
+    expect(await screen(page, "coach", "today", "studio")).toMatch(/^NOOR · STUDIO DEMO/i);
+    await sim(page, (d) => {
+      const S = d.state;
+      S.org = "pau";
+      S.tab.coach = "athletes";
+      S.dash.athlete = "mia";
+      d.render();
+    });
+    await expect(page.locator("#cnote")).toHaveValue("Starts too fast (PAU note)");
+  });
+  test("alarming symptoms get one clear answer: stop, get medical help; no plan, no guess", async ({
+    page,
+  }) => {
+    await start(page);
+    await screen(page, "athlete", "coach");
+    for (const words of [
+      "I feel dizzy and my chest hurts",
+      "i can't breathe properly after the intervals",
+      "mir ist schwindlig und ich habe Brustschmerzen",
+    ]) {
+      const cardsBefore = await page.locator(".pcard").count();
+      await say(page, words);
+      const reply = page.locator(".msg.coach").last();
+      await expect(reply).toContainText("Stop training now");
+      await expect(reply).toContainText("144");
+      await expect(reply).toContainText("I can't tell you what it is");
+      await expect(reply).not.toContainText(/easy|rest day|walk|probably|might be|sounds like/i);
+      expect(await page.locator(".pcard").count(), "no plan change is offered").toBe(cardsBefore);
+    }
+    // Nothing was changed, and with sharing off nobody was told.
+    expect(await sim(page, (d) => d.state.alerts.length)).toBe(0);
+    expect(await sim(page, (d) => d.state.form.pain)).toBe(false);
   });
 });
 

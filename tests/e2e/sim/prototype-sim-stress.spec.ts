@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- the demo is plain browser JS; its test hook (window.PATH_DEMO) has no types. */
 import { expect, test } from "@playwright/test";
 
+import { lastCard, say } from "../../helpers/demo";
+
 import {
   ALL_SCREENS,
   BROKEN_TEXT,
@@ -138,8 +140,10 @@ test.describe("Booking rules under pressure", () => {
               if (w.length && mine) out.push(`${what}: booked and waiting for ${x.id}`);
               if (w.some((q: any) => q.pos < 1))
                 out.push(`${what}: waitlist position below 1 in ${x.id}`);
-              if (w.some((q: any) => q.offer) !== !!x.held)
-                out.push(`${what}: held spot and offer disagree in ${x.id}`);
+              if ((w.some((q: any) => q.offer) ? 1 : 0) + (x.offerTo ? 1 : 0) !== (x.held || 0))
+                out.push(`${what}: held spots and offers disagree in ${x.id}`);
+              if (x.offerTo && x.waitOthers < 1)
+                out.push(`${what}: a spot is held for someone who is not waiting in ${x.id}`);
             }
             for (const p of S.passes) {
               const st = d.passState(p);
@@ -237,10 +241,6 @@ test.describe("Booking rules under pressure", () => {
   test("when a member cancels out of a full session, the spot goes to the next person waiting", async ({
     page,
   }) => {
-    test.fail(
-      true,
-      "QA-01: a member's own cancel leaves the spot open; the people waiting are skipped, and the member can rebook past them",
-    );
     await start(page);
     const r = await sim(page, (d) => {
       const S = d.state,
@@ -256,10 +256,6 @@ test.describe("Booking rules under pressure", () => {
   test("two bookings at the same time in two clubs are not made without a word", async ({
     page,
   }) => {
-    test.fail(
-      true,
-      "QA-02: overlapping bookings are accepted silently (Track 18:30 to 20:00 at PAU and Ride 19:00 at the studio)",
-    );
     await start(page);
     const r = await sim(page, (d) => {
       d.book("pau-track-2026-11-19", "t");
@@ -270,10 +266,6 @@ test.describe("Booking rules under pressure", () => {
   test("when the club cancels a session, booked members are told and get the session back", async ({
     page,
   }) => {
-    test.fail(
-      true,
-      "QA-03: a cancelled session leaves the booking confirmed and the credit used; only the Week card says Cancelled",
-    );
     await start(page);
     const r = await sim(page, (d) => {
       const S = d.state,
@@ -288,10 +280,6 @@ test.describe("Booking rules under pressure", () => {
     expect(r).toEqual({ status: "cancelled", pass: "3 of 4 used in November" });
   });
   test("a pass that has run out cannot book", async ({ page }) => {
-    test.fail(
-      true,
-      'QA-04: "Valid until 31 Mar 2027" is only a line of text; on 6 April the pass still books',
-    );
     await start(page, new Date("2027-04-06T12:00:00+02:00"));
     const r = await sim(page, (d) => {
       const s: any = Object.values(d.state.sessions)
@@ -300,6 +288,181 @@ test.describe("Booking rules under pressure", () => {
       return d.book(s.id, "t").ok;
     });
     expect(r).toBe(false);
+  });
+  test("offer mode: a cancelled spot is held for the next person and runs out, like the member's own offer", async ({
+    page,
+  }) => {
+    await start(page);
+    const r = await sim(page, (d) => {
+      const S = d.state,
+        s = S.sessions["studio-ride-2026-11-18"];
+      s.others = s.cap - 1;
+      s.waitOthers = 2;
+      const b = d.book(s.id, "t"),
+        msg = d.cancel(b.bid).msg,
+        held = { others: s.others, waiting: s.waitOthers, held: s.held, spots: d.spots(s) },
+        again = d.book(s.id, "t").status;
+      return { msg, held, again, to: s.offerTo.name, names: d.rosterNames(s).waiting };
+    });
+    expect(r.msg).toMatch(/Your spot is held for .+, next on the waitlist, until 14:00/);
+    expect(r.held).toEqual({ others: 17, waiting: 2, held: 1, spots: 0 });
+    expect(r.again, "the member cannot book past the people waiting").toBe("waitlisted");
+    expect(r.names[0]).toBe(r.to);
+    await clock(page, ZURICH("2026-11-16T14:01"));
+    expect(
+      await sim(page, (d) => {
+        const s = d.state.sessions["studio-ride-2026-11-18"];
+        return [s.others, s.waitOthers, s.held, !!s.offerTo];
+      }),
+    ).toEqual([18, 1, 0, false]);
+  });
+  test("the overlap is on the screen before the tap: session sheet, Week card, coach card and Explore", async ({
+    page,
+  }) => {
+    await start(page);
+    await sim(page, (d) => {
+      d.book("pau-track-2026-11-19", "t");
+      d.state.day = "2026-11-19";
+    });
+    await screen(page, "athlete", "week", "studio");
+    await page.locator('.filters .chip:has-text("Cycling")').click();
+    await expect(page.locator("#clash-card")).toContainText(
+      "Overlaps with Track session at PAU Trackrunning, 18:30 to 20:00.",
+    );
+    await page.locator("#classcard").getByRole("button", { name: "Book anyway" }).click();
+    await expect(page.locator(".toast")).toContainText("Heads up: it overlaps with Track session");
+    // No overlap, no warning.
+    await sim(page, (d) => {
+      d.state.day = "2026-11-18";
+      d.state.filter.cat = "all";
+      d.render();
+    });
+    await page.locator('#daylist [data-v="studio-ride-2026-11-18"]').click();
+    await expect(page.getByRole("dialog")).not.toContainText("Overlaps");
+    await expect(
+      page.getByRole("dialog").getByRole("button", { name: "Book", exact: true }),
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
+    // The coach says it on the card, before the confirm.
+    await screen(page, "athlete", "coach", "studio");
+    await say(page, "book yoga on Thursday");
+    await expect(lastCard(page)).toContainText(/Overlaps with (Track session|Ride)/);
+    // Explore: a taster at the time of a club session.
+    const id = await sim(page, (d) => {
+      const o = d.OFFERS.find(
+        (x: any) =>
+          !d.signedUp(x.id) && d.offerStart(x) > new Date() && x.price === 0 && x.cap > x.taken,
+      );
+      const s: any = Object.values(d.state.sessions).find(
+        (x: any) => x.org === "pau" && x.off === "gym" && x.start > new Date(),
+      );
+      d.state.bookings.push({
+        id: 77001,
+        sid: s.id,
+        status: "confirmed",
+        pass: null,
+        source: "t",
+        at: new Date(),
+      });
+      s.start = d.offerStart(o);
+      return o.id;
+    });
+    await sim(
+      page,
+      (d, id) => {
+        d.ui.sheet = { type: "offer", id };
+        d.render();
+      },
+      id,
+    );
+    await expect(page.locator("#consequence")).toContainText(
+      "It overlaps with Gym session at PAU Trackrunning",
+    );
+  });
+  test("a session the club cancelled: the member is told on Path, in Week and in the chat, and her waitlist entries go too", async ({
+    page,
+  }) => {
+    await start(page);
+    const msg = await sim(page, (d) => {
+      const S = d.state;
+      d.book("pau-track-2026-11-19", "t");
+      const full = S.sessions["pau-gym-2026-11-20"];
+      full.others = full.cap;
+      d.book(full.id, "t", null, { wait: true });
+      d.cancelSession(full.id);
+      return d.cancelSession("pau-track-2026-11-19").msg;
+    });
+    expect(msg).toMatch(
+      /Cancelled\. \d+ booked members were told and got the session back on their pass\./,
+    );
+    const path = await screen(page, "athlete", "path");
+    expect(path).toMatch(/Cancelled by the club: (Track|Gym) session/);
+    expect(path).toContain("3 of 4 used in November");
+    const week = await screen(page, "athlete", "week");
+    expect(week).toMatch(/Thu 19 Track session[^]*?Cancelled by the club/);
+    expect(await sim(page, (d) => d.state.waitlist.length)).toBe(0);
+    expect(await screen(page, "athlete", "coach")).toContain(
+      "PAU Trackrunning cancelled Track session on Thu 19 Nov at 18:30. Your booking is gone",
+    );
+    // It cannot be booked again, and "Find another session" leads to that day.
+    expect(await sim(page, (d) => d.book("pau-track-2026-11-19", "t").code)).toBe("CANCELLED");
+    await screen(page, "athlete", "path");
+    await page.getByRole("button", { name: "Find another session" }).click();
+    await expect(page.locator("#weeklabel")).toBeVisible();
+    expect(await sim(page, (d) => d.state.notices.filter((n: any) => !n.seen).length)).toBe(1);
+    expect(await screen(page, "admin", "money")).toMatch(
+      /Cancelled Track session, Thu 19 Nov 18:30: \d+ booked members told/,
+    );
+  });
+  test("an ended pass says so, offers the renewal, and books again once renewed", async ({
+    page,
+  }) => {
+    await start(page, new Date("2027-04-06T12:00:00+02:00"));
+    expect(await screen(page, "athlete", "me")).toContain("Ended 31 Mar 2027");
+    await sim(page, (d) => {
+      d.state.bookings = []; // nothing left to log, so the pass is the next thing to deal with
+    });
+    const path = await screen(page, "athlete", "path");
+    expect(path).toContain("Your pass has ended");
+    expect(path).toContain("Drop-in season pass: ended 31 Mar 2027");
+    const sid = await sim(page, (d) => {
+      const s: any = Object.values(d.state.sessions)
+        .filter((x: any) => x.org === "pau" && x.off === "track" && x.start > new Date())
+        .sort((a: any, b: any) => a.start - b.start)[0];
+      return s.id;
+    });
+    const before = await sim(
+      page,
+      (d, sid) => {
+        const s = d.state.sessions[sid];
+        return {
+          code: d.check(s).code,
+          offers: d.offersFor(s).map((o: any) => o.kind),
+          free: d.book(
+            Object.values(d.state.sessions).find(
+              (x: any) => x.org === "pau" && x.off === "community" && x.start > new Date(),
+            )!.id,
+            "t",
+          ).ok,
+        };
+      },
+      sid,
+    );
+    expect(before).toEqual({ code: "PASS_EXPIRED", offers: ["renew", "dropin"], free: true });
+    await page.getByRole("button", { name: "Renew for Summer season · CHF 300.00" }).click();
+    await page.getByRole("button", { name: "Pay with TWINT" }).click();
+    expect(await screen(page, "athlete", "me")).toContain("Valid until 30 Sep 2027");
+    expect(await sim(page, (d, sid) => d.book(sid, "t").ok, sid)).toBe(true);
+    // A session after the end of a pass that is still running is refused too.
+    expect(
+      await sim(page, (d) => {
+        d.passOf("pau").until = new Date(2027, 3, 7);
+        const s: any = Object.values(d.state.sessions)
+          .filter((x: any) => x.org === "pau" && x.off === "gym" && x.start > new Date(2027, 3, 8))
+          .sort((a: any, b: any) => a.start - b.start)[0];
+        return d.check(s).msg;
+      }),
+    ).toMatch(/is valid until 7 Apr 2027\. This session is after that\./);
   });
 });
 

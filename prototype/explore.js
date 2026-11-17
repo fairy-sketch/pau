@@ -113,6 +113,7 @@ const offerPrice = (o) => (o.price ? chf(o.price) : o.trial ? "Free trial" : "Fr
 const openOffers = () => OFFERS.filter((o) => offerStart(o) > now()).sort((a, b) => offerStart(a) - offerStart(b));
 const offerLine = (o) => `${o.title}, ${o.club}: ${fDay(offerStart(o))} ${fTime(offerStart(o))}, ${offerKm(o)} km away, ${offerPrice(o).toLowerCase()}`;
 
+const offerClash = (o) => clashAt(offerStart(o), new Date(offerStart(o).getTime() + o.dur * 60000), o.id);
 /* Putting your name down. The club learns your name and nothing else; your pass and your log stay where they are. */
 function signUp(id, key, opts = {}) {
   if (key && S.idem[key]) return S.idem[key];
@@ -124,8 +125,9 @@ function signUp(id, key, opts = {}) {
     S.signups.push({ id, at: now(), wait: true });
     return remember(key, { ok: true, msg: `You are on the waitlist for ${o.title} at ${o.club}. Nothing is charged; you are told when a spot opens.` });
   }
+  const clash = offerClash(o);
   S.signups.push({ id, at: now() });
-  return remember(key, { ok: true, msg: `You're in: ${o.title} at ${o.club}, ${fDay(offerStart(o))} ${fTime(offerStart(o))}. ${o.club} sees your name, nothing else.` });
+  return remember(key, { ok: true, msg: `You're in: ${o.title} at ${o.club}, ${fDay(offerStart(o))} ${fTime(offerStart(o))}. ${o.club} sees your name, nothing else.${clash ? ` Heads up: it overlaps with ${clash}.` : ""}` });
 }
 function dropSignup(id) { const o = offerById(id); S.signups = S.signups.filter((x) => x.id !== id); return { ok: true, msg: `Your name is off the list for ${o ? o.title : "that session"}.` }; }
 
@@ -214,7 +216,7 @@ function vOfferSheet() {
   const full = left <= 0 && !inList;
   /* What happens if you book: spots, what it costs, what it does to your passes, and the waitlist if it is full. */
   const then = inList ? [onWait(o.id) ? "You are on the waitlist. You are told when a spot opens." : "Your name is down. It is in your Week and your coach knows about it.", "You can take your name off at any time."]
-    : [full ? "It is full. You can join the waitlist: you are told when a spot opens, and nothing is charged until then." : `You take 1 of the ${left} spots left; ${left - 1} remain.`, "It uses none of your passes or credits.", full ? "" : o.price ? `You pay ${chf(o.price)} once, in the test checkout. No real money moves.` : "Nothing is charged.", "It shows up in your Week, and your coach can see and cancel it for you."].filter(Boolean);
+    : [!full && offerClash(o) ? `It overlaps with ${esc(offerClash(o))}.` : "", full ? "It is full. You can join the waitlist: you are told when a spot opens, and nothing is charged until then." : `You take 1 of the ${left} spots left; ${left - 1} remain.`, "It uses none of your passes or credits.", full ? "" : o.price ? `You pay ${chf(o.price)} once, in the test checkout. No real money moves.` : "Nothing is charged.", "It shows up in your Week, and your coach can see and cancel it for you."].filter(Boolean);
   const action = inList ? `<button class="btn full" data-a="offer-drop" data-v="${o.id}">${onWait(o.id) ? "Leave the waitlist" : "Take my name off"}</button>`
     : full ? `<button class="btn acc full" data-a="offer-wait" data-v="${o.id}">Join waitlist</button>`
     : `<button class="btn acc full" data-a="offer-signup" data-v="${o.id}">${o.price ? `Put my name down · ${chf(o.price)}` : "Put my name down"}</button>`;

@@ -12,7 +12,7 @@ let lastKey = "", swipeClickGuard = -1e9;
 function render() {
   document.documentElement.style.setProperty("--accent", (ACCENTS[S.accent] || ACCENTS.sage)[1]);
   for (const v of ["--bg", "--surface", "--soft"]) document.documentElement.style.setProperty(v, (GROUNDS[S.ground] || GROUNDS.stone)[1]);
-  ensureSessions(); sweep(); sweepProposals(); sweepOffers(); runSeries();
+  ensureSessions(); sweepCancelled(); sweep(); sweepProposals(); sweepOffers(); runSeries();
   const app = document.getElementById("app"), tab = S.tab[S.role], key = S.role + tab + S.org + (S.rosterSid || "") + ((S.dash && (S.dash.athlete || S.dash.planView || S.dash.sess)) || "") + (tab === "explore" ? S.explore.open || "" : ""), old = document.getElementById("view"), top = old && key === lastKey ? old.scrollTop : 0;
   const body = S.role === "athlete" ? { path: vPath, coach: vCoachChat, log: vLog, week: vWeek, me: vMe, explore: vExplore }[tab]() : S.role === "coach" ? vCoach() : vAdmin();
   const badge = S.role === "coach" ? S.alerts.filter((a) => a.status === "open" && (a.info || shares("alerts.pain"))).length : 0;
@@ -63,6 +63,9 @@ const ACT = {
   sheet: (v) => { UI.sheet = { type: "session", sid: v }; }, "close-btn": () => { UI.sheet = null; },
   book: (v) => { UI.toast = book(v, "app").msg; UI.sheet = null; }, cancel: (v) => { UI.toast = cancel(Number(v)).msg; UI.sheet = null; }, leave: (v) => { UI.toast = leaveWait(v).msg; UI.sheet = null; },
   "go-invoices": () => { S.org = "pau"; S.tab.athlete = "me"; setTimeout(() => { const el = document.getElementById("invoices"); if (el) el.scrollIntoView(); }, 0); },
+  /* A session the club cancelled: "Find another session" opens Week on that day, at that club. */
+  "notice-ok": (v) => { const n = (S.notices || []).find((x) => x.id === Number(v)); if (!n) return; n.seen = true; const s = S.sessions[n.sid]; S.org = s.org; S.tab.athlete = "week"; S.filter = { cat: "all", mine: false }; if (s.start < addDays(monday(today()), 7 * WEEKS)) S.day = ymd(s.start); },
+  renew: (v) => { const p = S.passes.find((x) => x.id === v) || passOf(S.org), r = p && renewalOf(p); if (r) UI.sheet = { type: "pay", what: `${p.name}, ${r.season.name}`, amount: r.price, note: `Valid until ${fDate(r.season.end)}.`, buy: "renew", org: p.org }; },
   "review-plan": () => { S.planNews = false; const r = applyDraft(currentDraft()); UI.toast = `Your plan is now "${S.plan.title}", approved by Coach Sara. ${r.applied} upcoming ${r.applied === 1 ? "day" : "days"} changed${r.skipped ? `, ${r.skipped} left alone because ${r.skipped === 1 ? "it was" : "they were"} already under way or done` : ""}. Nothing in the past was touched.`; },
   "clear-pain": () => { S.entries.forEach((e) => { if (e.pain) e.cleared = true; }); UI.toast = "Pain flag cleared. Hard sessions can be suggested again."; },
   logit: (v) => { S.form = newForm(v); S.logTab = "log"; S.tab.athlete = "log"; UI.sheet = null; },
@@ -161,7 +164,7 @@ document.addEventListener("submit", (e) => {
   if (f === "chat") { const v = document.getElementById("chat-input").value.trim(); if (v) ask(v); }
   if (f === "log") submitLog();
   if (f === "walkin") UI.toast = addWalkin(e.target.dataset.id, document.getElementById("walkin-name").value).msg;
-  if (f === "comment") { const id = Number(e.target.dataset.id), inp = document.getElementById("c-" + id), v = inp.value.trim(); if (v) { S.entries.find((x) => x.id === id).comments.push({ by: "Coach Sara", text: v }); UI.toast = "Comment sent. The athlete sees it in their log."; } }
+  if (f === "comment") { const id = Number(e.target.dataset.id), inp = document.getElementById("c-" + id), v = inp.value.trim(); if (v) { S.entries.find((x) => x.id === id).comments.push({ by: coachMe(), text: v }); UI.toast = "Comment sent. The athlete sees it in their log."; } }
   if (f === "adjust") { const n = Number(document.getElementById("adj-n").value), r = document.getElementById("adj-r").value.trim(); if (!r) UI.toast = "A reason is required for every credit change."; else if (!n) UI.toast = "Enter a change other than 0."; else { const p = passOf(S.org); S.ledger.push({ pass: p.id, delta: n, kind: "admin_adjust", reason: "Admin: " + r, at: now() }); S.audit.unshift({ what: `Adjusted ${S.me.name}'s credits by ${n > 0 ? "+" : ""}${n}: ${r}`, at: now() }); UI.toast = `Credits adjusted. New balance: ${passState(p).text}.`; } }
   render();
 });
@@ -185,7 +188,7 @@ for (const k of ["home", "tab"]) { const f = ACT[k]; ACT[k] = (v) => { const r =
 /* For the tests and for poking around in the console. */
 window.PATH_DEMO = {
   get state() { return S; }, disciplines, ACCENTS, GROUNDS, athletes, statusOf, roster, ui: UI, ORGS, LOAD_LIMIT, CARD_TTL_MIN, STORE_KEY,
-  render, seed, save, load, resetDemo, book, cancel, check, freeSpot, leaveWait, passState, passOf, stats, guard, guardDraft, currentDraft, RAW_DRAFT,
+  render, seed, save, load, resetDemo, book, cancel, cancelSession, clashAt, passEnded, renewalOf, check, freeSpot, leaveWait, passState, passOf, stats, guard, guardDraft, currentDraft, RAW_DRAFT,
   newForm, toLog, ask, confirmProposal, toggleAct, runAct, planLocked, nextChangeable, applyDraft, shiftWeek, weekIndex,
   parseClub, agenda, openPain, OFFERS, openOffers, exploreList, tryPlan, dropPlan, tryToday, providerOf, signUp, dropSignup, signedUp, offerStart, offerKm, offersFor, purchase, acceptOffer, declineOffer, sweepOffers, waitTotal, createSeries, previewSeries, pauseSeries, endSeries, runSeries, seriesRows, seriesSummary, findSeries, sweepProposals, parseWhen, parseOffering, rosterRows, rosterNames, addWalkin, markAttendance, memoryFor, upcomingBookings, sessList, myBooking, myWait, spots, nextStep,
 };

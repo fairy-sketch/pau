@@ -205,7 +205,7 @@ function replyBook(text) {
     return null;
   }
   if (asksWait && !full) why = `${offOf(s).name} on ${fDay(s.start)} still has ${spots(s)} ${spots(s) === 1 ? "spot" : "spots"}, so you don't need the waitlist.`;
-  return propose(why, { intent: `book:${s.id}`, title: full ? "Join the waitlist?" : "Book this session?", lines: [`${offOf(s).name}, ${fDay(s.start)} ${fTime(s.start)}, ${offOf(s).loc}`, full ? `Full. You would be #${s.waitOthers + 1} on the waitlist.` : c.pass ? { pass: c.pass.id, sid: s.id } : c.note, `Free cancel until ${fDay(deadline(s))} ${fTime(deadline(s))}.`], acts: [{ t: "book", sid: s.id, wait: full }] });
+  return propose(why, { intent: `book:${s.id}`, title: full ? "Join the waitlist?" : "Book this session?", lines: [`${offOf(s).name}, ${fDay(s.start)} ${fTime(s.start)}, ${offOf(s).loc}`, full ? `Full. You would be #${s.waitOthers + 1} on the waitlist.` : c.pass ? { pass: c.pass.id, sid: s.id } : c.note, `Free cancel until ${fDay(deadline(s))} ${fTime(deadline(s))}.`, c.clash ? `Overlaps with ${c.clash}.` : ""], acts: [{ t: "book", sid: s.id, wait: full }] });
 }
 
 /* "Where am I on the waitlist?" */
@@ -256,8 +256,17 @@ function replySeries(text) {
 }
 
 const AREA_WORDS = [["Foot or ankle", /foot|feet|ankle|achilles|heel/], ["Calf or shin", /calf|calves|shin/], ["Knee", /knee/], ["Thigh or hamstring", /thigh|hamstring|quad/], ["Hip or groin", /hip|groin|glute/], ["Back", /back|spine/], ["Shoulder or arm", /shoulder|arm|elbow|wrist/]];
+/* Symptoms that are not a training question (QA-11). The answer is always the same: stop, get medical help now.
+   No plan change is offered, nothing is booked or cancelled, and the coach never says what it might be. */
+const RED_FLAGS = /chest (pain|hurts?|is tight|tight|pressure)|(pain|tight(ness)?|pressure|hurts?) in (my|the) chest|\bmy chest\b|can'?t breathe|cannot breathe|short(ness)? of breath|trouble breathing|hard to breathe|\bdizz|light.?headed|\bfaint|pass(ed|ing)? out|black(ed|ing)? out|collaps|heart (is )?(racing|pounding|skipping)|palpitation|numb(ness)?\b|blurr(ed|y) vision|can'?t see|confus(ed|ion)|slurr|cough(ed|ing)? (up )?blood|severe (pain|headache)|worst headache|unbearable|brust(schmerz|enge)?|schwindel|schwindlig|atemnot|keine luft|ohnmacht|ohnmächtig|herzrasen|bewusstlos/;
+function replyRedFlag() {
+  const told = S.consent.pau["alerts.pain"];
+  if (told) S.alerts.push({ id: S.seq++, kind: "Urgent: alarming symptoms mentioned in coach chat", at: now(), status: "open" });
+  say("Stop training now.\nWhat you describe needs medical help straight away, not a training answer. Call 144 (emergency number in Switzerland, 112 anywhere in Europe), or have someone take you to a doctor now. Don't wait to see if it passes, and don't drive yourself.\nI can't tell you what it is and I won't guess. Please don't train again until a doctor has said it is fine.\n" + (told ? "Coach Sara has been told, because you share pain alerts with PAU." : "Nobody at your clubs has been told; what you write here stays with you."));
+}
 function coachReply(q) {
   const t = q.toLowerCase(), st = stats();
+  if (RED_FLAGS.test(t)) return replyRedFlag();
   if (/\bpain|hurt|\bsore\b|injur|\bach(e|es|ing)\b/.test(t)) {
     // A flag that is already open is the starting point: say what it says, and offer to update or clear it. Never open a second one.
     const flag = openPain();

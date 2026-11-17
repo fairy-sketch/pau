@@ -4,9 +4,13 @@
    everything the coach does shows up on her side. The other athletes are invented demo data, made the same way
    on every start. A coach only ever sees what an athlete shares with this club. */
 
-const COACH_ME = "Coach Sara";
-const DASH0 = () => ({ athlete: null, att: "all", group: "all", notes: {}, kudos: {}, answered: {} });
+/* Who you are as a coach depends on the club you are looking at (QA-19). */
+const coachMe = () => ORGS[S.org].me.coach;
+/* Where the coach is on the screen: which athlete, plan or session is open, and the filters. */
+const DASH0 = () => ({ athlete: null, att: "all", group: "all" });
 const dash = () => (S.dash ||= DASH0());
+/* What the coach wrote and made: private notes, comments, answers, plans. Kept per club and never shown in another club (QA-07). */
+const clubData = (org = S.org) => ((S.coach ||= {})[org] ||= { notes: {}, kudos: {}, answered: {}, plans: null, seq: 0 });
 
 /* ---------- invented athletes ---------- */
 function rng(seed) { let a = seed; return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -33,7 +37,7 @@ function roster() {
 /* Mia, as her coach is allowed to see her. */
 function liveAthlete() {
   const st = stats(), op = shares("alerts.pain") ? S.entries.find((e) => e.pain && !e.cleared) : null, last = S.entries[0];
-  return { id: "mia", live: true, name: S.me.name, first: S.me.name.split(" ")[0], group: "Track", goal: S.goal.title, goalKind: "10K", stage: S.stage, inSt: S.stageSessions,
+  return { id: "mia", live: true, name: S.me.name, first: S.me.name.split(" ")[0], group: ORGS[S.org].me.myGroup, goal: S.goal.title, goalKind: "10K", stage: S.stage, inSt: S.stageSessions,
     away: last ? Math.max(0, Math.round((today() - new Date(last.at)) / 864e5)) : 30, back: false, load: st.ratio, pain: op ? { where: op.painWhere, level: op.painLevel } : null, ask: null, attend: 88,
     shares: { path: shares("path.read"), log: shares("log.read"), pain: shares("alerts.pain") }, draft: shares("plan.write") && S.draftStatus === "pending_review" };
 }
@@ -45,7 +49,7 @@ function statusOf(a) {
   const pct = Math.round(a.load * 100), reasons = [];
   if (a.pain && a.shares.pain) reasons.push([2, `Shared a ${a.pain.where.toLowerCase()} flag, level ${a.pain.level}`, "pain"]);
   if (a.draft) reasons.push([2, "Plan draft waiting for you", "draft"]);
-  if (a.ask && !dash().answered[a.id]) reasons.push([2, "Asked you a question", "ask"]);
+  if (a.ask && !clubData().answered[a.id]) reasons.push([2, "Asked you a question", "ask"]);
   if (a.shares.log && a.load >= 1.35) reasons.push([2, `Load ${pct}% of usual`, "load"]);
   if (a.away >= 12) reasons.push([2, a.back ? `Back after ${Math.round(a.away / 7)} weeks off` : `No session in ${a.away} days`, "away"]);
   if (a.shares.log && a.load >= 1.15 && a.load < 1.35) reasons.push([1, `Load ${pct}% of usual`, "load"]);
@@ -65,7 +69,7 @@ function vCoachToday() {
   const back = list.find((x) => x.a.back), pain = list.find((x) => x.st.kinds.includes("pain"));
   const brief = [`${todays.length} ${todays.length === 1 ? "session" : "sessions"} today, ${todays.reduce((n, s) => n + booked(s), 0)} booked.`, back ? `${back.a.first} is back after ${Math.round(back.a.away / 7)} weeks off.` : "", pain ? `${pain.a.first} shared a ${pain.a.pain.where.toLowerCase()} flag, so a lighter option is ready for the next hard session.` : needs.length ? `${needs.length} ${needs.length === 1 ? "athlete needs" : "athletes need"} you.` : "Nobody needs you right now."].filter(Boolean).join(" ");
   const card = (s) => `<div class="card stack" data-today="${s.id}" style="gap:12px"><div class="between" style="align-items:flex-start"><span><span class="h2" style="display:block">${fTime(s.start)} · ${offOf(s).name}</span><span class="sub">${offOf(s).loc} · ${offOf(s).coach}</span></span><span class="end"><span class="num">${booked(s)}<span class="sub" style="font-weight:400"> / ${s.cap}</span></span>${waitTotal(s) ? `<span class="sub" style="display:block">${waitTotal(s)} waiting</span>` : ""}</span></div><button class="btn acc full" data-a="roster" data-v="${s.id}">Check in</button></div>`;
-  return `<section class="pad stack-l" id="coach-today"><div><div class="eyebrow">${COACH_ME} · ${esc(ORGS[S.org].name)}</div><h1 class="h1">${["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][T.getDay()]}, ${T.getDate()} ${MOL[T.getMonth()]}</h1></div>
+  return `<section class="pad stack-l" id="coach-today"><div><div class="eyebrow">${esc(coachMe())} · ${esc(ORGS[S.org].name)}</div><h1 class="h1">${["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][T.getDay()]}, ${T.getDate()} ${MOL[T.getMonth()]}</h1></div>
     <div class="stack" style="gap:8px"><p id="briefing" style="font-size:18px;line-height:28px">${esc(brief)}</p><p class="sub">Drafted by PATH from bookings and from what athletes share with this club.</p></div>
     <div class="stack"><div class="eyebrow">Today</div>${todays.length ? todays.map(card).join("") : `<p class="sub">No sessions today.</p>`}</div>
     <div class="stack" id="needs"><div class="between" style="align-items:center"><span class="eyebrow">Needs you · ${needs.length > 5 ? `5 of ${needs.length}` : needs.length}</span><button class="btn sm" data-a="tab" data-v="alerts">Alerts</button></div>${needs.length ? `<div class="card rows">${needs.slice(0, 5).map(({ a, st }) => `<button class="row" data-a="${st.kinds[0] === "draft" ? "tab" : "athlete"}" data-v="${st.kinds[0] === "draft" ? "review" : a.id}"><span class="mid"><span class="strong">${sdot(st)}${esc(a.name)}</span><span class="sub">${esc(st.why)}</span></span><span class="end sub">${st.kinds[0] === "draft" ? "Review" : "Open"}</span></button>`).join("")}</div>${needs.length > 5 ? `<button class="btn sm link" data-a="needs-all">See all ${needs.length} in Athletes</button>` : ""}` : `<p class="sub">Nothing is waiting for you.</p>`}</div>
@@ -91,7 +95,7 @@ function vCoachAthletes() {
 function vAthleteDetail(a) {
   const d = dash(), st = statusOf(a), M = a.live, org = esc(ORGS[S.org].name);
   const shared = [["Goal and progress", a.shares.path], ["Training log", a.shares.log], ["Pain flags", a.shares.pain]];
-  const logs = M ? S.entries.slice(0, 5).map((e) => ({ id: e.id, title: e.title, at: e.at, dur: e.dur, rpe: e.rpe, pain: e.pain && a.shares.pain ? `pain ${e.painLevel}, ${e.painWhere}` : "", comments: e.comments, real: true })) : a.logs.map((l) => ({ ...l, pain: "", comments: [...(l.ask ? [{ by: a.first, text: l.ask }] : []), ...(d.kudos[l.id] || [])] }));
+  const logs = M ? S.entries.slice(0, 5).map((e) => ({ id: e.id, title: e.title, at: e.at, dur: e.dur, rpe: e.rpe, pain: e.pain && a.shares.pain ? `pain ${e.painLevel}, ${e.painWhere}` : "", comments: e.comments, real: true })) : a.logs.map((l) => ({ ...l, pain: "", comments: [...(l.ask ? [{ by: a.first, text: l.ask }] : []), ...(clubData().kudos[l.id] || [])] }));
   const canComment = M ? shares("log.comment") : true;
   const logRow = (e) => `<div class="row" data-log="${e.id}" style="align-items:flex-start"><span class="mid"><span class="strong">${esc(e.title)}</span><span class="sub">${fDay(e.at)} · ${e.dur} min · RPE ${e.rpe}${e.pain ? " · " + esc(e.pain) : ""}</span>${e.comments.map((c) => `<span class="note" style="margin-top:8px"><span class="strong" style="color:var(--text)">${esc(c.by)}</span> ${esc(c.text)}</span>`).join("")}${canComment ? `<form data-f="${e.real ? "comment" : "dcomment"}" data-id="${e.id}" data-ath="${a.id}" style="display:flex;gap:8px;margin-top:8px;align-items:center"><input class="inp" style="min-height:44px" id="c-${e.id}" aria-label="Comment on ${esc(e.title)}, ${fDay(e.at)}" placeholder="Add a comment"><button class="btn sm" type="submit">Send</button><button class="btn sm" type="button" data-a="kudos" data-v="${a.id}|${e.id}" aria-label="Kudos for ${esc(e.title)}, ${fDay(e.at)}">Kudos</button></form>` : ""}</span></div>`;
   const nextStep = M ? nextStep0() : st.kinds.includes("pain") ? "Easy session, then check the flag" : a.back ? "Comeback session, short and easy" : `${["Track", "Technique", "Long run"][a.inSt % 3]} session`;
@@ -105,7 +109,7 @@ function vAthleteDetail(a) {
     ${a.shares.log ? `<div class="stack"><div class="between"><span class="eyebrow">Weekly load</span><span class="sub">${Math.round(a.load * 100)}% of usual</span></div>${M ? lineChart(loadPts(stats()), stats().wl.length - 1) : lineChart(a.pts, a.pts.length - 1)}</div>
     <div class="stack"><div class="eyebrow">Training log</div><div class="card rows" id="detail-logs">${logs.map(logRow).join("")}</div></div>` : `<p class="sub" id="log-private">Training log not shared.</p>`}
     <div class="stack"><div class="eyebrow">Plan</div><div class="card stack"><p class="sub" id="plan-from-you">From you: <span class="strong" style="color:var(--text)">${esc(planNames(a))}</span></p>${M ? `<p class="sub">Own plan: <span class="strong" style="color:var(--text)">${esc(S.plan.title)}</span></p>` : ""}${proposal}</div></div>
-    <form class="stack" data-f="cnote" data-ath="${a.id}" style="gap:8px"><label class="f">Your private notes<input id="cnote" value="${esc(d.notes[a.id] || "")}" placeholder="Only you see this" autocomplete="off"></label><div class="between" style="align-items:center"><span class="sub">${esc(a.first)} never sees these notes.</span><button class="btn sm" type="submit">Save note</button></div></form>
+    <form class="stack" data-f="cnote" data-ath="${a.id}" style="gap:8px"><label class="f">Your private notes<input id="cnote" value="${esc(clubData().notes[a.id] || "")}" placeholder="Only you see this" autocomplete="off"></label><div class="between" style="align-items:center"><span class="sub">${esc(a.first)} never sees these notes.</span><button class="btn sm" type="submit">Save note</button></div></form>
     <p class="note" id="sharing">${esc(a.first)} shares with ${org}: ${shared.filter((x) => x[1]).map((x) => x[0].toLowerCase()).join(", ") || "name only"}. ${shared.some((x) => !x[1]) ? `Private: ${shared.filter((x) => !x[1]).map((x) => x[0].toLowerCase()).join(", ")}.` : "Nothing is held back."}</p></section>`;
 }
 const nextStep0 = () => { const n = nextStep(); return n.title; };
@@ -118,27 +122,30 @@ const DASH_ACT = {
   "needs-all": () => { Object.assign(dash(), { att: "needs", group: "all", athlete: null }); S.tab.coach = "athletes"; },
   kudos: (v) => {
     const [aid, lid] = v.split("|"), a = athleteById(aid);
-    if (a.live) S.entries.find((e) => String(e.id) === lid).comments.push({ by: COACH_ME, text: "Kudos. Well done." });
-    else (dash().kudos[lid] ||= []).push({ by: COACH_ME, text: "Kudos. Well done." });
+    if (a.live) S.entries.find((e) => String(e.id) === lid).comments.push({ by: coachMe(), text: "Kudos. Well done." });
+    else (clubData().kudos[lid] ||= []).push({ by: coachMe(), text: "Kudos. Well done." });
     UI.toast = `Kudos sent to ${a.first}.`;
   },
 };
 document.addEventListener("submit", (e) => {
   const f = e.target.dataset.f; if (f !== "cnote" && f !== "dcomment") return;
   e.preventDefault(); const a = athleteById(e.target.dataset.ath);
-  if (f === "cnote") { dash().notes[a.id] = document.getElementById("cnote").value.trim(); UI.toast = `Note saved. Only you can see it.`; }
-  else { const inp = e.target.querySelector("input"), v = inp.value.trim(); if (!v) return; (dash().kudos[e.target.dataset.id] ||= []).push({ by: COACH_ME, text: v }); if (a.ask) dash().answered[a.id] = true; UI.toast = `Sent to ${a.first}.`; }
+  if (f === "cnote") { clubData().notes[a.id] = document.getElementById("cnote").value.trim(); UI.toast = `Note saved. Only you can see it, and only at ${ORGS[S.org].name}.`; }
+  else { const inp = e.target.querySelector("input"), v = inp.value.trim(); if (!v) return; (clubData().kudos[e.target.dataset.id] ||= []).push({ by: coachMe(), text: v }); if (a.ask) clubData().answered[a.id] = true; UI.toast = `Sent to ${a.first}.`; }
   render();
 });
 
 /* ================= Plans (K-7 to K-11): upload or paste a plan, or build one with PATH, then share it with a group ================= */
-const PLAN_SEED = () => [
+const PLAN_SEED = (org) => (org === "pau" ? [
   { id: "p1", title: "Base block", source: "Yours", sessions: genPlan({ kind: "10k", weeks: 4, level: 0, fun: false }), shared: ["Track"] },
   { id: "p2", title: "Race week taper", source: "Yours", sessions: genPlan({ kind: "taper", weeks: 1, level: 0, fun: false }), shared: [] },
-];
-const plans = () => (dash().plans ||= PLAN_SEED());
+] : [
+  { id: "s1", title: "Hips and hamstrings, 4 weeks", source: "Yours", sessions: [1, 2, 3, 4].flatMap((w) => [{ week: w, day: "Tue", text: `Flow: ${["hip openers, long holds", "hamstrings and calves", "twists and side body", "slow full sequence"][w - 1]}` }, { week: w, day: "Thu", text: `Flow: balance and core, ${15 + 5 * w} min standing work` }]), shared: [] },
+]);
+/* A club's plans. Each club has its own list; nothing crosses over. */
+const plans = (org = S.org) => (clubData(org).plans ||= PLAN_SEED(org));
 /* The plans a group has, the one shared last first: that one is the plan the group follows now. */
-const plansOf = (g) => plans().filter((p) => p.shared.includes(g)).sort((a, b) => (b.seq || 0) - (a.seq || 0));
+const plansOf = (g, org = S.org) => plans(org).filter((p) => p.shared.includes(g)).sort((a, b) => (b.seq || 0) - (a.seq || 0));
 const planById = (id) => plans().find((p) => p.id === id);
 const weeksOf = (p) => Math.max(1, ...p.sessions.map((s) => s.week));
 const planMeta = (p) => `${weeksOf(p)} ${weeksOf(p) === 1 ? "week" : "weeks"} · ${p.sessions.length} sessions`;
@@ -235,8 +242,8 @@ function vPlanDetail(p) {
 /* ---- The athlete's side of it (K-19 to K-21): the plan you follow, as your coach set it ----
    Mia is in the Track group at PAU. The newest plan her coach shared with that group is the plan she follows;
    the coach sees the same thing under "From you" on her page and on every session of the week. */
-const MY_GROUP = "Track";
-const myPlans = () => plansOf(MY_GROUP);
+const MY_GROUP = ORGS.pau.me.myGroup, MY_COACH = ORGS.pau.me.coach;
+const myPlans = () => plansOf(MY_GROUP, "pau");
 /* The club session that belongs to a line of the plan: same group, same weekday, this week. */
 function sessionForPlanDay(day) {
   const mon = monday(today()), end = addDays(mon, 7);
@@ -251,10 +258,10 @@ function planDayState(x, n) {
 /* Your plan on Path: one week at a time, every day a row you can open. No folded-away "whole plan": the weeks are a step apart. */
 function coachPlansCard() {
   const mine = myPlans();
-  if (!mine.length) return `<div class="stack" id="from-coach" style="gap:8px"><div class="eyebrow">Your plan</div><p class="sub">${COACH_ME} has not shared a plan with the ${MY_GROUP} group yet.</p></div>`;
+  if (!mine.length) return `<div class="stack" id="from-coach" style="gap:8px"><div class="eyebrow">Your plan</div><p class="sub">${MY_COACH} has not shared a plan with the ${MY_GROUP} group yet.</p></div>`;
   const p = mine[0], N = weeksOf(p), n = Math.min(N, Math.max(1, dash().myWeek || 1));
   const rows = p.sessions.map((x, i) => ({ x, i })).filter(({ x }) => x.week === n).map(({ x, i }) => { const st = planDayState(x, n); return `<button class="row" data-a="planday" data-v="${i}" style="align-items:flex-start"><span class="lead time" style="width:40px">${x.day || "·"}</span><span class="mid"><span>${esc(x.text)}</span>${st.label ? `<span class="sub">${st.label}</span>` : ""}</span></button>`; }).join("");
-  return `<div class="stack" id="from-coach"><div class="eyebrow">Your plan</div><div class="card stack" data-plan="${p.id}" style="gap:12px"><div><p class="h2">${esc(p.title)}</p><p class="sub">${COACH_ME} shared this with the ${MY_GROUP} group · ${esc(ORGS.pau.name)}</p></div>
+  return `<div class="stack" id="from-coach"><div class="eyebrow">Your plan</div><div class="card stack" data-plan="${p.id}" style="gap:12px"><div><p class="h2">${esc(p.title)}</p><p class="sub">${MY_COACH} shared this with the ${MY_GROUP} group · ${esc(ORGS.pau.name)}</p></div>
     <div class="weeknav" style="margin:0 -12px"><button class="x" data-a="myweek" data-v="-1" aria-label="Previous week of the plan" ${n <= 1 ? "disabled" : ""}>${I(P.back, 18)}</button><span class="sub" id="plan-week" aria-live="polite"><span class="strong" style="color:var(--text)">Week ${n} of ${N}</span>${n === 1 ? " · this week" : ""}</span><button class="x" data-a="myweek" data-v="1" aria-label="Next week of the plan" ${n >= N ? "disabled" : ""}>${I(P.fwd, 18)}</button></div>
     <div class="rows" id="plan-days" style="margin-top:-12px">${rows}</div></div>
     ${mine.length > 1 ? `<p class="sub" id="also-shared">Also from your coach: ${mine.slice(1).map((x) => esc(x.title)).join(", ")}.</p>` : ""}</div>`;
@@ -264,7 +271,7 @@ function vPlanDaySheet() {
   const p = myPlans()[0], x = p && p.sessions[UI.sheet.i]; if (!x) return "";
   const st = planDayState(x, x.week), s = st.s, full = { Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday", Sat: "Saturday", Sun: "Sunday" }[x.day] || "Any day";
   const next = st.done ? `<p class="sub">Logged. Well done.</p>` : s && st.mineB ? `<button class="btn acc full" data-a="sheet" data-v="${s.id}">Manage booking</button>` : s && s.start >= today() ? `<button class="btn acc full" data-a="sheet" data-v="${s.id}">Book this session</button>` : x.week === 1 ? `<button class="btn acc full" data-a="tab" data-v="log">Log it</button>` : "";
-  return `<div class="sheetbg" data-a="close"><div class="sheet stack-l" id="planday" role="dialog" aria-modal="true" aria-label="${full}, week ${x.week}"><div><div class="eyebrow">${full} · week ${x.week} of ${weeksOf(p)}</div><p class="h1" style="margin-top:8px">${esc(x.text)}</p><p class="sub" style="margin-top:8px">${esc(p.title)} · from ${COACH_ME}</p></div>
+  return `<div class="sheetbg" data-a="close"><div class="sheet stack-l" id="planday" role="dialog" aria-modal="true" aria-label="${full}, week ${x.week}"><div><div class="eyebrow">${full} · week ${x.week} of ${weeksOf(p)}</div><p class="h1" style="margin-top:8px">${esc(x.text)}</p><p class="sub" style="margin-top:8px">${esc(p.title)} · from ${MY_COACH}</p></div>
     ${s ? `<div class="card stack" style="gap:4px"><p class="h2">${offOf(s).name}, ${fTime(s.start)}</p><p class="sub">${fDay(s.start)} · ${offOf(s).loc} · ${offOf(s).coach}</p><p class="sub">${st.label}</p></div>` : x.week === 1 ? `<p class="sub">The club has no session for this one. Do it on your own, then log it.</p>` : `<p class="sub">Comes up in week ${x.week}.</p>`}
     <div class="stack" style="gap:8px">${next}<button class="btn full ghost" data-a="planday-close">Close</button></div></div></div>`;
 }
@@ -325,9 +332,9 @@ Object.assign(DASH_ACT, {
   "plan-add": (v) => { const dr = dash().pdraft, w = Number(v), at = dr.sessions.reduce((n, x, i) => (x.week === w ? i + 1 : n), dr.sessions.length); dr.sessions.splice(at, 0, { week: w, day: "", text: "" }); dr.edited = true; UI.focus = at; },
   "plan-addweek": () => { const dr = dash().pdraft; dr.sessions.push({ week: Math.max(0, ...dr.sessions.map((x) => x.week)) + 1, day: "", text: "" }); dr.edited = true; UI.focus = dr.sessions.length - 1; },
   "plan-group": (v) => { const d = dash(); d.pgroups = (d.pgroups || []).includes(v) ? d.pgroups.filter((g) => g !== v) : [...(d.pgroups || []), v]; },
-  "plan-share": () => { const d = dash(), p = planById(d.planView), n = d.pgroups.reduce((s, g) => s + groupSize(g), 0); p.shared.push(...d.pgroups); p.seq = d.seq = (d.seq || 0) + 1; UI.toast = `Shared with ${d.pgroups.join(" and ")}: ${n} athletes see it on their Path.`; d.pgroups = []; },
+  "plan-share": () => { const d = dash(), p = planById(d.planView), n = d.pgroups.reduce((s, g) => s + groupSize(g), 0); p.shared.push(...d.pgroups); p.seq = clubData().seq = (clubData().seq || 0) + 1; UI.toast = `Shared with ${d.pgroups.join(" and ")}: ${n} athletes see it on their Path.`; d.pgroups = []; },
   "plan-unshare": () => { const p = planById(dash().planView); p.shared = []; UI.toast = "Sharing stopped. Athletes no longer see this plan."; },
-  "plan-del": () => { const d = dash(); d.plans = plans().filter((p) => p.id !== d.planView); d.planView = null; UI.toast = "Plan deleted."; },
+  "plan-del": () => { const d = dash(); clubData().plans = plans().filter((p) => p.id !== d.planView); d.planView = null; UI.toast = "Plan deleted."; },
 });
 document.addEventListener("submit", (e) => {
   const f = e.target.dataset.f; if (f !== "pgen" && f !== "ppaste" && f !== "predo") return; e.preventDefault(); const d = dash();
@@ -356,7 +363,7 @@ document.addEventListener("input", (e) => { if (e.target.id === "pprompt") dash(
 /* ================= Week (K-14 to K-18): every session the coach runs, groups and one-to-one, in one list ================= */
 const planFor = (a) => plansOf(a.group);
 const planNames = (a) => planFor(a).map((p) => p.title).join(", ") || "No plan from you yet";
-const groupOf = (s) => (/technique/i.test(offOf(s).name) ? "Technique" : /track/i.test(offOf(s).name) ? "Track" : null);
+const groupOf = (s) => offOf(s).group;
 /* What the shared plan says for this session: the plan of the session's group, its week, this weekday. */
 function planLine(s, wk) {
   const g = groupOf(s), p = g && plansOf(g)[0]; if (!p) return null;
