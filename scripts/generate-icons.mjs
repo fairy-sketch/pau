@@ -1,22 +1,27 @@
 // Renders the PWA icons into public/icons and app/icon.svg.
 // Run with `pnpm icons` after changing the mark or the colours.
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import sharp from "sharp";
 
 const INK = "#1c1916";
 const PAPER = "#ffffff";
 
 /**
- * "Just the cut" (decision L-5): a white block with the logo's cut through it, on warm black.
- * Same geometry as MARK in src/ui/logo.tsx (on a 100 grid). `scale` shrinks it for the maskable safe zone.
+ * The app icon for now (decision L-10): the PATH wordmark, white on warm black, 64 % of the width.
+ * The outlines come from src/ui/logo-path.ts, so no font is needed. `scale` shrinks it for the maskable safe zone.
  */
+const src = await readFile("src/ui/logo-path.ts", "utf8");
+const LOGO_PATH = src.match(/LOGO_PATH =\s*"([^"]+)"/)[1];
+const [vx, vy, vw, vh] = src
+  .match(/LOGO_VIEWBOX = "([^"]+)"/)[1]
+  .split(" ")
+  .map(Number);
 function mark(scale = 1) {
-  const u = 5.12; // 100 grid -> 512 px
+  const s = (512 * 0.64) / vw;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <defs><mask id="cut"><rect width="512" height="512" fill="#fff"/><rect x="0" y="${50.35 * u}" width="512" height="${4.3 * u}" fill="#000"/></mask></defs>
   <rect width="512" height="512" fill="${INK}"/>
   <g transform="translate(256 256) scale(${scale}) translate(-256 -256)">
-    <rect x="${24 * u}" y="${24 * u}" width="${52 * u}" height="${52 * u}" rx="${4 * u}" fill="${PAPER}" mask="url(#cut)"/>
+    <g transform="translate(${512 * 0.18} ${(512 - vh * s) / 2}) scale(${s}) translate(${-vx} ${-vy})"><path d="${LOGO_PATH}" fill="${PAPER}"/></g>
   </g>
 </svg>`;
 }

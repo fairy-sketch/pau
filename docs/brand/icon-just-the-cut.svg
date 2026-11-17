@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="PATH">
-  <!-- PATH app icon, "Just the cut" (chosen 17 Nov 2026): a solid block with the logo's cut through it, on a warm black tile. -->
-  <defs><mask id="cut"><rect width="100" height="100" fill="#fff"/><rect x="0" y="47" width="100" height="6" fill="#000"/></mask></defs>
-  <rect width="100" height="100" rx="22" fill="#1C1916"/>
-  <rect x="24" y="24" width="52" height="52" rx="4" fill="#FFFFFF" mask="url(#cut)"/>
-</svg>

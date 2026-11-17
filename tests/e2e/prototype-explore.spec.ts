@@ -349,8 +349,8 @@ test("Explore passes axe (WCAG A and AA), has 44 px targets and names on every c
 
 test("the PATH logo always leads back to the start page of the role", async ({ page }) => {
   await open(page);
-  // The logo is the Clean cut wordmark, not plain text.
-  await expect(page.locator(".top .name svg.logo text")).toHaveAttribute("mask", "url(#logo-cut)");
+  // The logo is the lettering, drawn as outlines.
+  await expect(page.locator(".top .name svg.logo path")).toHaveCount(1);
   const logo = page.getByRole("button", { name: "PATH, back to your start page" });
   const current = page.locator('nav [aria-current="page"]');
   // From deep inside Explore, with a sheet open.

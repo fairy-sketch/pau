@@ -95,11 +95,11 @@ export default async function StyleguidePage() {
           <p className="text-secondary max-w-prose">{t("logo.intro", { name: APP_NAME })}</p>
           <div className="rounded-card bg-surface border-hairline flex flex-wrap items-center gap-8 border p-8">
             <Logo className="text-ink h-12" />
-            <div className="bg-ink text-surface rounded-[22%] p-1" data-logo-tile>
-              <LogoMark className="size-16" title={t("logo.markLabel", { name: APP_NAME })} />
+            <div className="bg-ink text-surface rounded-[22%]" data-logo-tile>
+              <LogoMark className="size-20" title={t("logo.markLabel", { name: APP_NAME })} />
             </div>
-            <div className="bg-ink text-surface flex items-center rounded-[22%] p-0.5">
-              <LogoMark className="size-7" />
+            <div className="bg-ink text-surface flex items-center rounded-[22%]">
+              <LogoMark className="size-8" />
             </div>
           </div>
           <div className="rounded-card bg-ink text-surface flex items-center gap-8 p-8">

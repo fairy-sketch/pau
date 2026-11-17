@@ -2,8 +2,8 @@
 /* PATH clickable demo, part 4 of 4: the shell. Top bar, tabs, actions, events, start-up. */
 
 const TABS = { athlete: [["path", "Path", "flag"], ["coach", "Coach", "chat"], ["log", "Log", "plus"], ["week", "Week", "cal"], ["me", "Me", "user"]], coach: [["today", "Today", "clock"], ["athletes", "Athletes", "users"], ["review", "Review", "check"], ["alerts", "Alerts", "bell"]], admin: [["dash", "Home", "home"], ["sched", "Schedule", "cal"], ["members", "Members", "users"], ["products", "Products", "tag"], ["money", "Money", "card"]] };
-/* The logo, "Clean cut" (decision L-1): PATH in Satoshi Black with one straight cut, drawn as a mask. */
-const LOGO = '<svg viewBox="0 0 290 110" width="58" height="22" aria-hidden="true" class="logo"><defs><mask id="logo-cut" maskUnits="userSpaceOnUse" x="-40" y="-20" width="370" height="150"><rect x="-40" y="-20" width="370" height="150" fill="#fff"></rect><rect x="-10" y="56" width="310" height="6" fill="#000"></rect></mask></defs><text x="4" y="92" font-family="Satoshi" font-weight="900" font-size="104" letter-spacing="-2" fill="currentColor" mask="url(#logo-cut)">PATH</text></svg>';
+/* The logo (decision L-9): PATH in Satoshi Black capitals, set tight, as outlines. */
+const LOGO = '<svg viewBox="77 -740 2419 740" width="66" height="20" aria-hidden="true" class="logo"><path d="M239 -740V0H77V-740ZM377 -246H199V-390H341Q400 -390 429.0 -415.5Q458 -441 458 -493Q458 -545 429.0 -570.5Q400 -596 341 -596H199V-740H377Q453 -740 509.5 -709.0Q566 -678 597.5 -622.5Q629 -567 629 -493Q629 -419 597.5 -363.5Q566 -308 509.5 -277.0Q453 -246 377 -246Z M767.0 0H598.0L862.0 -740H1020.0L1283.0 0H1111.0L1059.0 -156H820.0ZM920.0 -450 867.0 -292H1013.0L960.0 -450Q954.0 -469 948.0 -489.0Q942.0 -509 940.0 -522Q938.0 -509 932.5 -489.5Q927.0 -470 920.0 -450Z M1599.0 -662V0H1437.0V-662ZM1227.0 -590V-740H1809.0V-590Z M2048.0 0H1886.0V-740H2048.0V-448H2334.0V-740H2496.0V0H2334.0V-298H2048.0Z" fill="currentColor"></path></svg>';
 let lastKey = "", swipeClickGuard = -1e9;
 function render() {
   ensureSessions(); sweep(); sweepProposals(); sweepOffers(); runSeries();
