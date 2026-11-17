@@ -11,6 +11,7 @@ function parseWhen(text) {
   const t = text.toLowerCase(), T = today(), out = { date: null, weekday: null, range: null, label: "" };
   let m;
   if (/\btoday\b|\btonight\b/.test(t)) out.date = T;
+  else if (/\byesterday\b/.test(t)) out.date = addDays(T, -1);
   else if (/\btomorrow\b/.test(t)) out.date = addDays(T, 1);
   else if ((m = t.match(new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\.?\\s+(${MONTH_WORDS.join("|")})[a-z]*`)))) out.date = nearYear(MONTH_WORDS.indexOf(m[2]), Number(m[1]));
   else if ((m = t.match(new RegExp(`\\b(${MONTH_WORDS.join("|")})[a-z]*\\s+(\\d{1,2})\\b`)))) out.date = nearYear(MONTH_WORDS.indexOf(m[1]), Number(m[2]));
@@ -90,6 +91,7 @@ function runAct(a, key) {
     if (S.idem[key]) return S.idem[key];
     const it = S.plan.items.find((i) => i.date === a.date); if (!it) return remember(key, err("NOT_FOUND", "That plan day no longer exists."));
     const locked = planLocked(it); if (locked) return remember(key, err("PLAN_LOCKED", `${fDay(new Date(a.date + "T12:00"))} can't be changed any more: ${locked}.`));
+    it.was = planText(it);
     if (a.t === "ease") { it.kind = "rest"; it.title = "Rest, or an easy 20 min walk"; it.off = null; it.status = "eased"; return remember(key, { ok: true, msg: `Plan: today is now rest, or an easy 20 min walk.` }); }
     it.kind = "workout"; it.title = "Easy 30 min @ RPE 3"; it.off = null; it.status = "swapped";
     return remember(key, { ok: true, msg: `Plan: ${fDay(new Date(a.date + "T12:00"))} is now an easy 30 min at RPE 3.` });
@@ -165,6 +167,11 @@ function replyCancel(text) {
 }
 
 function replyBook(text) {
+  /* Things a booking can't be: in the past, or many at once. Each gets a plain answer and a way forward, never a card. */
+  const t0 = text.toLowerCase(), w0 = parseWhen(text);
+  if (/\byesterday\b|\blast (week|night|mon|tue|wed|thu|fri|sat|sun)/.test(t0) || (w0.date && w0.date < today())) return say(`${w0.date && w0.date < today() ? fDay(w0.date) : "That"} is over, so there is nothing to book there. I can book any session that hasn't started. Ask me "what's on this week?" to see them.`);
+  const many = t0.match(/\b(\d+|two|three|four|five|six|seven|eight|nine|ten|several|many)\s+(sessions|classes|trainings|times)\b/);
+  if (many && many[1] !== "1") return say(`I book one session at a time, so you see each one before it is booked. For a regular slot, ask for it every week, for example "book every Thursday 18:30 this season". Or tell me the days one by one.`);
   const far = elsewhereOnly(text);
   if (far) return say(`${offName(far.org, far.off)} is at ${ORGS[far.org].name}, not at ${ORGS[S.org].name}. Say "book ${offName(far.org, far.off).toLowerCase()} at ${ORGS[far.org].name}", or switch club at the top.`);
   const club = parseClub(text), scope = club && club !== "all" ? club : S.org;
@@ -205,7 +212,7 @@ function replyBook(text) {
     return null;
   }
   if (asksWait && !full) why = `${offOf(s).name} on ${fDay(s.start)} still has ${spots(s)} ${spots(s) === 1 ? "spot" : "spots"}, so you don't need the waitlist.`;
-  return propose(why, { intent: `book:${s.id}`, title: full ? "Join the waitlist?" : "Book this session?", lines: [`${offOf(s).name}, ${fDay(s.start)} ${fTime(s.start)}, ${offOf(s).loc}`, full ? `Full. You would be #${s.waitOthers + 1} on the waitlist.` : c.pass ? { pass: c.pass.id, sid: s.id } : c.note, `Free cancel until ${fDay(deadline(s))} ${fTime(deadline(s))}.`], acts: [{ t: "book", sid: s.id, wait: full }] });
+  return propose(why, { intent: `book:${s.id}`, title: full ? "Join the waitlist?" : "Book this session?", lines: [`${offOf(s).name}, ${fDay(s.start)} ${fTime(s.start)}, ${offOf(s).loc}`, full ? `Full. You would be #${s.waitOthers + 1} on the waitlist.` : c.pass ? { pass: c.pass.id, sid: s.id } : c.note, `Free cancel until ${fDay(deadline(s))} ${fTime(deadline(s))}.`, c.clash ? `Overlaps with ${c.clash}.` : ""], acts: [{ t: "book", sid: s.id, wait: full }] });
 }
 
 /* "Where am I on the waitlist?" */
@@ -256,8 +263,29 @@ function replySeries(text) {
 }
 
 const AREA_WORDS = [["Foot or ankle", /foot|feet|ankle|achilles|heel/], ["Calf or shin", /calf|calves|shin/], ["Knee", /knee/], ["Thigh or hamstring", /thigh|hamstring|quad/], ["Hip or groin", /hip|groin|glute/], ["Back", /back|spine/], ["Shoulder or arm", /shoulder|arm|elbow|wrist/]];
-function coachReply(q) {
-  const t = q.toLowerCase(), st = stats();
+/* Symptoms that are not a training question (QA-11). The answer is always the same: stop, get medical help now.
+   No plan change is offered, nothing is booked or cancelled, and the coach never says what it might be. */
+const RED_FLAGS = /chest (pain|hurts?|is tight|tight|pressure)|(pain|tight(ness)?|pressure|hurts?) in (my|the) chest|\bmy chest\b|can'?t breathe|cannot breathe|short(ness)? of breath|trouble breathing|hard to breathe|\bdizz|light.?headed|\bfaint|pass(ed|ing)? out|black(ed|ing)? out|collaps|heart (is )?(racing|pounding|skipping)|palpitation|numb(ness)?\b|blurr(ed|y) vision|can'?t see|confus(ed|ion)|slurr|cough(ed|ing)? (up )?blood|severe (pain|headache)|worst headache|unbearable|brust(schmerz|enge)?|schwindel|schwindlig|atemnot|keine luft|ohnmacht|ohnmächtig|herzrasen|bewusstlos/;
+function replyRedFlag() {
+  const told = S.consent.pau["alerts.pain"];
+  if (told) S.alerts.push({ id: S.seq++, kind: "Urgent: alarming symptoms mentioned in coach chat", at: now(), status: "open" });
+  say("Stop training now.\nWhat you describe needs medical help straight away, not a training answer. Call 144 (emergency number in Switzerland, 112 anywhere in Europe), or have someone take you to a doctor now. Don't wait to see if it passes, and don't drive yourself.\nI can't tell you what it is and I won't guess. Please don't train again until a doctor has said it is fine.\n" + (told ? "Coach Sara has been told, because you share pain alerts with PAU." : "Nobody at your clubs has been told; what you write here stays with you."));
+}
+/* The scripted coach reads English. Common German words are turned into the English ones it knows, so a member who writes
+   "buche Donnerstag Bahntraining" is understood; it answers in English (QA-12). A real model behind the chat replaces this. */
+const GERMAN = [[/\bmontags?\b/g, "monday"], [/\bdienstags?\b/g, "tuesday"], [/\bmittwochs?\b/g, "wednesday"], [/\bdonnerstags?\b/g, "thursday"], [/\bfreitags?\b/g, "friday"], [/\bsamstags?\b/g, "saturday"], [/\bsonntags?\b/g, "sunday"],
+  [/\bheute\b/g, "today"], [/\bmorgen\b/g, "tomorrow"], [/\bgestern\b/g, "yesterday"], [/\bdiese woche\b/g, "this week"], [/\bn(ä|ae)chste woche\b/g, "next week"], [/\b(ganze|diese) saison\b/g, "this season"], [/\bjede[nrs]?\b|\bw(ö|oe)chentlich\b/g, "every"],
+  [/\b(buche?n?|buch mir|reservier\w*|anmelden|melde mich an)\b/g, "book"], [/\b(stornier\w*|absagen|sag\w*\b.*\bab|abmelden|melde mich ab|streich\w*)\b/g, "cancel"], [/\bwarteliste\b/g, "waitlist"], [/\b(wie immer|das (ü|ue)bliche|mein (ü|ue)bliches|wie gewohnt)\b/g, "my usual"],
+  [/\b(bahntraining|bahn)\b/g, "track"], [/\bkrafttraining\b|\bkraft\b/g, "gym"], [/\b(alles|alle)\b/g, "everything"],
+  [/\bschmerz\w*|\btut weh\b|\bweh\b|\bverletz\w*/g, "hurts"], [/\bknie\b/g, "knee"], [/\bwade\b/g, "calf"], [/\br(ü|ue)cken\b/g, "back"], [/\b(fuss|fuß|kn(ö|oe)chel)\b/g, "ankle"],
+  [/\b(leichte|ruhige|lockere|einfache)\w* woche\b|\bm(ü|ue)de\b|\bersch(ö|oe)pft\b|\bzu (hart|viel|streng)\b/g, "easy week"], [/\bwie l(ä|ae)uft\w*\b|\bwie stehe ich\b|\bfortschritt\w*/g, "how am i doing"],
+  [/\bwas l(ä|ae)uft\b|\bwas gibt es\b|\bwelche (trainings|kurse|stunden)\b|\bstundenplan\b|\bprogramm\b/g, "what's on"], [/\bwas kostet\b|\bwie ?viel kostet\b|\bpreise?\b|\bkosten\b/g, "how much"], [/\bguthaben\b|\babo\b/g, "pass"],
+  [/\bwas (weisst|weißt) du\b|\bmerkst du dir\b|\berinnerst\b/g, "remember"], [/\betwas neues\b|\bvorschlag\b|\bschlag\w*\b.*\bvor\b|\bempfiehl\w*/g, "suggest something new"]];
+const understood = (q) => GERMAN.reduce((t, [re, en]) => t.replace(re, en), q.toLowerCase());
+const EASY_WISH = /easy week|easier|too hard|too much|tired|exhausted|worn out|wrecked|(make|keep|take) (this|the|my|it)( whole)?( week)? (easy|easier|light|lighter)|week (easy|easier|light|lighter)|(lighter|light|rest|recovery) week|go easy|take it easy|less (training|load)|ease (off|up|my|this|the)|back off|need a break/;
+function coachReply(raw) {
+  const q = understood(raw), t = q, st = stats();
+  if (RED_FLAGS.test(raw.toLowerCase()) || RED_FLAGS.test(t)) return replyRedFlag();
   if (/\bpain|hurt|\bsore\b|injur|\bach(e|es|ing)\b/.test(t)) {
     // A flag that is already open is the starting point: say what it says, and offer to update or clear it. Never open a second one.
     const flag = openPain();
@@ -280,17 +308,17 @@ function coachReply(q) {
     if (locked) return say(`${text}\nToday's ${it.title.toLowerCase()} can't be changed any more, because ${locked}. Take the rest of the day easy.`);
     return propose(`${text}\nWant me to make today easy?`, {
       intent: "ease-today", title: "Make today easy?",
-      lines: [`Today's plan, "${it.title}", becomes rest or an easy 20 min walk.`, b ? `Your booking for ${offOf(s).name} at ${fTime(s.start)} stays as it is. Tell me if you want it cancelled.` : "Nothing is booked or cancelled.", "It only reduces load, so you can accept it yourself; Coach Sara gets a note."],
+      lines: [`Today's plan, "${planText(it)}", becomes rest or an easy 20 min walk.`, b ? `Your booking for ${offOf(s).name} at ${fTime(s.start)} stays as it is. Tell me if you want it cancelled.` : "Nothing is booked or cancelled.", "It only reduces load, so you can accept it yourself; Coach Sara gets a note."],
       acts: [{ t: "ease", date: it.date }],
     });
   }
-  if (/easy week|easier|too hard|tired/.test(t)) {
+  if (EASY_WISH.test(t)) {
     const T = today(), end = addDays(monday(T), 7), items = S.plan.items.filter((i) => i.date >= ymd(T) && i.date < ymd(end) && i.status === "planned" && (i.off === "track" || /long run/i.test(i.title)) && !planLocked(i));
     if (!items.length) return say("There is nothing hard left in your plan this week, so there is nothing to ease. Rest well.");
     const acts = [];
     for (const it of items) {
       const d = fDay(new Date(it.date + "T12:00"));
-      acts.push({ t: "swap", date: it.date, label: `${d}: swap "${it.title}" for an easy 30 min at RPE 3` });
+      acts.push({ t: "swap", date: it.date, label: `${d}: swap "${planText(it)}" for an easy 30 min at RPE 3` });
       const b = S.bookings.find((x) => x.status === "confirmed" && x.sid === `pau-${it.off}-${it.date}` && S.sessions[x.sid].start > now());
       if (b) acts.push({ t: "cancel", bid: b.id, label: `${d}: cancel your ${it.title} booking` });
     }
@@ -305,6 +333,10 @@ function coachReply(q) {
     const ms = memoryFor(S.org);
     return say(ms.length ? `Here at ${ORGS[S.org].name} I use:\n${ms.map((m) => `[${memoryLabel(m)}] ${m.text}`).join("\n")}\nWhat I learned at your other clubs stays out of this club's chat. You can delete any of it under Me.` : "I remember nothing about you here. Anything I learn shows up under Me, and you can delete it.");
   }
+  if (/how much|\bprices?\b|\bcosts?\b|\bfees?\b/.test(t)) {
+    const o = ORGS[S.org], p = passOf(S.org);
+    return say(`Prices at ${o.name}:\n${[`${o.single.name}: ${chf(o.single.price)}`, ...o.products.filter((x) => x.name !== o.single.name).map((x) => `${x.name}: ${x.price ? chf(x.price) : "free"}`)].join("\n")}\nThat is the full price each time; no fees are added.${p ? `\nYou have: ${p.name}, ${passState(p).text}.` : ""}`);
+  }
   if (/\bpass\b|credits?\b|balance|how many (sessions|classes)/.test(t)) { const p = passOf(S.org); return say(p ? `${p.name} at ${ORGS[S.org].name}: ${passState(p).text}.` : `You have no pass at ${ORGS[S.org].name}.`); }
   if (/what'?s on|schedule|which sessions|what sessions/.test(t)) {
     const when = parseWhen(q), club = parseClub(q), org = club && club !== "all" ? club : S.org;
@@ -317,7 +349,7 @@ function coachReply(q) {
     const pb = [...S.pbs].sort((a, b) => b.at - a.at)[0];
     return say(`Last 7 days: ${st.cur.count} session(s), load ${st.cur.load}. Your 4-week average is ${Math.round(st.avg)}, so you are at ${Math.round(st.ratio * 100)}%.\nLatest personal best: ${pb.metric} ${pb.value} ${pb.unit} on ${fDay(pb.at)}.\nStage: ${S.stages[S.stage]}, ${S.stageSessions} of ${PER} sessions done. ${st.ratio > LOAD_LIMIT ? "That is more than 10% above your average, so keep the next days easy." : "You are on track."}`);
   }
-  if (/log/.test(t)) return say("Open the Log tab and tap how it felt. It takes under 30 seconds.");
-  say("In this demo I understand: \"book my usual\", \"book my usual Thursday\", \"book every Thursday 18:30 this season\", \"suggest something new for me\", \"join the waitlist for gym on Friday\", \"where am I on the waitlist?\", \"what's on this week?\", \"cancel my next session\", \"cancel everything this week\", \"I need an easy week\", \"how am I doing?\", \"what do you remember?\" and anything about pain.");
+  if (/\blog\b|\blogged\b/.test(t)) return say("Tap \"Log a session\" on Path and tap how it felt. It takes under 30 seconds.");
+  say("I didn't get that, sorry. I can book or cancel a session, show what's on, ease your week, tell you your pass and prices, or suggest something new. In this demo I understand: \"book my usual\", \"book my usual Thursday\", \"book every Thursday 18:30 this season\", \"suggest something new for me\", \"join the waitlist for gym on Friday\", \"where am I on the waitlist?\", \"what's on this week?\", \"cancel my next session\", \"cancel everything this week\", \"I need an easy week\", \"how am I doing?\", \"what do you remember?\" and anything about pain.");
 }
-function ask(text) { S.chat.push({ who: "me", text }); coachReply(text); }
+function ask(text) { S.chat.push({ who: "me", text }); coachReply(String(text).slice(0, 500)); }

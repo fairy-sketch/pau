@@ -43,7 +43,7 @@ h1, h2, h3, p, ul, ol { margin: 0; padding: 0; } ul, ol { list-style: none; }
 #app.wide { max-width: 960px; }
 
 /* Header: the wordmark on the content edge, one round club button on the right. */
-.top { display: flex; align-items: center; justify-content: space-between; padding: 8px var(--m); }
+.top { display: flex; align-items: center; justify-content: space-between; padding: calc(8px + env(safe-area-inset-top, 0px)) var(--m) 8px; }
 .top .name { min-height: 44px; min-width: 44px; display: flex; align-items: center; font: 700 20px/1 var(--heading); letter-spacing: -.01em; color: var(--text); }
 .clubbtn { width: 44px; height: 44px; margin-right: -4px; display: grid; place-items: center; border-radius: 999px; }
 .mono36 { flex: none; width: 36px; height: 36px; border-radius: 999px; background: var(--surface); box-shadow: var(--shadow); display: grid; place-items: center; font: 500 14px/1 var(--heading); color: var(--text); }
@@ -53,7 +53,7 @@ h1, h2, h3, p, ul, ol { margin: 0; padding: 0; } ul, ol { list-style: none; }
 #view::-webkit-scrollbar, .sheet::-webkit-scrollbar { display: none; }
 
 /* Tab bar: 22 px icons, a filled pill behind the active one. */
-.tabs { display: flex; background: var(--surface); padding: 8px 8px 8px; box-shadow: 0 -1px 0 rgba(0,0,0,.04); }
+.tabs { display: flex; background: var(--surface); padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -1px 0 rgba(0,0,0,.04); }
 .tabs button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 52px; font-size: 11px; line-height: 16px; font-weight: 500; color: var(--quiet); border-radius: var(--r); }
 .tabs .ic { width: 56px; height: 32px; display: grid; place-items: center; border-radius: 999px; transition: background .15s ease; }
 .tabs button[aria-current="page"] { color: var(--text); }
@@ -93,6 +93,8 @@ h1, h2, h3, p, ul, ol { margin: 0; padding: 0; } ul, ol { list-style: none; }
 .btns { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .row { display: flex; align-items: center; gap: 16px; width: 100%; min-height: 56px; padding: 12px 0; }
+/* A row that is information, not a control: an empty slot. Quieter than the rows around it, so it does not ask to be tapped (QA-22). */
+.row.quiet .strong, .row.quiet .time { font-weight: 400; color: var(--text-2); }
 .rows > * + * { border-top: 1px solid var(--hairline); }
 .row .lead { flex: none; width: 56px; }
 .row .mid { flex: 1; min-width: 0; }
@@ -123,6 +125,7 @@ details ul { font-size: 14px; line-height: 20px; color: var(--text-2); display: 
 .dot.booked { border-color: var(--text); }
 .dot.done { background: var(--text); border-color: var(--text); }
 .days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+@media (max-width: 379px) { .days { gap: 1px; } } /* on a 360 px phone seven days need every pixel to stay 44 px wide (QA-14) */
 .days button { display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 64px; justify-content: center; border-radius: var(--r); color: var(--text-2); }
 .days button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
 /* Day letters are plain text, not mono labels: one mono label per section. */
@@ -175,6 +178,9 @@ table { border-collapse: collapse; width: 100%; font-size: 14px; line-height: 20
 th, td { text-align: left; padding: 12px 12px 12px 0; border-top: 1px solid var(--hairline); vertical-align: middle; }
 th { font-weight: 400; color: var(--text-2); border-top: 0; }
 .scroll { overflow-x: auto; scrollbar-width: none; }
+/* A long table (the member list) scrolls inside its card, so what follows it stays within reach. */
+.scroll.tall { max-height: 480px; overflow-y: auto; }
+.scroll.tall thead th { position: sticky; top: 0; background: var(--surface); }
 .tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 @media (min-width: 700px) { .tiles { grid-template-columns: repeat(4, 1fr); } }
 svg text { font-family: var(--body); font-size: 11px; fill: var(--text-2); }
@@ -310,7 +316,10 @@ textarea.inp { min-height: 168px; padding: 12px 16px; line-height: 24px; resize:
 .card > .rows { margin: 0 0 -12px; }
 textarea.inp.big { min-height: 248px; padding: 16px; }
 .srow { display: flex; align-items: center; gap: 8px; }
-.srow .sday { flex: none; width: 76px; min-height: 44px; border: 0; border-radius: var(--r); background: var(--bg); box-shadow: var(--press); padding: 0 8px; font-size: 14px; color: var(--text); }
+.srow .sday { flex: none; width: 76px; min-height: 44px; border: 0; border-radius: var(--r); background: var(--bg); box-shadow: var(--press); padding: 0 8px; font-size: 16px; color: var(--text); } /* 16 px: iOS zooms the page on anything smaller */
 .srow { align-items: flex-start; }
 .srow textarea.stext { flex: 1; min-width: 0; min-height: 44px; padding: 10px 12px; border: 0; box-shadow: var(--press); line-height: 24px; resize: none; overflow: hidden; field-sizing: content; }
 .srow .x { margin-right: -8px; }
+/* ---- Explore navigation (X-15): who offers it as six tabs that always fit, then the discipline as chips ---- */
+#xkinds button { padding: 0 2px; min-width: 44px; font-size: 13px; }
+.only { display: flex; gap: 4px; margin-right: -12px; }
