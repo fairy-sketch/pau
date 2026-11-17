@@ -2,7 +2,7 @@
 /* PATH clickable demo, part 4 of 4: the shell. Top bar, tabs, actions, events, start-up. */
 
 const TABS = { athlete: [["path", "Path", "flag"], ["week", "Week", "cal"], ["explore", "Explore", "compass"], ["coach", "Coach", "chat"], ["me", "Me", "user"]], coach: [["today", "Today", "clock"], ["week", "Week", "cal"], ["athletes", "Athletes", "users"], ["plans", "Plans", "plan"], ["review", "Review", "check"]], admin: [["dash", "Home", "home"], ["sched", "Schedule", "cal"], ["members", "Members", "users"], ["products", "Products", "tag"], ["money", "Money", "card"]] };
-/* The wordmark in the header (decision D-2): PATH in Satoshi Bold, 20 px, on the content edge. */
+/* The wordmark in the header (D-2, L-9, B-22): PATH in Satoshi Black, 20 px, set tight, on the content edge. */
 const mono = (o) => esc(ORGS[o].name.trim()[0].toUpperCase());
 /* Your colour (S-9): one accent, chosen by each person. All six sit at the same lightness as sage, so black text reads on every one. */
 const ACCENTS = { sage: ["Sage", "#8e9a80"], rose: ["Rose", "#c99aa0"], sky: ["Sky", "#8a9fb5"], lavender: ["Lavender", "#a397bd"], sand: ["Sand", "#bfa27c"], clay: ["Clay", "#c4917a"] };

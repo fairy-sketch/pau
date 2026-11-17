@@ -556,3 +556,9 @@ Brief: fix what Ramon's own test found (step 0), then build admin (N-04), coach 
 | #    | Decision                                                                                                                                                                                                                                                                                            | Reason                             |
 | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
 | B-21 | **Satoshi and Switzer stay in the repository and on the website.** Ramon checked the licence and confirms the fonts may be used for the website. This replaces the "remove them before the repo goes public" part of R4; the files stay byte for byte as downloaded (no subsetting, no conversion). | Ramon's confirmation, 17 Nov 2026. |
+
+### Wordmark bolder (Ramon, 17 Nov 2026)
+
+| #    | Decision                                                                                                                                                                               | Reason                              |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| B-22 | **The header wordmark is PATH in Satoshi Black (900), 20 px, letter-spacing −0.02 em**, instead of Bold (700) at −0.01 em. This is now the same weight and spacing as the logo in L-9. | Ramon: "the PATH logo can be bold". |
