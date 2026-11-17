@@ -1,4 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- the demo is plain browser JS; its test hook (window.PATH_DEMO) has no types. */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { expect, test } from "@playwright/test";
 
 import { lastCard, say } from "../../helpers/demo";
@@ -568,10 +571,6 @@ test.describe("Empty, extreme and broken data", () => {
     expect(errors).toEqual([]);
   });
   test("empty lists say what goes there", async ({ page }) => {
-    test.fail(
-      true,
-      "QA-17: Personal bests and Recent (in Log) show a bare heading when empty; the load chart draws an axis of 0, 1, 1",
-    );
     await start(page);
     await sim(page, (d) => {
       const S = d.state;
@@ -620,10 +619,6 @@ test.describe("Empty, extreme and broken data", () => {
     expect(bad).toEqual([]);
   });
   test("a log of 99,999 minutes is not accepted", async ({ page }) => {
-    test.fail(
-      true,
-      "QA-15: minutes have no upper limit; one typo (99999) is saved and distorts the load chart",
-    );
     await start(page);
     await screen(page, "athlete", "log");
     await page.locator("#view input").first().fill("Run");
@@ -728,7 +723,6 @@ test.describe("The device", () => {
     expect(bad).toEqual([]);
   });
   test("every control is at least 44 px at 360 px wide", async ({ page }) => {
-    test.fail(true, "QA-14: at 360 px the seven day buttons in Week are 42 px wide");
     await start(page);
     await page.setViewportSize({ width: 360, height: 844 });
     await screen(page, "athlete", "week");
@@ -833,10 +827,6 @@ test.describe("The device", () => {
     for (const [k, v] of Object.entries(ms)) expect(v, k).toBeLessThan(16);
   });
   test("Explore loads its photos as they come into view", async ({ page }) => {
-    test.fail(
-      true,
-      "QA-18: Explore requests all 38 photos at once (about 3 MB); none is lazy-loaded",
-    );
     await start(page);
     await screen(page, "athlete", "explore");
     const lazy = await page.evaluate(
@@ -846,5 +836,116 @@ test.describe("The device", () => {
         ).length,
     );
     expect(lazy).toBeGreaterThan(20);
+  });
+});
+
+test.describe("The small things (QA-19 to QA-24)", () => {
+  test("a coach is who the club says, and sees the sessions that coach runs", async ({ page }) => {
+    await start(page);
+    for (const [org, name, own, other] of [
+      ["pau", "COACH SARA", /Track session|Technique session/, /Gym session|community/i],
+      ["studio", "NOOR", /Yoga flow/, /Strength|HIIT|Mobility|Ride/],
+    ] as const) {
+      expect(await screen(page, "coach", "today", org)).toContain(`${name} · `);
+      const week = await screen(page, "coach", "week", org);
+      expect(week).toMatch(own);
+      expect(week.replace(/Tap a group.*?page\./, "")).not.toMatch(other);
+      const mine = await sim(
+        page,
+        (d) =>
+          d
+            .sessList(d.state.org)
+            .filter(
+              (s: any) =>
+                d.ORGS[s.org].offerings.find((o: any) => o.id === s.off).coach ===
+                d.ORGS[s.org].me.coach,
+            ).length,
+      );
+      expect(mine).toBeGreaterThan(3);
+    }
+  });
+  test("attendance on the coach's page is counted from her bookings", async ({ page }) => {
+    await start(page);
+    const open = async () => {
+      await sim(page, (d) => {
+        const S = d.state;
+        S.role = "coach";
+        S.org = "pau";
+        S.tab.coach = "athletes";
+        d.render();
+        S.dash.athlete = "mia";
+        d.render();
+      });
+      return page.locator("#attendance").innerText();
+    };
+    expect(await open()).toBe("100% · 3 of 3");
+    await sim(page, (d) => {
+      d.state.bookings.find((b: any) => b.status === "attended").status = "no_show";
+    });
+    expect(await open()).toBe("67% · 2 of 3");
+    await sim(page, (d) => {
+      d.state.bookings = [];
+    });
+    expect(await open()).toBe("No sessions yet");
+  });
+  test("every screen has one heading, the coach chat included; an open slot is not a button; Send with nothing typed says so", async ({
+    page,
+  }) => {
+    await start(page);
+    for (const org of ["pau", "studio"] as const)
+      for (const [role, tab] of ALL_SCREENS) {
+        await screen(page, role, tab, org);
+        expect(await page.locator("#view h1").count(), `${org}/${role}/${tab}`).toBe(1);
+      }
+    await screen(page, "coach", "week", "pau");
+    const slot = page.locator('#coach-week [data-kind="open"]');
+    expect(await slot.evaluate((el) => [el.tagName, el.classList.contains("quiet")])).toEqual([
+      "DIV",
+      true,
+    ]);
+    expect(await slot.locator(".strong").evaluate((el) => getComputedStyle(el).fontWeight)).toBe(
+      "400",
+    );
+    await screen(page, "athlete", "coach", "pau");
+    const before = await sim(page, (d) => d.state.chat.length);
+    await page.getByRole("button", { name: "Send message" }).click();
+    await expect(page.locator(".toast")).toContainText("Type a message first");
+    await expect(page.locator("#chat-input")).toBeFocused();
+    expect(await sim(page, (d) => d.state.chat.length)).toBe(before);
+  });
+  test("the page leaves room for the notch and the home bar, and nothing zooms on focus", async ({
+    page,
+  }) => {
+    await start(page);
+    expect(await page.locator('meta[name="viewport"]').getAttribute("content")).toContain(
+      "viewport-fit=cover",
+    );
+    const css = readFileSync(join(process.cwd(), "prototype/styles.css"), "utf8");
+    expect(css).toMatch(/\.tabs \{[^}]*safe-area-inset-bottom/);
+    expect(css).toMatch(/\.top \{[^}]*safe-area-inset-top/);
+    // iOS zooms the page when a field under 16 px takes the focus.
+    const small: string[] = [];
+    const check = async (where: string) => {
+      for (const el of await page.locator("#app input, #app select, #app textarea").all()) {
+        const px = await el.evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+        if (px < 16) small.push(`${where}: ${px}px`);
+      }
+    };
+    await screen(page, "athlete", "log");
+    await check("log");
+    await screen(page, "athlete", "coach");
+    await check("chat");
+    await sim(page, (d) => {
+      const S = d.state;
+      S.role = "coach";
+      S.tab.coach = "plans";
+      d.render();
+    });
+    await page.locator("#plan-list .row").first().click();
+    await page.getByRole("button", { name: "Edit plan" }).click();
+    await check("plan draft");
+    await screen(page, "admin", "members", "studio");
+    await check("admin members");
+    expect(small).toEqual([]);
   });
 });

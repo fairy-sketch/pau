@@ -345,9 +345,11 @@ test.describe("Week: groups and one-to-one in one place (K-14 to K-18)", () => {
     await asRole(page, "coach");
     await tab(page, "Week");
     await expect(page.locator("#week-answer")).toHaveText(
-      "9 sessions: 6 groups, 3 one-to-one, 1 open slot",
+      "6 sessions: 3 groups, 3 one-to-one, 1 open slot",
     );
-    await expect(page.locator('#coach-week [data-kind="group"]')).toHaveCount(6);
+    await expect(page.locator('#coach-week [data-kind="group"]')).toHaveCount(3);
+    // Only the sessions this coach runs: a colleague's Gym session is not "yours".
+    await expect(page.locator("#coach-week")).not.toContainText("Gym session");
     await expect(page.locator('#coach-week [data-kind="one"]')).toHaveCount(3);
     await expect(page.locator('#coach-week [data-kind="open"]')).toHaveCount(1);
     // Each session says which plan it runs on.

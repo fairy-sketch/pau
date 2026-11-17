@@ -12,6 +12,7 @@ let lastKey = "", swipeClickGuard = -1e9;
 function render() {
   document.documentElement.style.setProperty("--accent", (ACCENTS[S.accent] || ACCENTS.sage)[1]);
   for (const v of ["--bg", "--surface", "--soft"]) document.documentElement.style.setProperty(v, (GROUNDS[S.ground] || GROUNDS.stone)[1]);
+  const tc = document.querySelector('meta[name="theme-color"]'); if (tc) tc.content = (GROUNDS[S.ground] || GROUNDS.stone)[1]; // the phone's status bar takes the ground colour
   ensureSessions(); syncPlan(); sweepCancelled(); sweep(); sweepProposals(); sweepOffers(); runSeries();
   const had = focusKey(document.activeElement), hadSheet = !!document.querySelector(".sheet"); // where the keyboard was, before the screen is redrawn
   const app = document.getElementById("app"), tab = S.tab[S.role], key = S.role + tab + S.org + (S.rosterSid || "") + ((S.dash && (S.dash.athlete || S.dash.planView || S.dash.sess)) || "") + (tab === "explore" ? S.explore.open || "" : ""), old = document.getElementById("view"), top = old && key === lastKey ? old.scrollTop : 0;
@@ -185,9 +186,10 @@ document.addEventListener("change", (e) => {
 function submitLog() {
   const d = S.form, errors = {};
   for (const el of document.querySelectorAll('form[data-f="log"] [data-d]')) d[el.dataset.d] = el.value;
-  const title = String(d.title || "").trim(), dur = Number(d.dur);
+  const title = String(d.title || "").trim().slice(0, 80), dur = Number(d.dur);
   if (!title) errors.title = "Say what you did.";
   if (!(dur > 0)) errors.dur = "Add how many minutes it took.";
+  else if (dur > 600) errors.dur = "That is more than 10 hours. Check the minutes.";
   if (!d.rpe) errors.rpe = "Tap how hard it was, from 1 to 10.";
   if (d.pain && !d.painWhere) errors.pain = 'Choose where it hurt, or "Not sure". A pain flag needs a location.';
   d.pristine = false;
@@ -217,7 +219,7 @@ function submitLog() {
 }
 document.addEventListener("submit", (e) => {
   e.preventDefault(); const f = e.target.dataset.f; UI.toast = ""; UI.resetArmed = false; UI.undo = null;
-  if (f === "chat") { const v = document.getElementById("chat-input").value.trim(); if (v) ask(v); }
+  if (f === "chat") { const v = document.getElementById("chat-input").value.trim(); if (v) ask(v); else UI.toast = "Type a message first, or tap one of the suggestions."; setTimeout(() => { const el = document.getElementById("chat-input"); if (el) el.focus(); }, 0); }
   if (f === "log") submitLog();
   if (f === "walkin") UI.toast = addWalkin(e.target.dataset.id, document.getElementById("walkin-name").value).msg;
   if (f === "comment") { const id = Number(e.target.dataset.id), inp = document.getElementById("c-" + id), v = inp.value.trim(); if (v) { S.entries.find((x) => x.id === id).comments.push({ by: coachMe(), text: v }); UI.toast = "Comment sent. The athlete sees it in their log."; } }
@@ -246,7 +248,7 @@ window.PATH_DEMO = {
   get state() { return S; }, disciplines, ACCENTS, GROUNDS, athletes, statusOf, roster, members, memberPass, ui: UI, ORGS, LOAD_LIMIT, CARD_TTL_MIN, STORE_KEY,
   render, seed, save, load, resetDemo, syncPlan, planText, planName, coachAlerts, openPains, book, cancel, cancelSession, clashAt, passEnded, renewalOf, check, freeSpot, leaveWait, passState, passOf, stats, guard, guardDraft, currentDraft, RAW_DRAFT,
   newForm, toLog, ask, confirmProposal, toggleAct, runAct, planLocked, nextChangeable, applyDraft, shiftWeek, weekIndex,
-  parseClub, agenda, openPain, OFFERS, openOffers, exploreList, tryPlan, dropPlan, tryToday, providerOf, signUp, dropSignup, signedUp, offerStart, offerKm, offersFor, purchase, acceptOffer, declineOffer, sweepOffers, waitTotal, createSeries, previewSeries, pauseSeries, endSeries, runSeries, seriesRows, seriesSummary, findSeries, sweepProposals, parseWhen, parseOffering, rosterRows, rosterNames, addWalkin, markAttendance, memoryFor, upcomingBookings, sessList, myBooking, myWait, spots, nextStep, offerById, packOf, ticketOf, myInvoices,
+  parseClub, agenda, openPain, OFFERS, openOffers, exploreList, tryPlan, dropPlan, tryToday, providerOf, signUp, dropSignup, signedUp, offerStart, offerKm, offersFor, purchase, acceptOffer, declineOffer, sweepOffers, waitTotal, createSeries, previewSeries, pauseSeries, endSeries, runSeries, seriesRows, seriesSummary, findSeries, sweepProposals, parseWhen, parseOffering, rosterRows, rosterNames, addWalkin, markAttendance, memoryFor, upcomingBookings, sessList, attendance, myBooking, myWait, spots, nextStep, offerById, packOf, ticketOf, myInvoices,
 };
 if (!load()) seed();
 render();

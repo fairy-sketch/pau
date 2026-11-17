@@ -9,8 +9,9 @@ import { DEMO } from "../../helpers/demo";
  * Personas drive the same engine the screens use (through window.PATH_DEMO) and then read every screen where the
  * result has to show up. One athlete can be played in the demo (Mia Keller, a member of both clubs), so the
  * scripts written for "Jonas" and "Lea" in the QA brief run on her account; what they need that is not built yet
- * is listed with test.fixme. Known defects are marked test.fail with their QA number: the suite stays green, and
- * a marker has to be removed the moment its defect is fixed.
+ * is listed with test.fixme. A defect that is found and not yet fixed is marked test.fail with its QA number: the
+ * suite stays green, and the marker has to be removed the moment the defect is fixed. (All 24 from the November 2026
+ * pass are fixed; no marker is left.)
  */
 export type Role = "athlete" | "coach" | "admin";
 export type Org = "pau" | "studio";

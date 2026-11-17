@@ -22,7 +22,10 @@ test("the icon top right opens a photo grid of clubs, coaches and pros", async (
   await expect(page.getByRole("heading", { name: "Try something new" })).toBeVisible();
   await expect(tiles(page)).toHaveCount(38);
   await expect(page.locator("#xcount")).toHaveText("38 of 38");
-  // Every tile shows one of the supplied photos, and it loads.
+  // Every tile shows one of the supplied photos, and it loads. (Tiles load as they come into view; here all are asked for at once.)
+  await page
+    .locator("#xgrid img")
+    .evaluateAll((els) => els.forEach((e) => ((e as HTMLImageElement).loading = "eager")));
   await expect
     .poll(() =>
       page

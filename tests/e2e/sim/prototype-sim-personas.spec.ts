@@ -220,14 +220,38 @@ test.describe("Athlete Jonas: a regular's week at PAU (played on the demo athlet
   });
 
   test('understands the same wish in other words: "make this week easy"', async ({ page }) => {
-    test.fail(
-      true,
-      'QA-12: the coach only understands a few fixed phrases; "make this week easy" gets the help text',
-    );
     await start(page);
     await screen(page, "athlete", "coach");
-    await say(page, "make this week easy");
-    await expect(lastCard(page)).toContainText("Easy week", { timeout: 1500 });
+    for (const words of [
+      "make this week easy",
+      "can we go a bit lighter this week?",
+      "I'm exhausted, take it easy on me",
+      "ich bin müde, bitte eine leichte Woche",
+    ]) {
+      await say(page, words);
+      await expect(lastCard(page), words).toContainText("Easy week", { timeout: 1500 });
+    }
+    // German for a booking and a cancel, with the day.
+    await say(page, "buche das Bahntraining am Donnerstag");
+    await expect(lastCard(page)).toContainText("Track session, Thu 19 Nov 18:30");
+    await lastCard(page).getByRole("button", { name: "Confirm", exact: true }).click();
+    await say(page, "bitte Donnerstag absagen");
+    await expect(lastCard(page)).toContainText("Cancel this booking?");
+    // No dead ends: the past, many at once, and prices each get a plain answer and no card.
+    const n = await page.locator(".pcard").count();
+    await say(page, "book yesterday's track session");
+    await expect(page.locator(".msg.coach").last()).toContainText(
+      "Sun 15 Nov is over, so there is nothing to book there.",
+    );
+    await say(page, "book 50 sessions");
+    await expect(page.locator(".msg.coach").last()).toContainText("I book one session at a time");
+    await say(page, "How much does the season pass cost?");
+    await expect(page.locator(".msg.coach").last()).toContainText(
+      /Prices at PAU Trackrunning:[^]*Regular season pass: CHF 400\.00[^]*no fees are added/,
+    );
+    await say(page, "blorp");
+    await expect(page.locator(".msg.coach").last()).toContainText("I didn't get that, sorry.");
+    expect(await page.locator(".pcard").count()).toBe(n);
   });
 
   test("after the week is eased, Path shows the eased sessions in his plan", async ({ page }) => {
@@ -607,10 +631,6 @@ test.describe("Coach Sara: a training day", () => {
   test("comments and kudos on a log reach the athlete; five taps on Kudos send it once", async ({
     page,
   }) => {
-    test.fail(
-      true,
-      "QA-16: Kudos can be sent again and again; each tap adds another identical comment",
-    );
     await start(page);
     await sim(page, (d) => {
       const S = d.state;
@@ -635,7 +655,7 @@ test.describe("PT coach: one-to-one work", () => {
   test("the week shows one-to-one sessions and open slots next to the groups", async ({ page }) => {
     await start(page);
     expect(await screen(page, "coach", "week")).toMatch(
-      /9 sessions: 6 groups, 3 one-to-one, 1 open slot/,
+      /6 sessions: 3 groups, 3 one-to-one, 1 open slot/,
     );
   });
   test.fixme("sells a PT pack to a client", () => {
@@ -723,7 +743,7 @@ test.describe("The demo data: one member list per club, the same on every layer"
       d.render();
     });
     await page.locator('#coach-week [data-kind="group"]').first().click();
-    await page.locator("#attendees .row").nth(1).click();
+    await page.locator("#attendees .row:not(:has-text('Mia Keller'))").first().click();
     await expect(page.locator("#athlete-detail")).toBeVisible();
     await expect(page.locator("#member-pass")).toContainText(
       /Monthly 15 classes|10 classes|50 classes|Starter 7 classes|Drop-in/,

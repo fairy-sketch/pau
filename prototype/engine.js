@@ -309,6 +309,11 @@ function cancelSession(sid) {
 const openNotice = () => (S.notices || []).find((n) => !n.seen && S.sessions[n.sid] && S.sessions[n.sid].start > now()) || null;
 /* A booking whose session is over and that nobody marked present counts as missed. */
 function sweep() { for (const b of S.bookings) if (b.status === "confirmed" && endOf(S.sessions[b.sid]) <= now()) b.status = "no_show"; }
+/* How often the member came to what she booked at a club: attended out of attended plus missed. Null before the first session. */
+function attendance(org) {
+  const past = S.bookings.filter((b) => S.sessions[b.sid].org === org && (b.status === "attended" || b.status === "no_show")), came = past.filter((b) => b.status === "attended").length;
+  return past.length ? { came, of: past.length, pct: Math.round((came / past.length) * 100) } : null;
+}
 const pastLabel = (b, s) => (b.status === "attended" ? "Attended" : endOf(s) <= now() ? "Missed" : "In progress");
 
 /* ---------- booking engine: one path for the app, the coach chat and the waitlist ---------- */
@@ -670,7 +675,7 @@ function guardDraft(raw) {
     const date = nextChangeable(it.wd), on = S.plan.items.find((x) => x.date === ymd(date)), from = on ? planText(on) : it.from;
     const dated = { ...it, from, to: it.intensity === "none" ? from : it.to, date, day: fDay(date) };
     if (!g.active || (it.intensity !== "high" && it.load <= 0)) return { ...dated, changed: false };
-    const to = it.intensity === "high" ? "Easy 30 min @ RPE 3" : from.replace(/(\d+) min/, (m, n) => `${Math.round((n * 0.8) / 5) * 5} min`).replace(/ easy$/, "") + " @ RPE 4";
+    const to = it.intensity === "high" ? "Easy 30 min @ RPE 3" : from.replace(/(\d+) min/, (m, n) => `${Math.round((n * 0.8) / 5) * 5} min`).replace(/ easy$| @ RPE \d+$/, "") + " @ RPE 4";
     return { ...dated, was: it.to, to, intensity: "low", load: -1, changed: true };
   });
   return { title: raw.title, rationale: g.active ? "Changed before anyone saw it: with these signals a plan may only reduce load." : raw.rationale, items, guard: g.active ? g : null };
