@@ -47,8 +47,6 @@ h1, h2, h3, p, ul, ol { margin: 0; padding: 0; } ul, ol { list-style: none; }
 .top .name { min-height: 44px; min-width: 44px; display: flex; align-items: center; font: 700 20px/1 var(--heading); letter-spacing: -.01em; color: var(--text); }
 .clubbtn { width: 44px; height: 44px; margin-right: -4px; display: grid; place-items: center; border-radius: 999px; }
 .mono36 { flex: none; width: 36px; height: 36px; border-radius: 999px; background: var(--surface); box-shadow: var(--shadow); display: grid; place-items: center; font: 500 14px/1 var(--heading); color: var(--text); }
-.banner { margin: 0 var(--m) 8px; display: flex; align-items: center; gap: 8px; background: var(--soft); border-radius: var(--r); padding: 0 0 0 16px; font-size: 14px; line-height: 20px; color: var(--text-2); }
-.banner span { flex: 1; }
 .x { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 999px; color: var(--text-2); flex: none; }
 .x:hover { background: var(--soft); }
 #view { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
@@ -256,7 +254,7 @@ svg text { font-family: var(--body); font-size: 11px; fill: var(--text-2); }
 /* ---- Soft surfaces (decisions S-1 to S-4): raised = something you can use or read as one thing; pressed in = selected, or a place to type. ---- */
 .btn.acc, .toast { box-shadow: var(--shadow); }
 .tabs { box-shadow: none; }
-.tabs button[aria-current="page"] .ic, .seg, .banner, .note, .guard, .msg.me, .map { box-shadow: var(--press); }
+.tabs button[aria-current="page"] .ic, .seg, .note, .guard, .msg.me, .map { box-shadow: var(--press); }
 .card .note, .ccard .note { box-shadow: none; }
 .chip, .rpe button { color: var(--text-2); }
 .chip[aria-pressed="true"], .rpe button[aria-pressed="true"] { background: var(--bg); color: var(--text); font-weight: 500; box-shadow: var(--press); }

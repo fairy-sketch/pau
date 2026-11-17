@@ -625,7 +625,8 @@ test("B10 switching club keeps the current tab, in every role", async ({ page })
 
 test("B13 the demo survives a reload, and Reset demo starts over", async ({ page }) => {
   await open(page);
-  await expect(page.locator(".banner")).toContainText("saved on this device");
+  // No demo notice in the header any more (Ramon, 17 Nov); Reset demo lives under Me.
+  await expect(page.locator(".banner")).toHaveCount(0);
   await tab(page, "Week");
   await page.locator("#classcard").getByRole("button", { name: "Book", exact: true }).click();
   await atClub(page, "studio");
@@ -649,7 +650,9 @@ test("B13 the demo survives a reload, and Reset demo starts over", async ({ page
   expect(kept).toEqual({ booked: true, dates: true, pass: "4 of 4 used in November" });
 
   // Reset takes two taps. One tap changes nothing.
-  const reset = page.locator(".banner .resetbtn");
+  await asRole(page, "athlete");
+  await tab(page, "Me");
+  const reset = page.locator('#view [data-a="reset"]');
   await reset.click();
   await expect(page.locator(".toast")).toContainText("Tap Reset again to confirm");
   expect(await page.evaluate(() => !!window.PATH_DEMO.myBooking("pau-track-2026-11-16"))).toBe(
@@ -666,8 +669,6 @@ test("B13 the demo survives a reload, and Reset demo starts over", async ({ page
     await page.evaluate(() => window.PATH_DEMO.passState(window.PATH_DEMO.passOf("pau")).text),
   ).toBe("3 of 4 used in November");
 
-  // Hiding the notice keeps a Reset button under Me.
-  await page.getByRole("button", { name: /Hide this notice/ }).click();
   await tab(page, "Me");
   await expect(page.locator("#view").getByRole("button", { name: "Reset demo" })).toBeVisible();
 });

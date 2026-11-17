@@ -13,7 +13,6 @@ function render() {
   app.className = S.role === "admin" ? "wide" : "";
   app.innerHTML = `<header class="top"><button class="name" data-a="home" aria-label="PATH, back to your start page">PATH</button>
       <button class="clubbtn" data-a="clubs" data-org="${S.org}" aria-label="${esc(ORGS[S.org].name)}: your clubs and the demo view" aria-haspopup="dialog"><span class="mono36" aria-hidden="true">${mono(S.org)}</span></button></header>
-    ${S.banner ? `<div class="banner"><span>Made-up data, saved on this device.</span><button class="resetbtn ${UI.resetArmed ? "armed" : ""}" data-a="reset">${UI.resetArmed ? "Tap again" : "Reset demo"}</button>${xBtn("hide-banner", "Hide this notice. Reset demo stays under Me.")}</div>` : ""}
     <main id="view" tabindex="0">${body}</main>
     ${UI.toast ? `<div class="toast" role="status"><span>${esc(UI.toast)}</span>${UI.undo ? `<button class="btn sm" data-a="undo">Undo</button>` : ""}${xBtn("hide-toast", "Dismiss message")}</div>` : ""}
     <nav class="tabs" aria-label="Sections">${TABS[S.role].map(([v, l, ic]) => `<button data-a="tab" data-v="${v}" aria-label="${l}${v === "alerts" && badge ? ` (${badge}), ${badge} open` : ""}" ${tab === v ? 'aria-current="page"' : ""}><span class="ic">${I(P[ic])}</span>${l}${v === "alerts" && badge ? ` (${badge})` : ""}</button>`).join("")}</nav>${vSheet()}`;
