@@ -115,6 +115,11 @@ details summary { cursor: pointer; display: inline-flex; align-items: center; ga
 details summary::-webkit-details-marker { display: none; }
 details summary::after { content: ""; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-2px) rotate(45deg); transition: transform .15s ease; }
 details[open] summary::after { transform: translateY(2px) rotate(-135deg); }
+/* A "show more" button that looks and moves like "Why this?" (B-25). */
+.more { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; margin: -8px 0 -12px; font-size: 14px; line-height: 20px; color: var(--text-2); }
+.more::after { content: ""; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-2px) rotate(45deg); transition: transform .15s ease; }
+.more[aria-expanded="true"]::after { transform: translateY(2px) rotate(-135deg); }
+.more:focus-visible { text-decoration: underline; text-underline-offset: 4px; color: var(--text); outline: none; }
 details summary:focus-visible { text-decoration: underline; text-underline-offset: 4px; color: var(--text); }
 details ul { font-size: 14px; line-height: 20px; color: var(--text-2); display: flex; flex-direction: column; gap: 4px; padding-left: 16px; list-style: disc; }
 

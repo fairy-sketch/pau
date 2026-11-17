@@ -212,6 +212,7 @@ test.describe("Plans (K-7 to K-11)", () => {
     await expect(page.locator("#personal")).toContainText("waits for your approval in Review");
     await asRole(page, "athlete");
     const card = page.locator("#from-coach [data-plan]", { hasText: "Spring 5K" });
+    await card.getByRole("button", { name: "Show the whole week" }).click();
     await expect(card).toContainText("Coach Sara shared this with the Track group");
     await expect(card).toContainText("Relay games");
     await expect(card).toContainText("Track: 5 × 300 m, relaxed, full recovery");
@@ -440,6 +441,13 @@ test("the athlete's Path shows the plan they follow, and it mirrors what the coa
   await open(page);
   const plan = page.locator("#from-coach");
   await expect(plan).toContainText("Your plan");
+  // Closed, the card shows today and the next two days (B-25); the whole week is one tap away.
+  await expect(page.locator("#plan-week")).toHaveText("Week 1 of 4 · today and the next two days");
+  await expect(plan.locator("#plan-days .row")).toHaveCount(3);
+  await expect(plan.locator("#plan-days .row").first()).toContainText("Today");
+  await plan.getByRole("button", { name: "Show the whole week" }).click();
+  await expect(page.locator("#plan-toggle")).toHaveAttribute("aria-expanded", "true");
+  await expect(plan.locator("#plan-days .row")).toHaveCount(7);
   await expect(page.locator("#plan-week")).toHaveText("Week 1 of 4 · this week");
   await expect(plan.locator("[data-plan] .h2")).toHaveText("Base block");
   await expect(plan).toContainText("Coach Sara shared this with the Track group");
