@@ -9,6 +9,17 @@ const ACCENTS = { sage: ["Sage", "#8e9a80"], rose: ["Rose", "#c99aa0"], sky: ["S
 /* Your background (S-11): six very light grounds at one lightness, so the soft shadows and the grey text work on each. */
 const GROUNDS = { stone: ["Stone", "#ecebe7"], blush: ["Blush", "#efe8e8"], mist: ["Mist", "#e6eaee"], lilac: ["Lilac", "#eae8ef"], sand: ["Sand", "#eee9e0"], mint: ["Mint", "#e7ece5"] };
 let lastKey = "", swipeClickGuard = -1e9;
+/* The coach takes a breath before answering (B-28): her message shows at once, three quiet dots stand where the answer will be,
+   and the answer follows after a short moment. Nothing else changes: the answer is the same one, only later. */
+const THINK_MS = () => (typeof window.PATH_THINK_MS === "number" ? window.PATH_THINK_MS : 900);
+let thinkTimer = 0, thinkText = "", thinkIn = null;
+function answerNow() { if (!UI.thinking) return; clearTimeout(thinkTimer); UI.thinking = false; if (thinkIn && thinkIn.chat === S.chat && thinkIn.org === S.org) coachReply(String(thinkText).slice(0, 500)); } // a reset or a club switch in between: the question is gone with its chat
+function askSoon(text) {
+  answerNow(); // a second message before the answer: the first is answered first
+  if (!THINK_MS()) return ask(text);
+  S.chat.push({ who: "me", text }); UI.thinking = true; thinkText = text; thinkIn = { chat: S.chat, org: S.org };
+  thinkTimer = setTimeout(() => { answerNow(); render(); }, THINK_MS());
+}
 function render() {
   document.documentElement.style.setProperty("--accent", (ACCENTS[S.accent] || ACCENTS.sage)[1]);
   for (const v of ["--bg", "--surface", "--soft"]) document.documentElement.style.setProperty(v, (GROUNDS[S.ground] || GROUNDS.stone)[1]);
@@ -142,7 +153,7 @@ const ACT = {
   "log-edit": (v) => { const e = S.entries.find((x) => x.id === Number(v)); if (!e) return; S.form = { editId: e.id, sid: e.sid || null, title: e.title, dur: String(e.dur), rpe: e.rpe, dist: e.dist || "", notes: e.notes || "", pain: !!e.pain, painWhere: e.painWhere || undefined, painLevel: e.painLevel || 3 }; S.logTab = "log"; S.tab.athlete = "log"; lastKey = ""; },
   "log-delete": (v) => { const e = S.entries.find((x) => x.id === Number(v)); if (!e) return; const snap = logSnapshot(), form = structuredClone(S.form); S.entries = S.entries.filter((x) => x !== e); S.stageSessions = Math.max(0, S.stageSessions - 1); S.form = { rpe: 0, pain: false, title: "", dur: "" }; UI.toast = `Deleted: ${e.title}, ${fDay(e.at)}.`; return (UI.undo = { snap, form }), "undo"; },
   undo: () => { const u = UI.undo; if (!u) return; if (u.cancel) { UI.toast = undoCancel(u.cancel).msg; return; } Object.assign(S, u.snap); S.form = u.form; delete S.form.errors; S.tab.athlete = "log"; S.logTab = "log"; UI.toast = "Undone. Your entry is back in the form, nothing was lost."; },
-  ask: (v) => ask(v), "prop-yes": (v) => { confirmProposal(Number(v), true); }, "prop-no": (v) => { confirmProposal(Number(v), false); }, "prop-toggle": (v) => { const [id, i] = v.split("|").map(Number); toggleAct(id, i); },
+  ask: (v) => askSoon(v), "prop-yes": (v) => { confirmProposal(Number(v), true); }, "prop-no": (v) => { confirmProposal(Number(v), false); }, "prop-toggle": (v) => { const [id, i] = v.split("|").map(Number); toggleAct(id, i); },
   consent: (v) => { const [o, k] = v.split("|"); if (k !== "profile.basic") { S.consent[o][k] = !S.consent[o][k]; UI.toast = `${ORGS[o].name} ${S.consent[o][k] ? "can now see" : "no longer sees"} this. The change applies immediately.`; } },
   forget: (v) => { S.memory = S.memory.filter((m) => m.id !== Number(v)); UI.toast = "Deleted. Your coach no longer uses it."; },
   buy: () => { const p = ORGS[S.org].products.find((x) => x.buy); UI.sheet = { type: "pay", what: p.name, amount: p.price, credits: p.buy }; },
@@ -232,7 +243,7 @@ document.addEventListener("submit", (e) => {
   e.preventDefault(); const f = e.target.dataset.f;
   if (["cnote", "dcomment", "pgen", "ppaste", "predo", "snote", "recap", "rvedit", "obgoal", "goal", "ptbook"].includes(f) || ADMIN_FORMS.includes(f)) return; // the coach dashboard's own forms (dash.js) answer for themselves; clearing here wiped their confirmation
   UI.toast = ""; UI.resetArmed = false; UI.undo = null;
-  if (f === "chat") { const v = document.getElementById("chat-input").value.trim(); if (v) ask(v); else UI.toast = "Type a message first, or tap one of the suggestions."; setTimeout(() => { const el = document.getElementById("chat-input"); if (el) el.focus(); }, 0); }
+  if (f === "chat") { const v = document.getElementById("chat-input").value.trim(); if (v) askSoon(v); else UI.toast = "Type a message first, or tap one of the suggestions."; setTimeout(() => { const el = document.getElementById("chat-input"); if (el) el.focus(); }, 0); }
   if (f === "log") submitLog();
   if (f === "walkin") UI.toast = addWalkin(e.target.dataset.id, document.getElementById("walkin-name").value).msg;
   if (f === "comment") { const id = Number(e.target.dataset.id), inp = document.getElementById("c-" + id), v = inp.value.trim(); if (v) { S.entries.find((x) => x.id === id).comments.push({ by: coachMe(), text: v }); UI.toast = "Comment sent. The athlete sees it in their log."; } }
