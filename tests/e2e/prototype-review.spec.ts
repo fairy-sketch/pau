@@ -476,7 +476,7 @@ test.describe("Design pass (D-1 to D-12)", () => {
     await expect(page.locator('nav [aria-current="page"]')).toHaveText("Today");
   });
 
-  test("everything sits on the 20 px edge, and the path is one bar of five segments", async ({
+  test("the content sits on the 20 px edge, the wordmark 16 px from the screen edge (B-23), and the path is one bar of five segments", async ({
     page,
   }) => {
     await open(page);
@@ -485,7 +485,10 @@ test.describe("Design pass (D-1 to D-12)", () => {
         .locator(sel)
         .first()
         .evaluate((el) => Math.round(el.getBoundingClientRect().left));
-    expect(await left(".top .name")).toBe(20);
+    expect(await left(".top .name")).toBe(14); // 2 px padding inside: the P stands 16 px from the edge
+    expect(await page.locator(".top .name").evaluate((el) => getComputedStyle(el).fontSize)).toBe(
+      "24px",
+    );
     expect(await left(".goal")).toBe(20);
     expect(await left("#phases")).toBe(20);
     expect(await left("#view .card")).toBe(20);
