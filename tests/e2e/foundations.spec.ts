@@ -101,9 +101,16 @@ test.describe("styleguide", () => {
     await expect(nav.locator('[aria-current="page"]')).toHaveText("Path");
     await expect(nav.locator("svg[data-icon]")).toHaveCount(5);
 
-    // Our own icon set: all 36 are shown, drawn as lines in the text colour.
+    // Our own icon set: all 37 are shown, drawn as lines in the text colour.
     const icons = page.locator("[data-icon-group] svg[data-icon]");
-    await expect(icons).toHaveCount(36);
+    await expect(icons).toHaveCount(37);
+    // Places carry one solid sparkle; tools stay plain line (Y-1).
+    await expect(page.locator('[data-icon-group] svg[data-icon="path"] .fill-current')).toHaveCount(
+      1,
+    );
+    await expect(
+      page.locator('[data-icon-group] svg[data-icon="close"] .fill-current'),
+    ).toHaveCount(0);
     await expect(icons.first()).toHaveCSS("fill", "none");
     await expect(icons.first()).toHaveCSS("stroke", "rgb(28, 25, 22)");
   });

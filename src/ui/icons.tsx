@@ -1,85 +1,138 @@
 import type { ReactNode } from "react";
 
 /**
- * The PATH icon set: our own icons, drawn for this app (decisions R37 to R39).
- * One round line on a 24 px grid, no fills except small dots. Icons take the
- * colour of the text around them and are never the accent colour.
+ * The PATH icon set: our own icons, drawn for this app (decisions R37 to R39,
+ * and Y-1 to Y-4 for the sparkle). One round line on a 24 px grid. Icons that
+ * name a place in the app (the tabs of all three roles, Explore) carry one
+ * small solid four-point sparkle; tools and objects stay plain line. Icons take
+ * the colour of the text around them and are never the accent colour.
  */
 const paths = {
   path: (
     <>
       <circle cx="5.5" cy="19" r="1.6" />
-      <path d="M5.5 17.4V16.5a4 4 0 0 1 4-4h5a4 4 0 0 0 0-8h-2" />
-      <circle cx="10" cy="4.5" r="1.6" />
+      <path d="M5.5 17.4V16.5a4 4 0 0 1 4-4h5a4 4 0 0 0 0-8h-1.5" />
+      <path
+        className="fill-current stroke-none"
+        d="M9 0.5Q9.8 3.7 13 4.5Q9.8 5.3 9 8.5Q8.2 5.3 5 4.5Q8.2 3.7 9 0.5Z"
+      />
     </>
   ),
   coach: (
     <>
       <path d="M4 7a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-5.5L7 20v-4a3 3 0 0 1-3-3z" />
-      <path d="M12 7c.3 1.7 1 2.4 3 3-2 .600-2.7 1.3-3 3-.300-1.7-1-2.4-3-3 2-.600 2.7-1.3 3-3z" />
+      <path
+        className="fill-current stroke-none"
+        d="M12 6Q12.8 9.2 16 10Q12.8 10.8 12 14Q11.2 10.8 8 10Q11.2 9.2 12 6Z"
+      />
     </>
   ),
   log: (
     <>
       <circle cx="12" cy="12" r="8.5" />
-      <path d="M12 8.5v7M8.5 12h7" />
+      <path
+        className="fill-current stroke-none"
+        d="M12 6.4Q13.1 10.9 17.6 12Q13.1 13.1 12 17.6Q10.9 13.1 6.4 12Q10.9 10.9 12 6.4Z"
+      />
     </>
   ),
   week: (
     <>
       <rect x="4" y="5.5" width="16" height="14.5" rx="3.5" />
       <path d="M4 10.5h16M8.5 3.5v4M15.5 3.5v4" />
-      <circle className="fill-current stroke-none" cx="9" cy="15" r="1.3" />
+      <path
+        className="fill-current stroke-none"
+        d="M9.6 12Q10.25 14.55 12.8 15.2Q10.25 15.85 9.6 18.4Q8.95 15.85 6.4 15.2Q8.95 14.55 9.6 12Z"
+      />
     </>
   ),
   me: (
     <>
-      <circle cx="12" cy="8.5" r="3.7" />
-      <path d="M5 20c.500-3.6 3.3-5.5 7-5.5s6.5 1.9 7 5.5" />
+      <circle cx="11" cy="8.5" r="3.7" />
+      <path d="M4 20c.5-3.6 3.3-5.5 7-5.5s6.5 1.9 7 5.5" />
+      <path
+        className="fill-current stroke-none"
+        d="M19.3 1.8Q20 4.5 22.7 5.2Q20 5.9 19.3 8.6Q18.6 5.9 15.9 5.2Q18.6 4.5 19.3 1.8Z"
+      />
+    </>
+  ),
+  explore: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path
+        className="fill-current stroke-none"
+        d="M12 6Q12.6 11.4 14.2 12Q12.6 12.6 12 18Q11.4 12.6 9.8 12Q11.4 11.4 12 6Z"
+        transform="rotate(45 12 12)"
+      />
     </>
   ),
   today: (
     <>
-      <circle cx="12" cy="12" r="8.5" />
-      <path d="M12 7.5V12l3 2" />
+      <circle cx="10.5" cy="13.5" r="7" />
+      <path d="M10.5 9.5v4l2.7 1.8" />
+      <path
+        className="fill-current stroke-none"
+        d="M19.4 1.8Q20.1 4.5 22.8 5.2Q20.1 5.9 19.4 8.6Q18.7 5.9 16 5.2Q18.7 4.5 19.4 1.8Z"
+      />
     </>
   ),
   athletes: (
     <>
       <circle cx="9" cy="9" r="3.2" />
-      <path d="M3.5 19.5c.400-3.1 2.6-4.9 5.5-4.9s5.1 1.8 5.5 4.9" />
-      <path d="M15.5 6.1a3.2 3.2 0 0 1 0 5.8M17.6 14.8c1.6.700 2.7 2.2 2.9 4.2" />
+      <path d="M3.5 19.5c.4-3.1 2.6-4.9 5.5-4.900s5.1 1.8 5.5 4.9" />
+      <path d="M17.6 14.8c1.6.7 2.7 2.2 2.9 4.2" />
+      <path
+        className="fill-current stroke-none"
+        d="M18.4 3.2Q19.15 6.25 22.2 7Q19.15 7.75 18.4 10.8Q17.65 7.75 14.6 7Q17.65 6.25 18.4 3.2Z"
+      />
     </>
   ),
   review: (
     <>
       <rect x="5" y="4.5" width="14" height="16" rx="3" />
       <path d="M9.5 4.5V4A1.5 1.5 0 0 1 11 2.5h2A1.5 1.5 0 0 1 14.5 4v.5" />
-      <path d="M9 13l2.2 2.2L15.2 11" />
+      <path
+        className="fill-current stroke-none"
+        d="M12 9.2Q12.75 12.25 15.8 13Q12.75 13.75 12 16.8Q11.25 13.75 8.2 13Q11.25 12.25 12 9.2Z"
+      />
     </>
   ),
   alerts: (
     <>
-      <path d="M6.5 16.5v-5a5.5 5.5 0 0 1 11 0v5l1.5 2h-14z" />
-      <path d="M10.2 21h3.6" />
+      <path d="M5 17v-5a5.5 5.5 0 0 1 11 0v5l1.5 2h-14z" />
+      <path d="M8.7 21.500h3.6" />
+      <path
+        className="fill-current stroke-none"
+        d="M19.4 1.7Q20.05 4.35 22.7 5Q20.05 5.65 19.4 8.3Q18.75 5.65 16.1 5Q18.75 4.35 19.4 1.7Z"
+      />
     </>
   ),
   home: (
     <>
       <path d="M4.5 11.2 12 4.5l7.5 6.7V18a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2z" />
-      <path d="M10 20v-4.5h4V20" />
+      <path
+        className="fill-current stroke-none"
+        d="M12 10.6Q12.7 13.3 15.4 14Q12.7 14.7 12 17.4Q11.3 14.7 8.6 14Q11.3 13.3 12 10.6Z"
+      />
     </>
   ),
   products: (
     <>
       <path d="M4 6a2 2 0 0 1 2-2h4.8a2 2 0 0 1 1.4.6l7.2 7.2a2 2 0 0 1 0 2.8l-4.8 4.8a2 2 0 0 1-2.8 0L4.6 12.2A2 2 0 0 1 4 10.8z" />
-      <circle className="fill-current stroke-none" cx="8.5" cy="8.5" r="1.3" />
+      <path
+        className="fill-current stroke-none"
+        d="M10.6 7.3Q11.25 9.95 13.9 10.6Q11.25 11.25 10.6 13.9Q9.95 11.25 7.3 10.6Q9.95 9.95 10.6 7.3Z"
+      />
     </>
   ),
   money: (
     <>
       <rect x="3" y="6" width="18" height="13" rx="3" />
-      <path d="M3 10.5h18M7 15h3" />
+      <path d="M3 10.5h18" />
+      <path
+        className="fill-current stroke-none"
+        d="M8.2 12Q8.75 14.25 11 14.8Q8.75 15.35 8.2 17.6Q7.65 15.35 5.4 14.8Q7.65 14.25 8.2 12Z"
+      />
     </>
   ),
   check: (
@@ -127,7 +180,10 @@ const paths = {
   ),
   best: (
     <>
-      <path d="M12 3c.900 5.2 3.3 7.7 9 9-5.7 1.3-8.1 3.8-9 9-.900-5.2-3.3-7.7-9-9 5.7-1.3 8.1-3.8 9-9z" />
+      <path
+        className="fill-current stroke-none"
+        d="M12 2.5Q14.2 9.8 21.5 12Q14.2 14.2 12 21.5Q9.8 14.2 2.5 12Q9.8 9.8 12 2.5Z"
+      />
     </>
   ),
   progress: (
@@ -232,7 +288,7 @@ export const iconNames = Object.keys(paths) as IconName[];
 
 /** Icons grouped as on the styleguide. */
 export const iconGroups: ReadonlyArray<{ id: string; names: IconName[] }> = [
-  { id: "navigation", names: ["path", "coach", "log", "week", "me"] },
+  { id: "navigation", names: ["path", "coach", "log", "week", "me", "explore"] },
   { id: "coach", names: ["today", "athletes", "review", "alerts", "home", "products", "money"] },
   {
     id: "training",

@@ -15,26 +15,26 @@ const texture = (inner) => `<div class="tex"><img src="images/${TEXTURE_IMAGE[0]
 
 /* ---------- small pieces ---------- */
 const I = (d, s = 22) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
-/* PATH icon set (same drawings as src/ui/icons.tsx in the app). */
+/* PATH icon set (same drawings as src/ui/icons.tsx in the app). Places carry one solid sparkle (Y-1). */
 const P = {
-  flag: '<circle cx="5.5" cy="19" r="1.6"/><path d="M5.5 17.4V16.5a4 4 0 0 1 4-4h5a4 4 0 0 0 0-8h-2"/><circle cx="10" cy="4.5" r="1.6"/>',
-  chat: '<path d="M4 7a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-5.5L7 20v-4a3 3 0 0 1-3-3z"/><path d="M12 7c.3 1.7 1 2.4 3 3-2 .600-2.7 1.3-3 3-.300-1.7-1-2.4-3-3 2-.600 2.7-1.3 3-3z"/>',
-  plus: '<circle cx="12" cy="12" r="8.5"/><path d="M12 8.5v7M8.5 12h7"/>',
-  cal: '<rect x="4" y="5.5" width="16" height="14.5" rx="3.5"/><path d="M4 10.5h16M8.5 3.5v4M15.5 3.5v4"/><circle fill="currentColor" stroke="none" cx="9" cy="15" r="1.3"/>',
-  user: '<circle cx="12" cy="8.5" r="3.7"/><path d="M5 20c.500-3.6 3.3-5.5 7-5.5s6.5 1.9 7 5.5"/>',
-  users: '<circle cx="9" cy="9" r="3.2"/><path d="M3.5 19.5c.400-3.1 2.6-4.9 5.5-4.9s5.1 1.8 5.5 4.9"/><path d="M15.5 6.1a3.2 3.2 0 0 1 0 5.8M17.6 14.8c1.6.700 2.7 2.2 2.9 4.2"/>',
-  check: '<rect x="5" y="4.5" width="14" height="16" rx="3"/><path d="M9.5 4.5V4A1.5 1.5 0 0 1 11 2.5h2A1.5 1.5 0 0 1 14.5 4v.5"/><path d="M9 13l2.2 2.2L15.2 11"/>',
-  bell: '<path d="M6.5 16.5v-5a5.5 5.5 0 0 1 11 0v5l1.5 2h-14z"/><path d="M10.2 21h3.6"/>',
-  home: '<path d="M4.5 11.2 12 4.5l7.5 6.7V18a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2z"/><path d="M10 20v-4.5h4V20"/>',
-  tag: '<path d="M4 6a2 2 0 0 1 2-2h4.8a2 2 0 0 1 1.4.6l7.2 7.2a2 2 0 0 1 0 2.8l-4.8 4.8a2 2 0 0 1-2.8 0L4.6 12.2A2 2 0 0 1 4 10.8z"/><circle fill="currentColor" stroke="none" cx="8.5" cy="8.5" r="1.3"/>',
-  card: '<rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10.5h18M7 15h3"/>',
+  flag: '<circle cx="5.5" cy="19" r="1.6"/><path d="M5.5 17.4V16.5a4 4 0 0 1 4-4h5a4 4 0 0 0 0-8h-1.5"/><path fill="currentColor" stroke="none" d="M9 0.5Q9.8 3.7 13 4.5Q9.8 5.3 9 8.5Q8.2 5.3 5 4.5Q8.2 3.7 9 0.5Z"/>',
+  chat: '<path d="M4 7a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-5.5L7 20v-4a3 3 0 0 1-3-3z"/><path fill="currentColor" stroke="none" d="M12 6Q12.8 9.2 16 10Q12.8 10.8 12 14Q11.2 10.8 8 10Q11.2 9.2 12 6Z"/>',
+  plus: '<circle cx="12" cy="12" r="8.5"/><path fill="currentColor" stroke="none" d="M12 6.4Q13.1 10.9 17.6 12Q13.1 13.1 12 17.6Q10.9 13.1 6.4 12Q10.9 10.9 12 6.4Z"/>',
+  cal: '<rect x="4" y="5.5" width="16" height="14.5" rx="3.5"/><path d="M4 10.5h16M8.5 3.5v4M15.5 3.5v4"/><path fill="currentColor" stroke="none" d="M9.6 12Q10.25 14.55 12.8 15.2Q10.25 15.85 9.6 18.4Q8.95 15.85 6.4 15.2Q8.95 14.55 9.6 12Z"/>',
+  user: '<circle cx="11" cy="8.5" r="3.7"/><path d="M4 20c.5-3.6 3.3-5.5 7-5.5s6.5 1.9 7 5.5"/><path fill="currentColor" stroke="none" d="M19.3 1.8Q20 4.5 22.7 5.2Q20 5.9 19.3 8.6Q18.6 5.9 15.9 5.2Q18.6 4.5 19.3 1.8Z"/>',
+  users: '<circle cx="9" cy="9" r="3.2"/><path d="M3.5 19.5c.4-3.1 2.6-4.9 5.5-4.900s5.1 1.8 5.5 4.9"/><path d="M17.6 14.8c1.6.7 2.7 2.2 2.9 4.2"/><path fill="currentColor" stroke="none" d="M18.4 3.2Q19.15 6.25 22.2 7Q19.15 7.75 18.4 10.8Q17.65 7.75 14.6 7Q17.65 6.25 18.4 3.2Z"/>',
+  check: '<rect x="5" y="4.5" width="14" height="16" rx="3"/><path d="M9.5 4.5V4A1.5 1.5 0 0 1 11 2.5h2A1.5 1.5 0 0 1 14.5 4v.5"/><path fill="currentColor" stroke="none" d="M12 9.2Q12.75 12.25 15.8 13Q12.75 13.75 12 16.8Q11.25 13.75 8.2 13Q11.25 12.25 12 9.2Z"/>',
+  bell: '<path d="M5 17v-5a5.5 5.5 0 0 1 11 0v5l1.5 2h-14z"/><path d="M8.7 21.500h3.6"/><path fill="currentColor" stroke="none" d="M19.4 1.7Q20.05 4.35 22.7 5Q20.05 5.65 19.4 8.3Q18.75 5.65 16.1 5Q18.75 4.35 19.4 1.7Z"/>',
+  home: '<path d="M4.5 11.2 12 4.5l7.5 6.7V18a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2z"/><path fill="currentColor" stroke="none" d="M12 10.6Q12.7 13.3 15.4 14Q12.7 14.7 12 17.4Q11.3 14.7 8.6 14Q11.3 13.3 12 10.6Z"/>',
+  tag: '<path d="M4 6a2 2 0 0 1 2-2h4.8a2 2 0 0 1 1.4.6l7.2 7.2a2 2 0 0 1 0 2.8l-4.8 4.8a2 2 0 0 1-2.8 0L4.6 12.2A2 2 0 0 1 4 10.8z"/><path fill="currentColor" stroke="none" d="M10.6 7.3Q11.25 9.95 13.9 10.6Q11.25 11.25 10.6 13.9Q9.95 11.25 7.3 10.6Q9.95 9.95 10.6 7.3Z"/>',
+  card: '<rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10.5h18"/><path fill="currentColor" stroke="none" d="M8.2 12Q8.75 14.25 11 14.8Q8.75 15.35 8.2 17.6Q7.65 15.35 5.4 14.8Q7.65 14.25 8.2 12Z"/>',
   x: '<path d="M7 7l10 10M17 7 7 17"/>',
-  compass: '<circle cx="12" cy="12" r="8.5"/><path d="M15.4 8.6l-2 4.800-4.800 2 2-4.800z"/>',
+  compass: '<circle cx="12" cy="12" r="8.5"/><path fill="currentColor" stroke="none" d="M12 6Q12.6 11.4 14.2 12Q12.6 12.6 12 18Q11.4 12.6 9.8 12Q11.4 11.4 12 6Z" transform="rotate(45 12 12)"/>',
   up: '<path d="M12 19V5M6 11l6-6 6 6"/>',
   tick: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   back: '<path d="M14.5 5.5 8 12l6.5 6.5"/>',
   fwd: '<path d="M9.5 5.5 16 12l-6.5 6.5"/>',
-  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  clock: '<circle cx="10.5" cy="13.5" r="7"/><path d="M10.5 9.5v4l2.7 1.8"/><path fill="currentColor" stroke="none" d="M19.4 1.8Q20.1 4.5 22.8 5.2Q20.1 5.9 19.4 8.6Q18.7 5.9 16 5.2Q18.7 4.5 19.4 1.8Z"/>',
   hold: '<circle cx="12" cy="12" r="3.2"/><path d="M12 3.5a8.5 8.5 0 0 1 8.5 8.5M12 20.5A8.5 8.5 0 0 1 3.5 12"/>',
 };
 const xBtn = (a, label, v = "") => `<button class="x" data-a="${a}" data-v="${esc(v)}" aria-label="${esc(label)}">${I(P.x, 16)}</button>`;
