@@ -15,7 +15,7 @@ function render() {
       ${S.role === "athlete" ? `<button class="x explorebtn" data-a="tab" data-v="explore" aria-label="Explore: try something new" aria-pressed="${tab === "explore"}">${I(P.compass, 22)}</button>` : ""}</header>
     ${S.banner ? `<div class="banner"><span>Made-up data, saved on this device.</span><button class="resetbtn ${UI.resetArmed ? "armed" : ""}" data-a="reset">${UI.resetArmed ? "Tap again" : "Reset demo"}</button>${xBtn("hide-banner", "Hide this notice. Reset demo stays under Me.")}</div>` : ""}
     <main id="view" tabindex="0">${body}</main>
-    ${UI.toast ? `<div class="toast" role="status"><span>${esc(UI.toast)}</span>${xBtn("hide-toast", "Dismiss message")}</div>` : ""}
+    ${UI.toast ? `<div class="toast" role="status"><span>${esc(UI.toast)}</span>${UI.undo ? `<button class="btn sm" data-a="undo">Undo</button>` : ""}${xBtn("hide-toast", "Dismiss message")}</div>` : ""}
     <nav class="tabs" aria-label="Sections">${TABS[S.role].map(([v, l, ic]) => `<button data-a="tab" data-v="${v}" aria-label="${l}${v === "alerts" && badge ? ` (${badge}), ${badge} open` : ""}" ${tab === v ? 'aria-current="page"' : ""}><span class="ic">${I(P[ic])}</span>${l}${v === "alerts" && badge ? ` (${badge})` : ""}</button>`).join("")}</nav>${vSheet()}`;
   const view = document.getElementById("view"); view.scrollTop = tab === "coach" && S.role === "athlete" ? view.scrollHeight : top; lastKey = key;
   if (UI.sheet) { const b = app.querySelector(".sheet .btn"); if (b) b.focus(); }
@@ -25,7 +25,7 @@ function render() {
 const ACT = {
   /* The logo always leads to the start page of the role you are in. */
   home: () => { S.tab[S.role] = { athlete: "path", coach: "today", admin: "dash" }[S.role]; S.rosterSid = null; S.explore.open = null; UI.sheet = null; lastKey = ""; },
-  tab: (v) => { S.tab[S.role] = v; S.rosterSid = null; if (v === "explore") S.explore.open = null; }, day: (v) => { S.day = v; }, logtab: (v) => { S.logTab = v; },
+  tab: (v) => { S.tab[S.role] = v; S.rosterSid = null; if (v === "explore") S.explore.open = null; if (v === "log" && S.role === "athlete" && S.form.pristine && !S.form.editId) S.form = newForm(); }, day: (v) => { S.day = v; }, logtab: (v) => { S.logTab = v; },
   /* Explore */
   "prov-open": (v) => { S.explore.open = v || null; S.tab.athlete = "explore"; UI.sheet = null; }, xkind: (v) => { S.explore.kind = S.explore.kind === v ? "all" : v; S.explore.pin = null; },
   "plan-try": (v) => { UI.toast = tryPlan(v).msg + " Next: book a session with them."; }, "plan-drop": (v) => { UI.toast = dropPlan(v).msg; },
@@ -33,6 +33,7 @@ const ACT = {
   xclear: () => { Object.assign(S.explore, { kind: "all", group: "all", free: false, beginners: false, near: false, pin: null }); }, pin: (v) => { S.explore.pin = S.explore.pin === v ? null : v; },
   "offer-open": (v) => { UI.sheet = { type: "offer", id: v }; },
   "offer-signup": (v) => { const o = offerById(v); if (o.price) UI.sheet = { type: "pay", what: `${o.title}, ${o.club}`, amount: o.price, explore: v, then: true }; else { UI.toast = signUp(v).msg; UI.sheet = null; } },
+  "offer-wait": (v) => { UI.toast = signUp(v, undefined, { wait: true }).msg; UI.sheet = null; },
   "offer-drop": (v) => { UI.toast = dropSignup(v).msg; UI.sheet = null; },
   week: (v) => { shiftWeek(Number(v)); }, fcat: (v) => { S.filter.cat = v; }, fmine: () => { S.filter.mine = !S.filter.mine; }, fclear: () => { S.filter = { cat: "all", mine: false }; },
   /* Out of credits, in context: buying opens the test checkout and books the session when it goes through. */
@@ -52,9 +53,14 @@ const ACT = {
   "go-invoices": () => { S.org = "pau"; S.tab.athlete = "me"; setTimeout(() => { const el = document.getElementById("invoices"); if (el) el.scrollIntoView(); }, 0); },
   "review-plan": () => { S.planNews = false; const r = applyDraft(currentDraft()); UI.toast = `Your plan is now "${S.plan.title}", approved by Coach Sara. ${r.applied} upcoming ${r.applied === 1 ? "day" : "days"} changed${r.skipped ? `, ${r.skipped} left alone because ${r.skipped === 1 ? "it was" : "they were"} already under way or done` : ""}. Nothing in the past was touched.`; },
   "clear-pain": () => { S.entries.forEach((e) => { if (e.pain) e.cleared = true; }); UI.toast = "Pain flag cleared. Hard sessions can be suggested again."; },
-  logit: (v) => { const s = S.sessions[v], o = offOf(s); S.form = { rpe: 0, pain: false, sid: v, title: o.name, dur: o.dur }; S.logTab = "log"; S.tab.athlete = "log"; UI.sheet = null; },
-  "log-clear": () => { S.form = { rpe: 0, pain: false }; },
-  rpe: (v) => { S.form.rpe = Number(v); }, pain: () => { S.form.pain = !S.form.pain; if (!S.form.pain) delete S.form.painWhere; }, area: (v) => { S.form.painWhere = v; },
+  logit: (v) => { S.form = newForm(v); S.logTab = "log"; S.tab.athlete = "log"; UI.sheet = null; },
+  "log-clear": () => { S.form = { rpe: 0, pain: false, title: "", dur: "" }; },
+  more: () => { const f = S.form; f.more = !(f.more || f.pain || f.dist || f.metric || f.notes); if (!f.more) Object.assign(f, { pain: false, dist: "", metric: "", value: "", notes: "" }), delete f.painWhere; },
+  rpe: (v) => { S.form.rpe = Number(v); touch("rpe"); }, pain: () => { S.form.pain = !S.form.pain; S.form.more = true; if (!S.form.pain) delete S.form.painWhere; touch("pain"); }, area: (v) => { S.form.painWhere = v; touch("pain"); },
+  /* Edit or delete an entry. Both can be undone from the toast. */
+  "log-edit": (v) => { const e = S.entries.find((x) => x.id === Number(v)); if (!e) return; S.form = { editId: e.id, sid: e.sid || null, title: e.title, dur: String(e.dur), rpe: e.rpe, dist: e.dist || "", notes: e.notes || "", pain: !!e.pain, painWhere: e.painWhere || undefined, painLevel: e.painLevel || 3 }; S.logTab = "log"; S.tab.athlete = "log"; lastKey = ""; },
+  "log-delete": (v) => { const e = S.entries.find((x) => x.id === Number(v)); if (!e) return; const snap = logSnapshot(), form = structuredClone(S.form); S.entries = S.entries.filter((x) => x !== e); S.stageSessions = Math.max(0, S.stageSessions - 1); S.form = { rpe: 0, pain: false, title: "", dur: "" }; UI.toast = `Deleted: ${e.title}, ${fDay(e.at)}.`; return (UI.undo = { snap, form }), "undo"; },
+  undo: () => { const u = UI.undo; if (!u) return; Object.assign(S, u.snap); S.form = u.form; delete S.form.errors; S.tab.athlete = "log"; S.logTab = "log"; UI.toast = "Undone. Your entry is back in the form, nothing was lost."; },
   ask: (v) => ask(v), "prop-yes": (v) => { confirmProposal(Number(v), true); }, "prop-no": (v) => { confirmProposal(Number(v), false); }, "prop-toggle": (v) => { const [id, i] = v.split("|").map(Number); toggleAct(id, i); },
   consent: (v) => { const [o, k] = v.split("|"); if (k !== "profile.basic") { S.consent[o][k] = !S.consent[o][k]; UI.toast = `${ORGS[o].name} ${S.consent[o][k] ? "can now see" : "no longer sees"} this. The change applies immediately.`; } },
   forget: (v) => { S.memory = S.memory.filter((m) => m.id !== Number(v)); UI.toast = "Deleted. Your coach no longer uses it."; },
@@ -86,36 +92,60 @@ document.addEventListener("click", (e) => {
   if (el.disabled || !ACT[el.dataset.a]) return;
   const keep = el.dataset.a === "hide-banner" ? UI.toast : ""; UI.toast = keep;
   const out = ACT[el.dataset.a](el.dataset.v); if (out !== "armed") UI.resetArmed = false;
+  if (out !== "undo") UI.undo = null; // Undo is offered once, right after the change
   render();
 });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && UI.sheet) { UI.sheet = null; render(); } });
-document.addEventListener("input", (e) => { const d = e.target.dataset && e.target.dataset.d; if (d) { S.form[d] = e.target.value; save(); } });
+/* Typing in the log form is kept as typed. An inline error goes away as soon as its field is touched. */
+function touch(k) { S.form.pristine = false; if (S.form.errors) delete S.form.errors[k]; }
+document.addEventListener("input", (e) => {
+  const d = e.target.dataset && e.target.dataset.d; if (!d) return;
+  S.form[d] = e.target.value; touch(d);
+  const msg = document.getElementById("err-" + d); if (msg) { msg.remove(); e.target.removeAttribute("aria-invalid"); }
+  save();
+});
+const logSnapshot = () => structuredClone({ entries: S.entries, stage: S.stage, stageSessions: S.stageSessions, pbs: S.pbs, alerts: S.alerts });
 /* Switching club or role keeps the tab you are on. Only a roster closes, because it belongs to one club's session. */
 document.addEventListener("change", (e) => {
   if (e.target.id === "role") { S.role = e.target.value; S.rosterSid = null; UI.toast = ""; UI.sheet = null; render(); }
   if (e.target.id === "org") { S.org = e.target.value; S.rosterSid = null; S.filter.cat = "all"; UI.toast = ""; UI.sheet = null; render(); } // kinds of training differ per club; "My pass only" stays
 });
+/* Save. Only the effort is required when the form was filled from a session; nothing is refilled after a failed save. */
 function submitLog() {
-  const d = S.form, title = (document.getElementById("log-title").value || "").trim(), dur = Number(document.getElementById("log-dur").value);
-  if (!title || !dur) return (UI.toast = "Add what you did and how many minutes.");
-  if (!d.rpe) return (UI.toast = "Tap how hard it was (RPE 1 to 10).");
-  if (d.pain && !d.painWhere) { setTimeout(() => { const el = document.getElementById("pain"); if (el) el.scrollIntoView({ block: "center" }); }, 0); return (UI.toast = "Choose where it hurt, or \"Not sure\". A pain flag needs a location."); }
-  const forS = d.sid ? S.sessions[d.sid] : null;
-  const e2 = { id: S.seq++, at: forS ? endOf(forS) : now(), sid: d.sid || null, title, dur, rpe: d.rpe, dist: d.dist || "", notes: d.notes || "", comments: [], pain: !!d.pain, painWhere: d.pain ? d.painWhere : "", painLevel: d.pain ? Math.max(0, Math.min(10, Number(d.painLevel || 3))) : 0 };
-  S.entries.push(e2); S.entries.sort((a, b) => b.at - a.at);
-  let msg = `Saved: ${title}, ${dur} min, RPE ${d.rpe}.`;
-  const val = Number(d.value), pb = d.metric && val > 0 && S.pbs.find((p) => p.metric === d.metric);
-  if (pb && (pb.better === "lower" ? val < pb.value : val > pb.value)) { msg += ` New personal best: ${pb.metric} ${val} ${pb.unit} (was ${pb.value}).`; pb.value = val; pb.at = now(); pb.isNew = true; }
-  if (e2.pain) {
-    if (S.consent.pau["alerts.pain"]) { S.alerts.push({ id: S.seq++, kind: `Pain flag: ${e2.painWhere}, level ${e2.painLevel}`, at: now(), status: "open" }); msg += " Coach Sara was alerted."; } else msg += " The pain flag stays private.";
-    if (e2.painLevel >= 7) msg += " That is a high level: please see a doctor or physio.";
+  const d = S.form, errors = {};
+  for (const el of document.querySelectorAll('form[data-f="log"] [data-d]')) d[el.dataset.d] = el.value;
+  const title = String(d.title || "").trim(), dur = Number(d.dur);
+  if (!title) errors.title = "Say what you did.";
+  if (!(dur > 0)) errors.dur = "Add how many minutes it took.";
+  if (!d.rpe) errors.rpe = "Tap how hard it was, from 1 to 10.";
+  if (d.pain && !d.painWhere) errors.pain = 'Choose where it hurt, or "Not sure". A pain flag needs a location.';
+  d.pristine = false;
+  if (Object.keys(errors).length) { d.errors = errors; setTimeout(() => { const el = document.querySelector(".err"); if (el) el.scrollIntoView({ block: "center" }); }, 0); return; }
+  const snap = logSnapshot(), form = structuredClone(d);
+  const fields = { title, dur, rpe: d.rpe, dist: d.dist || "", notes: d.notes || "", pain: !!d.pain, painWhere: d.pain ? d.painWhere : "", painLevel: d.pain ? Math.max(0, Math.min(10, Number(d.painLevel || 3))) : 0 };
+  let msg;
+  if (d.editId) {
+    const e = S.entries.find((x) => x.id === d.editId); Object.assign(e, fields); if (!fields.pain) delete e.cleared;
+    msg = `Updated: ${title}, ${dur} min, RPE ${d.rpe}.`;
+  } else {
+    const forS = d.sid ? S.sessions[d.sid] : null;
+    const e2 = { id: S.seq++, at: forS ? endOf(forS) : now(), sid: d.sid || null, comments: [], ...fields };
+    S.entries.push(e2); S.entries.sort((a, b) => b.at - a.at);
+    msg = `Saved: ${title}, ${dur} min, RPE ${d.rpe}.`;
+    const val = Number(d.value), pb = d.metric && val > 0 && S.pbs.find((p) => p.metric === d.metric);
+    if (pb && (pb.better === "lower" ? val < pb.value : val > pb.value)) { msg += ` New personal best: ${pb.metric} ${val} ${pb.unit} (was ${pb.value}).`; pb.value = val; pb.at = now(); pb.isNew = true; }
+    if (e2.pain) {
+      if (S.consent.pau["alerts.pain"]) { S.alerts.push({ id: S.seq++, kind: `Pain flag: ${e2.painWhere}, level ${e2.painLevel}`, at: now(), status: "open" }); msg += " Coach Sara was alerted."; } else msg += " The pain flag stays private.";
+      if (e2.painLevel >= 7) msg += " That is a high level: please see a doctor or physio.";
+    }
+    UI.lineFrom = { stage: S.stage, inSt: S.stageSessions }; S.stageSessions++;
+    if (S.stageSessions >= PER && S.stage < S.stages.length - 1) { msg += ` Stage complete: ${S.stages[S.stage]}. Next up: ${S.stages[S.stage + 1]}.`; S.stage++; S.stageSessions = 0; }
+    S.tab.athlete = "path";
   }
-  UI.lineFrom = { stage: S.stage, inSt: S.stageSessions }; S.stageSessions++;
-  if (S.stageSessions >= PER && S.stage < S.stages.length - 1) { msg += ` Stage complete: ${S.stages[S.stage]}. Next up: ${S.stages[S.stage + 1]}.`; S.stage++; S.stageSessions = 0; }
-  S.tab.athlete = "path"; UI.toast = msg; S.form = { rpe: 0, pain: false };
+  UI.toast = msg; UI.undo = { snap, form }; S.form = { rpe: 0, pain: false, title: "", dur: "", pristine: true };
 }
 document.addEventListener("submit", (e) => {
-  e.preventDefault(); const f = e.target.dataset.f; UI.toast = ""; UI.resetArmed = false;
+  e.preventDefault(); const f = e.target.dataset.f; UI.toast = ""; UI.resetArmed = false; UI.undo = null;
   if (f === "chat") { const v = document.getElementById("chat-input").value.trim(); if (v) ask(v); }
   if (f === "log") submitLog();
   if (f === "walkin") UI.toast = addWalkin(e.target.dataset.id, document.getElementById("walkin-name").value).msg;
@@ -123,25 +153,6 @@ document.addEventListener("submit", (e) => {
   if (f === "adjust") { const n = Number(document.getElementById("adj-n").value), r = document.getElementById("adj-r").value.trim(); if (!r) UI.toast = "A reason is required for every credit change."; else if (!n) UI.toast = "Enter a change other than 0."; else { const p = passOf(S.org); S.ledger.push({ pass: p.id, delta: n, kind: "admin_adjust", reason: "Admin: " + r, at: now() }); S.audit.unshift({ what: `Adjusted ${S.me.name}'s credits by ${n > 0 ? "+" : ""}${n}: ${r}`, at: now() }); UI.toast = `Credits adjusted. New balance: ${passState(p).text}.`; } }
   render();
 });
-/* Hold to log. A plain tap only nudges; keyboard and reduced-motion users get a normal press. */
-const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
-let holdTimer = null;
-function releaseHold() {
-  const btn = document.querySelector("[data-hold].holding"); if (!btn || !holdTimer) return;
-  clearTimeout(holdTimer); holdTimer = null; btn.classList.remove("holding");
-  const label = btn.querySelector("span"); label.textContent = "Keep holding to log";
-  setTimeout(() => { if (label.isConnected) label.textContent = "Hold to log"; }, 1400);
-}
-document.addEventListener("pointerdown", (e) => {
-  const btn = e.target.closest("[data-hold]"); if (!btn || calm) return;
-  btn.classList.add("holding");
-  holdTimer = setTimeout(() => { holdTimer = null; btn.classList.remove("holding"); btn.closest("form").requestSubmit(); }, 650);
-});
-document.addEventListener("pointerup", releaseHold);
-document.addEventListener("pointercancel", releaseHold);
-document.addEventListener("contextmenu", (e) => { if (e.target.closest("[data-hold]")) e.preventDefault(); });
-document.addEventListener("click", (e) => { const btn = e.target.closest("[data-hold]"); if (btn && (e.detail === 0 || calm)) btn.closest("form").requestSubmit(); });
-
 /* A confirm card that runs out while you are looking at it closes by itself. */
 setInterval(() => { const a = sweepProposals(), b = sweepOffers(); if (a || b) render(); }, 20000);
 
@@ -160,8 +171,8 @@ document.addEventListener("pointercancel", () => { swipe = null; });
 window.PATH_DEMO = {
   get state() { return S; }, ui: UI, ORGS, LOAD_LIMIT, CARD_TTL_MIN, STORE_KEY,
   render, seed, save, load, resetDemo, book, cancel, check, freeSpot, leaveWait, passState, passOf, stats, guard, guardDraft, currentDraft, RAW_DRAFT,
-  ask, confirmProposal, toggleAct, runAct, planLocked, nextChangeable, applyDraft, shiftWeek, weekIndex,
-  OFFERS, openOffers, exploreList, tryPlan, dropPlan, tryToday, providerOf, signUp, dropSignup, signedUp, offerStart, offerKm, offersFor, purchase, acceptOffer, declineOffer, sweepOffers, waitTotal, createSeries, previewSeries, pauseSeries, endSeries, runSeries, seriesRows, seriesSummary, findSeries, sweepProposals, parseWhen, parseOffering, rosterRows, rosterNames, addWalkin, markAttendance, memoryFor, upcomingBookings, sessList, myBooking, myWait, spots, nextStep,
+  newForm, toLog, ask, confirmProposal, toggleAct, runAct, planLocked, nextChangeable, applyDraft, shiftWeek, weekIndex,
+  parseClub, agenda, openPain, OFFERS, openOffers, exploreList, tryPlan, dropPlan, tryToday, providerOf, signUp, dropSignup, signedUp, offerStart, offerKm, offersFor, purchase, acceptOffer, declineOffer, sweepOffers, waitTotal, createSeries, previewSeries, pauseSeries, endSeries, runSeries, seriesRows, seriesSummary, findSeries, sweepProposals, parseWhen, parseOffering, rosterRows, rosterNames, addWalkin, markAttendance, memoryFor, upcomingBookings, sessList, myBooking, myWait, spots, nextStep,
 };
 if (!load()) seed();
 render();

@@ -117,7 +117,8 @@ label.f { display: flex; flex-direction: column; gap: 6px; font-size: 13px; colo
 .btn:disabled { opacity: .45; cursor: default; }
 .sw .l { flex: 1; }
 .note { background: var(--soft); border-radius: var(--r-control); padding: 12px 14px; font-size: 13px; color: var(--text-2); }
-.toast { position: absolute; left: 16px; right: 16px; bottom: 84px; z-index: 5; display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-card); box-shadow: 0 8px 30px rgba(17,17,17,.12); padding: 12px 8px 12px 16px; font-size: 13px; }
+/* The toast sits between the page and the tab bar and takes its own space, so it can never lie on top of a button. */
+.toast { flex: none; margin: 8px 16px;  display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-card); box-shadow: 0 8px 30px rgba(17,17,17,.12); padding: 12px 8px 12px 16px; font-size: 13px; }
 .toast span { flex: 1; }
 
 .chatwrap { display: flex; flex-direction: column; min-height: 100%; }
@@ -164,12 +165,6 @@ svg text { font-family: var(--mono); font-size: 10px; fill: var(--text-2); }
 .tex img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: saturate(.35) contrast(.9); opacity: .16; }
 .tex > :not(img) { position: relative; }
 /* Hold to log: the button charges with lime while held, then releases into the line. */
-.hold { position: relative; overflow: hidden; width: 100%; min-height: 56px; border-radius: var(--r-control); background: var(--surface); border: 1.5px solid var(--text); color: var(--text); font-weight: 600; text-align: center; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: box-shadow .3s ease, transform .15s ease; }
-.hold::before { content: ""; position: absolute; inset: 0; background: var(--accent); transform: scaleX(0); transform-origin: left; transition: transform .25s ease; }
-.hold { display: flex; align-items: center; justify-content: center; gap: 8px; }
-.hold span, .hold svg { position: relative; }
-.hold.holding { transform: scale(.98); box-shadow: 0 0 0 4px rgba(142,154,128,.35), 0 0 28px rgba(142,154,128,.9); transition: box-shadow .65s ease-in, transform .15s ease; }
-.hold.holding::before { transform: scaleX(1); transition: transform .65s linear; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 
 /* ---- Iteration 2, milestone I2-0 ---- */
@@ -228,9 +223,16 @@ svg text { font-family: var(--mono); font-size: 10px; fill: var(--text-2); }
 .map svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .map .pin { position: absolute; width: 44px; height: 44px; transform: translate(-50%, -50%); display: grid; place-items: center; }
 .map .pin i { width: 20px; height: 20px; border-radius: 50%; background: var(--text); border: 2px solid var(--surface); display: grid; place-items: center; color: var(--surface); box-shadow: var(--shadow); }
-.map .pin[aria-pressed="true"] i { width: 26px; height: 26px; background: var(--accent); border-color: var(--text); color: var(--text); }
+.map .pin[aria-pressed="true"] i { width: 26px; height: 26px; }
 .map .you { position: absolute; width: 14px; height: 14px; transform: translate(-50%, -50%); border-radius: 50%; background: var(--surface); border: 4px solid var(--accent); box-shadow: 0 0 0 6px rgba(142,154,128,.25); }
 .mapcard { display: flex; gap: 12px; align-items: center; text-align: left; width: 100%; padding: 10px; }
 .mapcard .thumb { width: 64px; height: 64px; border-radius: 10px; overflow: hidden; flex: none; }
 .offerpic { height: 150px; flex: none; margin: -4px 0 0; border-radius: var(--r-card); overflow: hidden; }
 .tile .who { position: absolute; top: 6px; left: 6px; font: 600 10px/1 var(--mono); letter-spacing: .04em; text-transform: uppercase; background: var(--surface); color: var(--text); border-radius: 999px; padding: 4px 7px; }
+.err { display: block; margin-top: 6px; font-size: 13px; font-weight: 600; color: var(--text); }
+.err::before { content: "! "; }
+[aria-invalid="true"] { border-color: var(--text) !important; border-width: 2px !important; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; list-style: none; }
+.legend li { display: flex; align-items: center; gap: 6px; }
+.legend i { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+.map .pin[aria-pressed="true"] i { box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--text); }

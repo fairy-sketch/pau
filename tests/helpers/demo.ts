@@ -43,10 +43,9 @@ export const day = (page: Page, name: string) => page.getByRole("button", { name
 /** Opens the session sheet for a session id from the day list or the featured card. */
 export const openSession = (page: Page, sid: string) =>
   page.locator(`#weekpane [data-a="sheet"][data-v="${sid}"]`).first().click();
-/** Pressing Enter on the hold button is the keyboard way to log (no hold needed). */
+/** Saves the log form. (The name is kept from the time this was a hold button.) */
 export async function logWithKeyboard(page: Page) {
-  await page.getByRole("button", { name: "Log this session" }).focus();
-  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
 }
 /** The pass balance as each screen prints it. */
 export async function passOn(page: Page, tabs: string[]) {

@@ -76,6 +76,9 @@ const CLUB_PLAN = {
   Outdoor: [["Easy 30 min outside", "low"], ["Rest", "low"], ["Hill strides, 5 × 20 s", "medium"]],
 };
 const KIND = { club: "Club", coach: "Personal coach", pro: "Pro athlete", care: "Health and recovery", event: "Event" };
+/* On the map each kind has its own dot colour, explained in the legend. The colour is never the only cue: the label says the kind too. */
+const KIND_COLOR = { club: "#1C1916", coach: "#5F6E52", pro: "#9C4F36", care: "#4A6274", event: "#8A6A12" };
+const KIND_PLURAL = { club: "Clubs", coach: "Coaches", pro: "Pros", care: "Care", event: "Events" };
 const KIND_TAG = { coach: "Coach", pro: "Pro", care: "Care", event: "Event" };
 const kindOf = (o) => o.who || "club";
 /* Everything a provider shows on their page. Clubs get a short welcome and a three-day warm-up for their sport. */
@@ -104,18 +107,23 @@ const offerById = (id) => OFFERS.find((o) => o.id === id);
 const offerStart = (o) => { const b = new Date(S.exploreBase + "T12:00"); return new Date(b.getFullYear(), b.getMonth(), b.getDate() + o.day, o.time[0], o.time[1]); };
 const offerKm = (o) => Math.round(Math.hypot(o.x - ME_AT.x, (o.y - ME_AT.y) * 1.15) * 1.1) / 10; // the sketch map is about 9 km across
 const signedUp = (id) => S.signups.some((x) => x.id === id);
-const offerSpots = (o) => Math.max(0, o.cap - o.taken - (signedUp(o.id) ? 1 : 0));
+const onWait = (id) => S.signups.some((x) => x.id === id && x.wait);
+const offerSpots = (o) => Math.max(0, o.cap - o.taken - (signedUp(o.id) && !onWait(o.id) ? 1 : 0));
 const offerPrice = (o) => (o.price ? chf(o.price) : o.trial ? "Free trial" : "Free");
 const openOffers = () => OFFERS.filter((o) => offerStart(o) > now()).sort((a, b) => offerStart(a) - offerStart(b));
 const offerLine = (o) => `${o.title}, ${o.club}: ${fDay(offerStart(o))} ${fTime(offerStart(o))}, ${offerKm(o)} km away, ${offerPrice(o).toLowerCase()}`;
 
 /* Putting your name down. The club learns your name and nothing else; your pass and your log stay where they are. */
-function signUp(id, key) {
+function signUp(id, key, opts = {}) {
   if (key && S.idem[key]) return S.idem[key];
   const o = offerById(id); if (!o) return remember(key, err("NOT_FOUND", "That session is no longer listed."));
   if (offerStart(o) <= now()) return remember(key, err("WINDOW_CLOSED", "That session has already started."));
   if (signedUp(id)) return remember(key, err("ALREADY_BOOKED", "Your name is already down for this."));
-  if (offerSpots(o) <= 0) return remember(key, err("SESSION_FULL", "This one is full."));
+  if (offerSpots(o) <= 0) {
+    if (!opts.wait) return remember(key, err("SESSION_FULL", "This one is full. You can join its waitlist."));
+    S.signups.push({ id, at: now(), wait: true });
+    return remember(key, { ok: true, msg: `You are on the waitlist for ${o.title} at ${o.club}. Nothing is charged; you are told when a spot opens.` });
+  }
   S.signups.push({ id, at: now() });
   return remember(key, { ok: true, msg: `You're in: ${o.title} at ${o.club}, ${fDay(offerStart(o))} ${fTime(offerStart(o))}. ${o.club} sees your name, nothing else.` });
 }
@@ -177,7 +185,7 @@ function vProvider(o) {
       ${g && p.plan.days.some((d) => d[1] === "high") ? `<p class="note">Your load is up right now, so the hard days are held back until you are back in range.</p>` : ""}
       ${t ? `<p class="sub" id="onpath">On your Path since ${fDay(t.at)}.</p><button class="btn full" data-a="plan-drop" data-v="${o.id}">Remove from my Path</button>` : `<button class="btn ${inList ? "" : "acc"} full" data-a="plan-try" data-v="${o.id}">Add to my Path</button>`}</div></div>
     <div class="stack" style="gap:8px" id="booknow"><div class="eyebrow">3 · ${kindOf(o) === "event" ? "Sign up" : "Book a session"}</div><div class="card stack flat"><div><p class="h2">${esc(o.title)}</p><p class="sub">${fDay(at)} · ${fTime(at)} · ${o.dur} min · ${esc(o.place)} · ${offerPrice(o)} · ${left} of ${o.cap} spots left</p></div>
-      ${inList ? `<p class="sub">Your name is down. ${esc(o.club)} sees your name, nothing else.</p><button class="btn full" data-a="offer-drop" data-v="${o.id}">Take my name off</button>` : left <= 0 ? `<p class="note">This one is full.</p>` : `<button class="btn ${t ? "acc" : ""} full" data-a="offer-open" data-v="${o.id}">${o.price ? `Book · ${chf(o.price)}` : "Book, free"}</button>`}</div></div></section>`;
+      ${inList ? `<p class="sub">${onWait(o.id) ? "You are on the waitlist." : "Your name is down."} ${esc(o.club)} sees your name, nothing else.</p><button class="btn full" data-a="offer-drop" data-v="${o.id}">${onWait(o.id) ? "Leave the waitlist" : "Take my name off"}</button>` : left <= 0 ? `<p class="note">This one is full.</p><button class="btn full" data-a="offer-open" data-v="${o.id}">Join waitlist</button>` : `<button class="btn ${t ? "acc" : ""} full" data-a="offer-open" data-v="${o.id}">${o.price ? `Book · ${chf(o.price)}` : "Book, free"}</button>`}</div></div></section>`;
 }
 function vExplore() {
   const openP = S.explore.open && offerById(S.explore.open); if (openP) return vProvider(openP);
@@ -187,25 +195,31 @@ function vExplore() {
   const sel = list.find((o) => o.id === f.pin) || null;
   const map = `<div class="map" id="map"><svg viewBox="0 0 100 115" preserveAspectRatio="none" aria-hidden="true"><path d="M50 60C58 62 62 70 70 82 76 92 84 104 92 115H62C60 100 54 84 47 70 45 65 46 60 50 60Z" fill="var(--track)"/><path d="M50 60C44 50 36 44 28 36 20 28 12 24 0 20" fill="none" stroke="var(--track)" stroke-width="2.4"/><path d="M48 61C45 72 40 86 37 115" fill="none" stroke="var(--track)" stroke-width="1.2"/><g fill="none" stroke="var(--hairline)" stroke-width=".6"><path d="M0 52H40L100 44M22 0 34 40 30 115M62 0 56 40 70 60 100 70M0 84 34 76 46 60M70 0 100 24"/></g></svg>
       <span class="you" style="left:${ME_AT.x}%;top:${(ME_AT.y / 115) * 100}%" title="You are here"></span>
-      ${list.map((o) => `<button class="pin" style="left:${o.x}%;top:${(o.y / 115) * 100}%" data-a="pin" data-v="${o.id}" aria-pressed="${f.pin === o.id}" aria-label="${esc(o.sport)} at ${esc(o.club)}, ${offerKm(o)} km away"><i>${signedUp(o.id) ? I(P.tick, 12) : ""}</i></button>`).join("")}</div>
+      ${list.map((o) => `<button class="pin" style="left:${o.x}%;top:${(o.y / 115) * 100}%" data-a="pin" data-v="${o.id}" data-kind="${kindOf(o)}" aria-pressed="${f.pin === o.id}" aria-label="${esc(o.sport)} at ${esc(o.club)}, ${KIND[kindOf(o)]}, ${offerKm(o)} km away"><i style="background:${KIND_COLOR[kindOf(o)]}">${signedUp(o.id) ? I(P.tick, 12) : ""}</i></button>`).join("")}</div>
+    <ul class="legend" id="legend" aria-label="What the dot colours mean">${Object.keys(KIND_PLURAL).map((k) => `<li><i style="background:${KIND_COLOR[k]}"></i>${KIND_PLURAL[k]} <span class="sub">${list.filter((o) => kindOf(o) === k).length}</span></li>`).join("")}</ul>
     ${sel ? `<button class="card flat mapcard" data-a="prov-open" data-v="${sel.id}"><span class="thumb">${photo(sel.img)}</span><span class="mid"><span class="eyebrow">${esc(sel.sport)} · ${offerKm(sel)} km</span><span class="strong" style="display:block">${esc(sel.title)}</span><span class="sub">${esc(sel.club)} · ${fDay(offerStart(sel))} ${fTime(offerStart(sel))} · ${offerPrice(sel)}</span></span></button>` : `<p class="sub" id="maphint">Tap a dot to see what is on there. ${list.length} ${list.length === 1 ? "session" : "sessions"} on the map.</p>`}
     <p class="sub" style="font-size:12px">A sketch map with made-up places. The app will use a real map and ask before it uses your location.</p>`;
   return `<section class="pad stack-l" id="explore"><div><div class="eyebrow">Explore</div><h1 class="h1">Try something new</h1><p class="sub" style="margin-top:4px">Clubs, coaches, pros, physios and events around you. Look, try their plan, put your name down, like on the school sports list.</p></div>
     ${mine.length ? `<div class="stack" id="mylist" style="gap:8px"><div class="eyebrow">Your list · ${mine.length}</div><div class="card rows flat">${mine.map((o) => `<div class="row"><span class="lead time">${WD[offerStart(o).getDay()]} ${offerStart(o).getDate()}</span><button class="mid" style="text-align:left;min-height:44px" data-a="prov-open" data-v="${o.id}"><span class="strong" style="display:block">${esc(o.title)}</span><span class="sub">${fTime(offerStart(o))} · ${esc(o.club)}</span></button>${xBtn("offer-drop", "Take my name off: " + o.title, o.id)}</div>`).join("")}</div></div>` : ""}
-    <div class="stack"><div class="between" style="align-items:center"><div class="seg" role="group" aria-label="View">${["grid", "map"].map((v) => `<button data-a="xview" data-v="${v}" aria-pressed="${f.view === v}">${v === "grid" ? "Grid" : "Map"}</button>`).join("")}</div><span class="sub" id="xcount">${list.length} of ${openOffers().length}</span></div>
+    <div class="stack"><div class="between" style="align-items:center"><div class="seg" role="group" aria-label="View">${["grid", "map"].map((v) => `<button data-a="xview" data-v="${v}" aria-pressed="${f.view === v}">${v === "grid" ? "Grid" : "Map"}</button>`).join("")}</div><span style="display:flex;align-items:center;gap:8px">${f.kind !== "all" || f.group !== "all" || f.free || f.beginners || f.near ? `<button class="btn sm" id="xreset" data-a="xclear">Reset filters</button>` : ""}<span class="sub" id="xcount">${list.length} of ${openOffers().length}</span></span></div>
       <div class="filters" role="group" aria-label="Filter what you see">${chip("xgroup", "all", "All", f.group === "all")}${GROUPS.map((g) => chip("xgroup", g, g, f.group === g)).join("")}</div>
       <div class="filters" role="group" aria-label="More filters">${chip("xkind", "club", "Clubs", f.kind === "club")}${chip("xkind", "coach", "Coaches", f.kind === "coach")}${chip("xkind", "pro", "Pros", f.kind === "pro")}${chip("xkind", "care", "Care", f.kind === "care")}${chip("xkind", "event", "Events", f.kind === "event")}${chip("xflag", "free", "Free", f.free)}${chip("xflag", "beginners", "Beginners welcome", f.beginners)}${chip("xflag", "near", "Within 3 km", f.near)}</div>
-      ${list.length ? "" : `<p class="sub" id="xnone">Nothing matches. <button class="btn sm ghost" style="padding:0 4px" data-a="xclear">Clear filters</button></p>`}</div>
+      ${list.length ? "" : `<p class="sub" id="xnone">Nothing matches these filters.</p>`}</div>
     ${f.view === "map" ? map : `<div class="tiles3" id="xgrid">${list.map(tile).join("")}</div>`}
     <p class="note">Stuck for ideas? Ask your coach: "Suggest something new for me".</p></section>`;
 }
 function vOfferSheet() {
   const o = offerById(UI.sheet.id), at = offerStart(o), inList = signedUp(o.id), left = offerSpots(o);
-  const action = inList ? `<p class="sub">Your name is down. ${esc(o.club)} sees your name, nothing else.</p><button class="btn full" data-a="offer-drop" data-v="${o.id}">Take my name off</button>`
-    : left <= 0 ? `<p class="note">This one is full.</p>`
-    : `<p class="sub">${esc(o.club)} sees your name, nothing else. Your pass, your plan and your log stay private.</p><button class="btn acc full" data-a="offer-signup" data-v="${o.id}">${o.price ? `Put my name down · ${chf(o.price)}` : "Put my name down"}</button>`;
+  const full = left <= 0 && !inList;
+  /* What happens if you book: spots, what it costs, what it does to your passes, and the waitlist if it is full. */
+  const then = inList ? [onWait(o.id) ? "You are on the waitlist. You are told when a spot opens." : "Your name is down. It is in your Week and your coach knows about it.", "You can take your name off at any time."]
+    : [full ? "It is full. You can join the waitlist: you are told when a spot opens, and nothing is charged until then." : `You take 1 of the ${left} spots left; ${left - 1} remain.`, "It uses none of your passes or credits.", full ? "" : o.price ? `You pay ${chf(o.price)} once, in the test checkout. No real money moves.` : "Nothing is charged.", "It shows up in your Week, and your coach can see and cancel it for you."].filter(Boolean);
+  const action = inList ? `<button class="btn full" data-a="offer-drop" data-v="${o.id}">${onWait(o.id) ? "Leave the waitlist" : "Take my name off"}</button>`
+    : full ? `<button class="btn acc full" data-a="offer-wait" data-v="${o.id}">Join waitlist</button>`
+    : `<button class="btn acc full" data-a="offer-signup" data-v="${o.id}">${o.price ? `Put my name down · ${chf(o.price)}` : "Put my name down"}</button>`;
   return `<div class="sheetbg" data-a="close"><div class="sheet stack" role="dialog" aria-modal="true" aria-label="${esc(o.title)}"><div class="offerpic">${photo(o.img)}</div>
     <div><div class="eyebrow">${esc(o.sport)} · ${esc(o.club)}</div><h2 class="h1">${esc(o.title)}</h2><p class="sub" style="margin-top:4px">${fDay(at)} · ${fTime(at)} · ${o.dur} min · ${esc(o.place)}, ${offerKm(o)} km away</p></div>
     <div class="card rows flat"><div class="row"><span class="mid sub">Price</span><span class="strong">${offerPrice(o)}</span></div><div class="row"><span class="mid sub">Level</span><span class="strong" style="text-align:right">${o.beginners ? "Beginners welcome" : "Some experience helps"}<br>${o.intensity} intensity</span></div><div class="row"><span class="mid sub">Spots</span><span class="strong mono">${left} / ${o.cap} left</span></div></div>
+    <div class="stack" id="consequence" style="gap:6px"><div class="eyebrow">If you ${inList ? "stay" : full ? "join the waitlist" : "book"}</div><ul class="sub stack" style="gap:4px;padding-left:18px;list-style:disc">${then.map((x) => `<li>${x}</li>`).join("")}</ul><p class="sub">${esc(o.club)} sees your name, nothing else.</p></div>
     ${action}<button class="btn ghost full" data-a="close-btn">Close</button></div></div>`;
 }

@@ -162,10 +162,15 @@ test("a club session: put your name down, see it on your list, take it off again
   await expect(page.locator("#mylist .row")).toHaveCount(1);
   await page.getByRole("button", { name: "Take my name off: First climb, shoes included" }).click();
   await expect(page.locator("#mylist")).toHaveCount(0);
-  // A full session cannot be joined.
+  // A full session offers its waitlist, and says what that means.
   await tiles(page).filter({ hasText: "Kickboxing" }).click();
   await expect(page.locator("#booknow")).toContainText("This one is full.");
-  await expect(page.locator("#booknow").getByRole("button")).toHaveCount(0);
+  await page.locator("#booknow").getByRole("button", { name: "Join waitlist" }).click();
+  await expect(page.locator("#consequence")).toContainText("It is full. You can join the waitlist");
+  await expect(page.locator("#consequence")).toContainText("nothing is charged until then");
+  await page.getByRole("dialog").getByRole("button", { name: "Join waitlist" }).click();
+  await expect(toast(page)).toContainText("You are on the waitlist for Kickboxing pad work, intro");
+  await expect(page.locator("#booknow")).toContainText("You are on the waitlist.");
 });
 
 test("filters apply to the grid and the map alike", async ({ page }) => {
@@ -205,7 +210,8 @@ test("filters apply to the grid and the map alike", async ({ page }) => {
   await chip(page, "Dance").click();
   await chip(page, "Pros").click();
   await expect(page.locator("#xnone")).toContainText("Nothing matches");
-  await page.getByRole("button", { name: "Clear filters" }).click();
+  await page.getByRole("button", { name: "Reset filters" }).click();
+  await expect(page.getByRole("button", { name: "Reset filters" })).toHaveCount(0);
   await expect(page.locator("#map .pin")).toHaveCount(38);
 });
 

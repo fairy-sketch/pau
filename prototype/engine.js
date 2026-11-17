@@ -81,7 +81,7 @@ for (const last of ["Brunner", "Meier", "Rossi", "Frei", "Sutter", "Aziz"]) for 
 const STORE_KEY = "path-demo-v4", WEEKS = 4, PER = 12, LOAD_LIMIT = 1.1, CARD_TTL_MIN = 15;
 let S;
 /* Things that belong to the open screen, not to the demo's data. Never saved. */
-const UI = { sheet: null, toast: "", lineFrom: null, justDone: null, resetArmed: false };
+const UI = { sheet: null, toast: "", undo: null, lineFrom: null, justDone: null, resetArmed: false };
 
 function ensureSessions() {
   const T = today();
@@ -126,7 +126,7 @@ function seed() {
       { org: "pau", off: "gym", weekday: 5, count: 3 }, { org: "pau", off: "community", weekday: 6, count: 2 }, { org: "studio", off: "yoga", weekday: 2, count: 3 },
     ],
     plan: { title: "Build block", by: "Coach Sara", items: [] },
-    draftStatus: "pending_review", draftApproved: null, planNews: false, form: { rpe: 0, pain: false }, seq: 100,
+    draftStatus: "pending_review", draftApproved: null, planNews: false, form: { rpe: 0, pain: false, title: "", dur: "" }, seq: 100,
   };
   ensureSessions();
   // Mia's history: 3 PAU drop-ins this calendar month, and a studio pack with 6 of 10 left. Every one of them is a ledger row.
@@ -156,6 +156,7 @@ function seed() {
   S.pbs = [{ metric: "400 m", value: 63.2, unit: "s", better: "lower", at: addDays(T, -23) }, { metric: "5K", value: 20.4, unit: "min", better: "lower", at: addDays(T, -44) }, { metric: "Squat 1RM", value: 82.5, unit: "kg", better: "higher", at: addDays(T, -31) }];
   const tpl = { 1: ["club", "Track session", "track"], 2: ["workout", "Easy run 40 min @ RPE 4"], 3: ["rest", "Rest day"], 4: ["club", "Track session", "track"], 5: ["club", "Gym session", "gym"], 6: ["club", "Saturday community session", "community"], 0: ["workout", "Long run 75 min @ RPE 5"] };
   for (let i = 0; i < 14; i++) { const d = addDays(monday(T), i), t = tpl[d.getDay()]; S.plan.items.push({ date: ymd(d), kind: t[0], title: t[1], off: t[2] || null, status: "planned" }); }
+  S.form = newForm();
   S.chat = [{ who: "coach", text: "Hi Mia. I can book or cancel sessions, look at your week, ease your plan or tell you how you are doing. I always ask before I change anything." }];
 }
 
@@ -457,6 +458,17 @@ function markAttendance(sid, name, status) {
   b.status = status !== "absent" ? "attended" : endOf(S.sessions[sid]) <= now() ? "no_show" : "confirmed";
 }
 
+/* ---------- the log form ---------- */
+/* The booked or attended session that ended most recently (within two days) and has no entry yet. */
+function toLog() {
+  return S.bookings.map((b) => ({ b, s: S.sessions[b.sid] })).filter((r) => HELD.includes(r.b.status) && endOf(r.s) <= now() && endOf(r.s) > addDays(now(), -2) && !S.entries.some((e) => e.sid === r.s.id)).sort((a, c) => c.s.start - a.s.start)[0] || null;
+}
+/* A fresh form is filled from that session, or from the one asked for. With no session it is empty, and it stays empty: nothing is ever filled in behind the member's back. */
+function newForm(sid) {
+  const r = sid ? { s: S.sessions[sid] } : toLog();
+  return r ? { rpe: 0, pain: false, sid: r.s.id, title: offOf(r.s).name, dur: String(offOf(r.s).dur), pristine: true } : { rpe: 0, pain: false, title: "", dur: "", pristine: true };
+}
+
 /* ---------- training analytics (deterministic) ---------- */
 function weeklyLoad() {
   const out = [], T = today();
@@ -540,12 +552,12 @@ function nextStep() {
   const st = stats(), T = today(), over = S.invoices.find((i) => i.status === "open" && i.due < T);
   const held = S.waitlist.find((w) => w.offer);
   if (held) { const s = S.sessions[held.sid], can = check(s, { ignoreWait: true }).ok; return { kind: "offer", title: `A spot is held for you: ${offOf(s).name}`, meta: `${fDay(s.start)} ${fTime(s.start)} · ${ORGS[s.org].name} · held until ${fTime(held.offer.expiresAt)}`, cta: can ? "Take the spot" : "See your options", a: can ? "offer-accept" : "sheet", v: s.id, reason: "You were next on the waitlist and a spot opened. It is yours until the hold runs out, then it goes to the next person.", factors: [`Held until ${fDay(held.offer.expiresAt)} ${fTime(held.offer.expiresAt)}`, can ? "Nothing is charged until you take it" : "Your pass is used up, so taking it needs a drop-in or an upgrade"] }; }
+  const done = toLog();
+  if (done) return { kind: "log", title: "How did it go?", meta: `${offOf(done.s).name}, ${fDay(done.s.start)} ${fTime(done.s.start)}`, cta: "Log it", a: "logit", v: done.s.id, reason: "Your session is over and you have not logged how it felt. It takes one tap.", factors: ["Your coach learns from how hard it felt", "Only the effort is needed; everything else is already filled in"] };
   if (over) return { kind: "pay", title: "Pay your invoice", meta: `${chf(over.amount)} · ${over.what} · due ${fDay(over.due)}`, cta: "Open invoice", a: "go-invoices", reason: "An invoice is past its due date.", factors: [`Invoice ${over.id} was due ${fDay(over.due)}`, "No fees are added"] };
   if (S.planNews) { const d = currentDraft(); return { kind: "plan", title: "Your coach approved your plan", meta: `${d.title} · approved by Coach Sara`, cta: "Review plan", a: "review-plan", reason: "Your coach approved a new plan for your next stage.", factors: d.items.map((i) => `${i.day}: ${i.to}`) }; }
   if (st.pain) return { kind: "recover", title: "Recover today", meta: `You flagged pain (${esc(st.pain.painWhere)}, level ${st.pain.painLevel})`, cta: "Pain is gone, clear the flag", a: "clear-pain", reason: "You flagged pain, so intensity is paused until you or your coach clear it. If it persists or gets worse, see a doctor or physio.", factors: ["Pain flag logged " + fDay(st.pain.at), "No hard sessions are suggested while the flag is open"] };
   if (st.hard >= 2) return { kind: "recover", title: "Recover today", meta: `RPE was 9 or higher ${st.hard} times this week`, cta: "Log an easy day", a: "tab", v: "log", reason: "Two very hard sessions in a week need an easy day before the next one.", factors: [`${st.hard} sessions at RPE 9+ in the last 7 days`, `Your last 7 days are at ${Math.round(st.ratio * 100)}% of your 4-week average`] };
-  const y = addDays(T, -1), yb = S.bookings.find((b) => HELD.includes(b.status) && ymd(S.sessions[b.sid].start) === ymd(y));
-  if (yb && !S.entries.some((e) => ymd(e.at) === ymd(y))) return { kind: "log", title: "Log yesterday's session", meta: `${offOf(S.sessions[yb.sid]).name}, ${fDay(y)}`, cta: "Log it", a: "logit", v: yb.sid, reason: "You had a session yesterday and have not logged how it felt.", factors: ["Your coach learns from RPE and notes"] };
   for (const it of S.plan.items) {
     if (it.kind !== "club" || it.status !== "planned" || it.date < ymd(T)) continue;
     const s = S.sessions[`pau-${it.off}-${it.date}`]; if (!s || s.start <= now() || myBooking(s.id) || myWait(s.id)) continue;

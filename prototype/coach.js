@@ -22,12 +22,21 @@ function parseWhen(text) {
   return out;
 }
 const OFFER_WORDS = [["track", /\btrack\b|\bintervals?\b/], ["gym", /\bgym\b/], ["community", /\bcommunity\b/], ["strength", /\bstrength\b/], ["hiit", /\bhiit\b/], ["mobility", /\bmobility\b/], ["yoga", /\byoga\b/], ["ride", /\bride\b|\bspin(ning)?\b/]];
-/* Which session type is named? The current club is checked first, so "gym" at PAU means PAU's gym session. */
-function parseOffering(text) {
+/* Which club does the member name? "all" for "at all my clubs". Null when she names none: then the coach stays in the club she is in. */
+function parseClub(text) {
   const t = text.toLowerCase();
-  for (const org of [S.org, ...Object.keys(ORGS).filter((o) => o !== S.org)]) for (const [off, re] of OFFER_WORDS) if (re.test(t) && ORGS[org].offerings.some((o) => o.id === off)) return { org, off };
+  if (/all (my |the )?clubs|both clubs|everywhere/.test(t)) return "all";
+  for (const [id, o] of Object.entries(ORGS)) if (t.includes(o.name.toLowerCase()) || new RegExp(`\\b${id}\\b`).test(t)) return id;
   return null;
 }
+/* Which session type is named? With a scope, only that club is searched. Without one (used to route a message), the current club comes first. */
+function parseOffering(text, scope) {
+  const t = text.toLowerCase(), orgs = scope && scope !== "all" ? [scope] : [S.org, ...Object.keys(ORGS).filter((o) => o !== S.org)];
+  for (const org of orgs) for (const [off, re] of OFFER_WORDS) if (re.test(t) && ORGS[org].offerings.some((o) => o.id === off)) return { org, off };
+  return null;
+}
+/* A session type that only another club has, while no club was named: the coach says so and does not reach across. */
+function elsewhereOnly(text) { if (parseClub(text) || parseOffering(text, S.org)) return null; const f = parseOffering(text); return f && f.org !== S.org ? f : null; }
 const onDay = (d, when) => (when.date ? ymd(d) === ymd(when.date) : when.weekday != null ? d.getDay() === when.weekday : when.range ? d >= when.range[0] && d < when.range[1] : true);
 const offName = (org, off) => ORGS[org].offerings.find((o) => o.id === off).name;
 /* "the Thursday track session", "the Saturday community session" */
@@ -40,10 +49,10 @@ function sweepProposals() {
   for (const p of Object.values(S.props)) if (p.status === "pending" && now() >= p.expiresAt) { p.status = "expired"; p.note = `Expired after ${CARD_TTL_MIN} minutes. Nothing was changed.`; changed = true; }
   return changed;
 }
-/* Only the newest pending card for the same intent is live: an older one is switched off as "Replaced" when a new one is made. */
+/* Only the newest card is live. Every older card that is still pending is switched off as "Replaced" when a new one is made, whatever it was about. */
 function propose(text, p) {
   sweepProposals();
-  for (const old of Object.values(S.props)) if (old.status === "pending" && old.intent === p.intent) { old.status = "replaced"; old.note = "Replaced by a newer card. Nothing was changed."; }
+  for (const old of Object.values(S.props)) if (old.status === "pending") { old.status = "replaced"; old.note = "Replaced by a newer card. Nothing was changed."; }
   const id = S.seq++;
   S.props[id] = { id, key: `prop-${id}`, status: "pending", createdAt: now(), expiresAt: new Date(now().getTime() + CARD_TTL_MIN * 60000), results: [], note: "", lines: [], ...p };
   say(text, id);
@@ -67,6 +76,15 @@ function runAct(a, key) {
   }
   if (a.t === "series-pause") return pauseSeries(a.id, a.paused);
   if (a.t === "signup") return signUp(a.id, key);
+  if (a.t === "unsign") { if (S.idem[key]) return S.idem[key]; return remember(key, signedUp(a.id) ? dropSignup(a.id) : err("NOT_FOUND", "Your name is not on that list any more.")); }
+  if (a.t === "clearpain" || a.t === "painlevel") {
+    if (S.idem[key]) return S.idem[key];
+    const e = S.entries.find((x) => x.id === a.id);
+    if (!e || !e.pain || e.cleared) return remember(key, err("NOT_FOUND", "That pain flag is not open any more."));
+    if (a.t === "clearpain") { e.cleared = true; return remember(key, { ok: true, msg: "Pain flag cleared. Hard sessions can be suggested again." }); }
+    e.painLevel = a.level;
+    return remember(key, { ok: true, msg: `Pain flag updated: ${e.painWhere}, level ${a.level}.${a.level >= 7 ? " That is a high level: please see a doctor or physio." : ""}` });
+  }
   if (a.t === "tryplan") return tryPlan(a.id, key);
   if (a.t === "swap" || a.t === "ease") {
     if (S.idem[key]) return S.idem[key];
@@ -78,7 +96,7 @@ function runAct(a, key) {
   }
   return err("UNKNOWN", "Unknown action.");
 }
-const FAIL = { book: "Couldn't book", cancel: "Couldn't cancel", swap: "Couldn't change the plan", ease: "Couldn't change the plan", accept: "Couldn't take the spot", series: "Couldn't start the series", "series-pause": "Couldn't change the series", signup: "Couldn't put your name down", tryplan: "Couldn't add the plan" };
+const FAIL = { book: "Couldn't book", cancel: "Couldn't cancel", swap: "Couldn't change the plan", ease: "Couldn't change the plan", accept: "Couldn't take the spot", series: "Couldn't start the series", "series-pause": "Couldn't change the series", signup: "Couldn't put your name down", tryplan: "Couldn't add the plan", unsign: "Couldn't take your name off", clearpain: "Couldn't clear the flag", painlevel: "Couldn't update the flag" };
 /* The only way the coach changes anything. A card can be decided once; each action carries the card's idempotency key. */
 function confirmProposal(id, yes) {
   sweepProposals();
@@ -107,32 +125,51 @@ const cancelLine = (b, s) => { const forfeit = now() > deadline(s) && ORGS[s.org
 function memoryFor(org) { return S.memory.filter((m) => m.org === org || m.org == null); }
 const memoryLabel = (m) => (m.org ? ORGS[m.org].name : "General");
 
+/* Everything the member has coming up, from one place: club bookings (in scope) and her Explore list. */
+function agenda(scope) {
+  const rows = upcomingBookings().filter((r) => scope === "all" || r.s.org === scope).map((r) => ({ type: "club", start: r.s.start, b: r.b, s: r.s, label: cancelLine(r.b, r.s), act: { t: "cancel", bid: r.b.id }, intent: `cancel:${r.b.id}` }));
+  for (const x of S.signups) { const o = offerById(x.id); if (o && offerStart(o) > now()) rows.push({ type: "explore", start: offerStart(o), o, label: `${o.title}, ${fDay(offerStart(o))} ${fTime(offerStart(o))}, ${o.club} (Explore${x.wait ? ", waitlist" : ""})`, act: { t: "unsign", id: o.id }, intent: `unsign:${o.id}` }); }
+  return rows.sort((a, b) => a.start - b.start);
+}
+const scopeName = (scope) => (scope === "all" ? "all your clubs" : ORGS[scope].name);
 function replyCancel(text) {
-  const t = text.toLowerCase(), when = parseWhen(text), named = parseOffering(text), all = upcomingBookings();
-  if (!all.length) return say("You have no upcoming bookings to cancel.");
+  const t = text.toLowerCase(), when = parseWhen(text), club = parseClub(text), scope = club || S.org, named = parseOffering(text, scope), exN = namedOffer(text), ex = exN && signedUp(exN.id) && !named ? exN : null;
+  const far = elsewhereOnly(text);
+  if (far && !ex) {
+    const r = upcomingBookings().find((x) => x.s.org === far.org && x.s.off === far.off && onDay(x.s.start, when)), n = offName(far.org, far.off).toLowerCase();
+    return say(r ? `Your ${n} on ${fDay(r.s.start)} is at ${ORGS[far.org].name}. Here I only act at ${ORGS[S.org].name}. Say "cancel my ${n} at ${ORGS[far.org].name}" and I will.` : `${offName(far.org, far.off)} is at ${ORGS[far.org].name}, and you have nothing booked there${when.label ? " on " + when.label : ""}.`);
+  }
+  const all = agenda(scope), others = club ? [] : upcomingBookings().filter((r) => r.s.org !== S.org);
+  const also = others.length ? ` You also have ${others.length} at ${[...new Set(others.map((r) => ORGS[r.s.org].name))].join(" and ")}; say "at all my clubs" to include ${others.length === 1 ? "it" : "them"}.` : "";
+  const fits = (r) => onDay(r.start, when) && (ex ? r.type === "explore" && r.o.id === ex.id : !named || (r.type === "club" && r.s.org === named.org && r.s.off === named.off));
+  if (!all.length) return say(`You have no upcoming bookings at ${scopeName(scope)}.${also}`);
   const batch = /\b(everything|all|every|each)\b/.test(t) || !!when.range;
   if (batch) {
-    const rows = all.filter((r) => onDay(r.s.start, when) && (!named || (r.s.org === named.org && r.s.off === named.off)));
-    const scope = when.label ? ` ${when.date || when.weekday != null ? "on " : ""}${when.label}` : "";
-    if (!rows.length) return say(`You have no upcoming bookings${scope}.`);
-    return propose(`You have ${rows.length} upcoming ${rows.length === 1 ? "booking" : "bookings"}${scope}. Switch off any you want to keep.`, {
+    const rows = all.filter(fits);
+    const where = ` at ${scopeName(scope)}${when.label ? `${when.date || when.weekday != null ? " on" : ""} ${when.label}` : ""}`;
+    if (!rows.length) return say(`You have no upcoming bookings${where}.${also}`);
+    return propose(`You have ${rows.length} upcoming ${rows.length === 1 ? "booking" : "bookings"}${where}. Switch off any you want to keep.${also}`, {
       intent: "cancel-batch", batch: true, title: rows.length === 1 ? "Cancel this booking?" : `Cancel these ${rows.length} bookings?`,
-      acts: rows.map((r) => ({ t: "cancel", bid: r.b.id, on: true, label: cancelLine(r.b, r.s) })),
+      acts: rows.map((r) => ({ ...r.act, on: true, label: r.label })),
     });
   }
-  const r = all.find((x) => onDay(x.s.start, when) && (!named || (x.s.org === named.org && x.s.off === named.off)));
-  if (!r) return say(`You have no booking${named ? " for " + offName(named.org, named.off).toLowerCase() : ""}${when.label ? " on " + when.label : ""}. Your next one is ${offOf(all[0].s).name}, ${fDay(all[0].s.start)} ${fTime(all[0].s.start)}.`);
+  const r = all.find(fits);
+  if (!r) return say(`You have no booking${named ? " for " + offName(named.org, named.off).toLowerCase() : ""}${when.label ? " on " + when.label : ""} at ${scopeName(scope)}. Your next one is ${all[0].label}.${also}`);
+  if (r.type === "explore") return propose("Found it on your Explore list.", { intent: r.intent, title: "Take your name off?", lines: [r.label, r.o.price ? "This is a test booking: no money moves either way." : "Nothing was charged."], acts: [r.act] });
   const forfeit = now() > deadline(r.s) && ORGS[r.s.org].policy.lateCancel === "forfeit";
-  return propose(when.label || named ? "Found it." : "Here is your next booking.", {
-    intent: `cancel:${r.b.id}`, title: "Cancel this booking?",
+  return propose((when.label || named ? "Found it." : `Here is your next booking at ${scopeName(scope)}.`) + also, {
+    intent: r.intent, title: "Cancel this booking?",
     lines: [`${offOf(r.s).name}, ${fDay(r.s.start)} ${fTime(r.s.start)}, ${ORGS[r.s.org].name}`, forfeit ? "Inside the cancel deadline: the credit is not returned." : `Free cancel until ${fDay(deadline(r.s))} ${fTime(deadline(r.s))}.`],
-    acts: [{ t: "cancel", bid: r.b.id }],
+    acts: [r.act],
   });
 }
 
 function replyBook(text) {
-  const when = parseWhen(text), named = parseOffering(text), explicitDay = when.date || when.weekday != null;
-  let org = named ? named.org : S.org, off = named ? named.off : null, wd = when.date ? when.date.getDay() : when.weekday, why = "Found it.";
+  const far = elsewhereOnly(text);
+  if (far) return say(`${offName(far.org, far.off)} is at ${ORGS[far.org].name}, not at ${ORGS[S.org].name}. Say "book ${offName(far.org, far.off).toLowerCase()} at ${ORGS[far.org].name}", or switch club at the top.`);
+  const club = parseClub(text), scope = club && club !== "all" ? club : S.org;
+  const when = parseWhen(text), named = parseOffering(text, scope), explicitDay = when.date || when.weekday != null;
+  let org = scope, off = named ? named.off : null, wd = when.date ? when.date.getDay() : when.weekday, why = "Found it.";
   if (!off) {
     const pats = S.patterns.filter((p) => p.org === org).sort((a, b) => b.count - a.count);
     if (explicitDay) {
@@ -188,7 +225,8 @@ function replyOffer() {
 }
 /* "Book every Thursday 18:30 this season", and pausing or resuming a series. */
 function replySeries(text) {
-  const t = text.toLowerCase(), when = parseWhen(text), named = parseOffering(text), wd = when.date ? when.date.getDay() : when.weekday, org = named ? named.org : S.org;
+  const club = parseClub(text), org = club && club !== "all" ? club : S.org;
+  const t = text.toLowerCase(), when = parseWhen(text), named = parseOffering(text, org), wd = when.date ? when.date.getDay() : when.weekday;
   if (/pause|stop|resume|restart|continue|switch (it )?(on|off)/.test(t)) {
     const all = S.series.filter((x) => (wd == null || x.weekday === wd) && (!named || (x.org === named.org && x.off === named.off)));
     if (!all.length) return say(S.series.length ? "I could not find that series. You can see all of them under Week, Repeating." : "You have no repeating bookings.");
@@ -221,9 +259,19 @@ const AREA_WORDS = [["Foot or ankle", /foot|feet|ankle|achilles|heel/], ["Calf o
 function coachReply(q) {
   const t = q.toLowerCase(), st = stats();
   if (/\bpain|hurt|\bsore\b|injur|\bach(e|es|ing)\b/.test(t)) {
+    // A flag that is already open is the starting point: say what it says, and offer to update or clear it. Never open a second one.
+    const flag = openPain();
+    if (flag && !/cancel/.test(t)) {
+      const d = ymd(flag.at) === ymd(today()) ? "today" : ymd(flag.at) === ymd(addDays(today(), -1)) ? "yesterday" : fDay(flag.at), what = flag.painWhere === "Not sure" || flag.painWhere === "Other" ? "pain" : flag.painWhere.toLowerCase(), lv = (t.match(/\b(?:level|to|at|is|a)\s+(10|\d)\b/) || [])[1];
+      const head = `Your ${what} flag from ${d} is still on, level ${flag.painLevel}.`;
+      if (/\b(gone|clear|better now|fine now|healed)\b/.test(t)) return propose(`${head} Good to hear it is better.`, { intent: "clearpain", title: "Clear your pain flag?", lines: [`${flag.painWhere}, level ${flag.painLevel}, logged ${d}`, "Hard sessions can be suggested again once it is cleared."], acts: [{ t: "clearpain", id: flag.id }] });
+      if (lv != null && Number(lv) !== flag.painLevel) return propose(head, { intent: "painlevel", title: `Update your pain flag to level ${lv}?`, lines: [`${flag.painWhere}: level ${flag.painLevel} becomes level ${lv}`, "It stays one flag. Hard sessions stay paused while it is on."], acts: [{ t: "painlevel", id: flag.id, level: Number(lv) }] });
+      S.chat.push({ who: "coach", text: `${head} ${flag.painLevel >= 7 ? "That is a high level: please see a doctor or physio." : "I can't tell you what it is. If it persists or gets worse, please see a doctor or physio."}\nHard sessions stay paused while it is on. Is it better or worse? You can update it or clear it; I won't open a second flag.`, pain: flag.id });
+      return null;
+    }
     const alert = S.consent.pau["alerts.pain"], area = (AREA_WORDS.find(([, re]) => re.test(t)) || [])[0];
     if (alert) S.alerts.push({ id: S.seq++, kind: "Pain mentioned in coach chat", at: now(), status: "open" });
-    S.form.pain = true; if (area) S.form.painWhere = area;
+    S.form.pain = true; S.form.more = true; S.form.pristine = false; if (area) S.form.painWhere = area;
     const text = "Sorry to hear that. I can't tell you what it is, and I won't guess. If it persists or is severe, please see a doctor or physio.\n" + (alert ? "Coach Sara has been told, because you share pain alerts with PAU." : "Coach Sara has not been told, because you don't share pain alerts with PAU. You can change that under Me.") + `\nTo pause hard sessions, save it as a pain flag in Log. I have switched "Something hurt" on there${area ? ` with "${area}"` : ""}; nothing is saved until you log it.`;
     // Only the athlete decides about cancelling. If she asks for it in the same breath, that is what she gets.
     if (/cancel/.test(t)) { say(text); return replyCancel(q); }
@@ -259,8 +307,10 @@ function coachReply(q) {
   }
   if (/\bpass\b|credits?\b|balance|how many (sessions|classes)/.test(t)) { const p = passOf(S.org); return say(p ? `${p.name} at ${ORGS[S.org].name}: ${passState(p).text}.` : `You have no pass at ${ORGS[S.org].name}.`); }
   if (/what'?s on|schedule|which sessions|what sessions/.test(t)) {
-    const when = parseWhen(q), list = sessList(S.org).filter((s) => s.start > now() && onDay(s.start, when)).slice(0, 6).map((s) => `${fDay(s.start)} ${fTime(s.start)}  ${offOf(s).name}  ${myBooking(s.id) ? "(booked)" : spots(s) ? `${spots(s)} spots` : "full"}`);
-    return say(list.length ? `Next at ${ORGS[S.org].name}${when.label ? ", " + when.label : ""}:\n${list.join("\n")}` : `Nothing is scheduled at ${ORGS[S.org].name}${when.label ? " " + when.label : ""}.`);
+    const when = parseWhen(q), club = parseClub(q), org = club && club !== "all" ? club : S.org;
+    const list = sessList(org).filter((s) => s.start > now() && onDay(s.start, when)).slice(0, 6).map((s) => `${fDay(s.start)} ${fTime(s.start)}  ${offOf(s).name}  ${myBooking(s.id) ? "(booked)" : spots(s) ? `${spots(s)} spots` : "full"}`);
+    const mine = agenda(club || S.org).filter((r) => onDay(r.start, when)).slice(0, 6).map((r) => r.label);
+    return say((list.length ? `Next at ${ORGS[org].name}${when.label ? ", " + when.label : ""}:\n${list.join("\n")}` : `Nothing is scheduled at ${ORGS[org].name}${when.label ? " " + when.label : ""}.`) + `\n${mine.length ? `Yours${when.label ? " " + when.label : ""}:\n${mine.join("\n")}` : `Nothing of yours${when.label ? " " + when.label : ""} yet.`}`);
   }
   if (/waitlist|\bbook\b|usual|\bjoin\b|sign me up/.test(t) || parseOffering(q)) return replyBook(q);
   if (/how am i|doing|progress/.test(t)) {

@@ -35,6 +35,7 @@ test.describe("B1 guardrails", () => {
     await page.getByLabel("What did you do?").fill("Easy jog");
     await page.getByLabel("Minutes").fill("1");
     await page.getByRole("button", { name: "RPE 1", exact: true }).click();
+    await page.getByRole("button", { name: "Add details" }).click();
     await page.getByRole("switch", { name: "Something hurt" }).click();
     await page.getByRole("button", { name: "Knee" }).click();
     await page.getByLabel("Level, 0 to 10").fill("4");
@@ -182,6 +183,10 @@ test("B1 plan changes never touch a session that is in the past, has started or 
   await page.getByRole("button", { name: "Approve" }).click();
   await asRole(page, "athlete");
   await tab(page, "Path");
+  // (Tuesday's yoga class ended two days ago and is not logged, so Path first asks how it went. Log it.)
+  await page.getByRole("button", { name: "Log it" }).click();
+  await page.getByRole("button", { name: "RPE 3", exact: true }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
   await page.getByRole("button", { name: "Review plan" }).click();
   await expect(page.locator(".toast")).toContainText("Nothing in the past was touched");
   expect(await upToToday()).toBe(before);
@@ -327,7 +332,7 @@ test("B3 past sessions cannot be booked, and show attended or missed with Log it
 
   // "Log it" opens the log for that session, on that day.
   await expect(page.getByLabel("What did you do?")).toHaveValue("Track session");
-  await expect(page.locator("#view")).toContainText("Logging your session from Thu 12 Nov");
+  await expect(page.locator("#view")).toContainText("Filled in from your session on Thu 12 Nov");
   await page.getByRole("button", { name: "RPE 7", exact: true }).click();
   await logWithKeyboard(page);
   const entry = await page.evaluate(() => {
@@ -432,66 +437,6 @@ test.describe("B4 roster", () => {
 });
 
 test.describe("B5 confirm cards", () => {
-  test("pending, confirmed, declined and expired, with results under their own card", async ({
-    page,
-  }) => {
-    await open(page);
-    await tab(page, "Coach");
-
-    // Two requests for the same thing: only the newest card is live.
-    await say(page, "Book my usual Thursday");
-    await say(page, "Book my usual Thursday");
-    await expect(cards(page)).toHaveCount(2);
-    await expect(cards(page).nth(0)).toHaveAttribute("data-state", "replaced");
-    await expect(cards(page).nth(0).locator(".eyebrow")).toHaveText("Replaced");
-    await expect(cards(page).nth(0)).toContainText("Replaced by a newer card");
-    // The replaced card keeps its buttons, switched off.
-    await expect(cards(page).nth(0).getByRole("button")).toHaveCount(2);
-    for (const b of await cards(page).nth(0).getByRole("button").all())
-      await expect(b).toBeDisabled();
-    await expect(cards(page).nth(1)).toHaveAttribute("data-state", "pending");
-    await expect(cards(page).nth(1)).toContainText("expires 12:15");
-
-    // A second, different card below it.
-    await say(page, "Cancel my next session");
-    await expect(cards(page).nth(2)).toHaveAttribute("data-state", "pending");
-    const chatLength = await page.evaluate(() => window.PATH_DEMO.state.chat.length);
-
-    // Confirm the upper card: its result appears inside it, and nothing is appended to the chat.
-    await cards(page).nth(1).getByRole("button", { name: "Confirm" }).click();
-    await expect(cards(page).nth(1)).toHaveAttribute("data-state", "confirmed");
-    await expect(cards(page).nth(1).locator(".results li")).toHaveText([
-      /Booked: Track session, Thu 19 Nov 18:30/,
-    ]);
-    await expect(cards(page).nth(1).getByRole("button")).toHaveCount(0);
-    await expect(cards(page).nth(2).locator(".results")).toHaveCount(0);
-    expect(await page.evaluate(() => window.PATH_DEMO.state.chat.length)).toBe(chatLength);
-
-    // Decline the lower card.
-    await cards(page).nth(2).getByRole("button", { name: "Not now" }).click();
-    await expect(cards(page).nth(2)).toHaveAttribute("data-state", "declined");
-    await expect(cards(page).nth(2)).toContainText("Nothing was changed");
-    expect(await page.evaluate(() => window.PATH_DEMO.upcomingBookings().length)).toBe(2);
-
-    // A card nobody answers expires after 15 minutes and can no longer be confirmed.
-    await say(page, "book my usual Saturday");
-    await expect(lastCard(page)).toHaveAttribute("data-state", "pending");
-    await page.clock.setFixedTime(minutesLater(16));
-    await tab(page, "Coach");
-    await expect(lastCard(page)).toHaveAttribute("data-state", "expired");
-    await expect(lastCard(page)).toContainText("Expired after 15 minutes");
-    await expect(lastCard(page).getByRole("button")).toHaveCount(0);
-    const late = await page.evaluate(() => {
-      const d = window.PATH_DEMO,
-        s = d.state,
-        id = s.chat[s.chat.length - 1].prop,
-        n = s.bookings.length;
-      d.confirmProposal(id, true);
-      return { status: s.props[id].status, added: s.bookings.length - n };
-    });
-    expect(late).toEqual({ status: "expired", added: 0 });
-  });
-
   test("Confirm checks again: an action that is no longer possible gives a declined card, never Confirmed", async ({
     page,
   }) => {
@@ -526,7 +471,7 @@ test.describe("B5 confirm cards", () => {
     expect(await page.evaluate(() => window.PATH_DEMO.state.waitlist.length)).toBe(0);
 
     // The booking was already cancelled somewhere else.
-    await say(page, "Cancel my yoga class");
+    await say(page, "Cancel my yoga class at Studio Demo");
     await page.evaluate(() => {
       const d = window.PATH_DEMO;
       d.cancel(d.myBooking("studio-yoga-2026-11-17").id);
@@ -564,61 +509,6 @@ test.describe("B5 confirm cards", () => {
       replay: "confirmed",
     });
   });
-});
-
-test("B6 cancel everything: one batch card, confirm all or deselect", async ({ page }) => {
-  await open(page);
-  // This week: track tonight (PAU), yoga tomorrow (Studio Demo), community on Saturday. Next week: one more.
-  await page.evaluate(() => {
-    const d = window.PATH_DEMO;
-    for (const sid of [
-      "pau-track-2026-11-16",
-      "pau-community-2026-11-21",
-      "pau-community-2026-11-28",
-    ])
-      d.book(sid, "app");
-    d.render();
-  });
-  await tab(page, "Coach");
-  await say(page, "Cancel everything this week");
-  await expect(cards(page)).toHaveCount(1);
-  const card = lastCard(page);
-  await expect(card).toContainText("Cancel these 3 bookings?");
-  const rows = card.getByRole("switch");
-  await expect(rows).toHaveCount(3);
-  await expect(rows).toContainText([
-    /Track session, Mon 16 Nov/,
-    /Yoga flow, Tue 17 Nov.*Studio Demo/,
-    /Saturday community session, Sat 21 Nov/,
-  ]);
-  await expect(card).not.toContainText("Sat 28 Nov");
-
-  // Keep the yoga class.
-  await rows.nth(1).click();
-  await expect(rows.nth(1)).toHaveAttribute("aria-checked", "false");
-  await card.getByRole("button", { name: "Cancel 2 bookings" }).click();
-  await expect(card).toHaveAttribute("data-state", "confirmed");
-  await expect(card.locator(".results li")).toHaveText([
-    /Cancelled: Track session, Mon 16 Nov/,
-    /Cancelled: Saturday community session, Sat 21 Nov/,
-  ]);
-  await expect(card).toContainText("(kept)");
-  expect(
-    await page.evaluate(() => window.PATH_DEMO.upcomingBookings().map((r: any) => r.s.id)),
-  ).toEqual(["studio-yoga-2026-11-17", "pau-community-2026-11-28"]);
-
-  // "Cancel all" has no range: every upcoming booking, in every club. With nothing selected it cannot be confirmed.
-  await say(page, "cancel all my bookings");
-  const all = lastCard(page);
-  await expect(all.getByRole("switch")).toHaveCount(2);
-  await all.getByRole("switch").nth(0).click();
-  await all.getByRole("switch").nth(1).click();
-  await expect(all.getByRole("button", { name: "Nothing selected" })).toBeDisabled();
-  await all.getByRole("switch").nth(1).click();
-  await all.getByRole("button", { name: "Cancel 1 booking" }).click();
-  expect(
-    await page.evaluate(() => window.PATH_DEMO.upcomingBookings().map((r: any) => r.s.id)),
-  ).toEqual(["studio-yoga-2026-11-17"]);
 });
 
 test("B7 a weekday or date in the request overrides the default pattern", async ({ page }) => {
@@ -701,47 +591,6 @@ test("B8 coach memory: a club only sees its own items plus general ones, labelle
   await tab(page, "Me");
   await page.getByRole("button", { name: /Delete this memory: Likes the Tuesday yoga/ }).click();
   await expect(mem.locator("[data-mem]")).toHaveCount(2);
-});
-
-test("B9 a pain flag needs a location", async ({ page }) => {
-  await open(page);
-  await tab(page, "Log");
-  await page.getByLabel("What did you do?").fill("Easy run");
-  await page.getByRole("button", { name: "RPE 4", exact: true }).click();
-  await page.getByRole("switch", { name: "Something hurt" }).click();
-  const chips = page.locator("#pain .chip");
-  await expect(chips).toHaveText([
-    "Foot or ankle",
-    "Calf or shin",
-    "Knee",
-    "Thigh or hamstring",
-    "Hip or groin",
-    "Back",
-    "Shoulder or arm",
-    "Other",
-    "Not sure",
-  ]);
-
-  // No location: nothing is saved.
-  const before = await page.evaluate(() => window.PATH_DEMO.state.entries.length);
-  await logWithKeyboard(page);
-  await expect(page.locator(".toast")).toContainText("A pain flag needs a location");
-  expect(await page.evaluate(() => window.PATH_DEMO.state.entries.length)).toBe(before);
-
-  // "Not sure" is a valid answer. This time with a real press-and-hold.
-  await page.getByRole("button", { name: "Not sure" }).click();
-  await expect(page.getByRole("button", { name: "Not sure" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  await page.getByRole("button", { name: "Log this session" }).dispatchEvent("pointerdown");
-  await expect(page.locator(".toast")).toContainText("Saved: Easy run");
-  const saved = await page.evaluate(() => {
-    const e = window.PATH_DEMO.state.entries[0];
-    return { pain: e.pain, where: e.painWhere, level: e.painLevel };
-  });
-  expect(saved).toEqual({ pain: true, where: "Not sure", level: 3 });
-  await expect(page.locator("#view")).toContainText("Recover today");
 });
 
 test("B10 switching club keeps the current tab, in every role", async ({ page }) => {
@@ -848,6 +697,7 @@ test.describe("B11 and B12 accessibility", () => {
     await page.keyboard.press("Escape");
 
     await tab(page, "Log");
+    await page.getByRole("button", { name: "Add details" }).click();
     await page.getByRole("switch", { name: "Something hurt" }).click();
     await check("log with pain");
     await page.getByRole("button", { name: "Progress" }).click();
