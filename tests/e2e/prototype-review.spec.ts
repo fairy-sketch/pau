@@ -554,3 +554,31 @@ test.describe("Design pass (D-1 to D-12)", () => {
     }
   });
 });
+
+test("soft shadows are never cut off: rows that scroll sideways leave room for them (S-5)", async ({
+  page,
+}) => {
+  await open(page);
+  for (const name of ["Week", "Explore", "Coach"]) {
+    await tab(page, name);
+    const tight = await page.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>("#view *")]
+        .filter(
+          (el) =>
+            getComputedStyle(el).overflowX === "auto" &&
+            el.querySelector(".chip, .quick button, button"),
+        )
+        .filter((el) => el.matches(".filters, .quick"))
+        .map(
+          (el) =>
+            [
+              el.className,
+              parseFloat(getComputedStyle(el).paddingTop),
+              parseFloat(getComputedStyle(el).paddingBottom),
+            ] as const,
+        )
+        .filter(([, t, b]) => t < 20 || b < 20),
+    );
+    expect(tight, name).toEqual([]);
+  }
+});

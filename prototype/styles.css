@@ -269,3 +269,8 @@ svg text { font-family: var(--body); font-size: 11px; fill: var(--text-2); }
 .dot { border-color: #c9c8c2; }
 .tile .in { background: #fff; }
 .pcard.off { box-shadow: none; }
+/* Rows that scroll sideways clip whatever sticks out of them, top and bottom too. So they carry their own room for
+   the soft shadows of the chips inside (S-5), and give it back with a negative margin so the layout does not move. */
+.filters, .quick { padding-top: 20px; padding-bottom: 20px; }
+.filters { margin-top: -20px; margin-bottom: -20px; }
+.quick { margin-top: -12px; margin-bottom: -12px; }
