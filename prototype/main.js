@@ -4,8 +4,11 @@
 const TABS = { athlete: [["path", "Path", "flag"], ["week", "Week", "cal"], ["explore", "Explore", "compass"], ["coach", "Coach", "chat"], ["me", "Me", "user"]], coach: [["today", "Today", "clock"], ["athletes", "Athletes", "users"], ["review", "Review", "check"], ["alerts", "Alerts", "bell"]], admin: [["dash", "Home", "home"], ["sched", "Schedule", "cal"], ["members", "Members", "users"], ["products", "Products", "tag"], ["money", "Money", "card"]] };
 /* The wordmark in the header (decision D-2): PATH in Satoshi Bold, 20 px, on the content edge. */
 const mono = (o) => esc(ORGS[o].name.trim()[0].toUpperCase());
+/* Your colour (S-9): one accent, chosen by each person. All six sit at the same lightness as sage, so black text reads on every one. */
+const ACCENTS = { sage: ["Sage", "#8e9a80"], rose: ["Rose", "#c99aa0"], sky: ["Sky", "#8a9fb5"], lavender: ["Lavender", "#a397bd"], sand: ["Sand", "#bfa27c"], clay: ["Clay", "#c4917a"] };
 let lastKey = "", swipeClickGuard = -1e9;
 function render() {
+  document.documentElement.style.setProperty("--accent", (ACCENTS[S.accent] || ACCENTS.sage)[1]);
   ensureSessions(); sweep(); sweepProposals(); sweepOffers(); runSeries();
   const app = document.getElementById("app"), tab = S.tab[S.role], key = S.role + tab + S.org + (S.rosterSid || "") + ((S.dash && S.dash.athlete) || "") + (tab === "explore" ? S.explore.open || "" : ""), old = document.getElementById("view"), top = old && key === lastKey ? old.scrollTop : 0;
   const body = S.role === "athlete" ? { path: vPath, coach: vCoachChat, log: vLog, week: vWeek, me: vMe, explore: vExplore }[tab]() : S.role === "coach" ? vCoach() : vAdmin();
@@ -26,7 +29,7 @@ function render() {
 const ACT = {
   /* The logo always leads to the start page of the role you are in. */
   home: () => { S.tab[S.role] = { athlete: "path", coach: "today", admin: "dash" }[S.role]; S.rosterSid = null; S.explore.open = null; UI.sheet = null; lastKey = ""; },
-  clubs: () => { UI.sheet = { type: "clubs" }; },
+  clubs: () => { UI.sheet = { type: "clubs" }; }, accent: (v) => { if (ACCENTS[v]) S.accent = v; },
   org: (v) => { S.org = v; S.rosterSid = null; S.filter.cat = "all"; UI.toast = ""; UI.sheet = null; }, // kinds of training differ per club; "My pass only" stays
   role: (v) => { S.role = v; S.rosterSid = null; UI.toast = ""; UI.sheet = null; },
   tab: (v) => { S.tab[S.role] = v; S.rosterSid = null; if (v === "explore") S.explore.open = null; if (v === "log" && S.role === "athlete" && S.form.pristine && !S.form.editId) S.form = newForm(); }, day: (v) => { S.day = v; }, logtab: (v) => { S.logTab = v; },
@@ -176,7 +179,7 @@ Object.assign(ACT, DASH_ACT);
 for (const k of ["home", "tab"]) { const f = ACT[k]; ACT[k] = (v) => { const r = f(v); if (S.dash) S.dash.athlete = null; return r; }; }
 /* For the tests and for poking around in the console. */
 window.PATH_DEMO = {
-  get state() { return S; }, athletes, statusOf, roster, ui: UI, ORGS, LOAD_LIMIT, CARD_TTL_MIN, STORE_KEY,
+  get state() { return S; }, ACCENTS, athletes, statusOf, roster, ui: UI, ORGS, LOAD_LIMIT, CARD_TTL_MIN, STORE_KEY,
   render, seed, save, load, resetDemo, book, cancel, check, freeSpot, leaveWait, passState, passOf, stats, guard, guardDraft, currentDraft, RAW_DRAFT,
   newForm, toLog, ask, confirmProposal, toggleAct, runAct, planLocked, nextChangeable, applyDraft, shiftWeek, weekIndex,
   parseClub, agenda, openPain, OFFERS, openOffers, exploreList, tryPlan, dropPlan, tryToday, providerOf, signUp, dropSignup, signedUp, offerStart, offerKm, offersFor, purchase, acceptOffer, declineOffer, sweepOffers, waitTotal, createSeries, previewSeries, pauseSeries, endSeries, runSeries, seriesRows, seriesSummary, findSeries, sweepProposals, parseWhen, parseOffering, rosterRows, rosterNames, addWalkin, markAttendance, memoryFor, upcomingBookings, sessList, myBooking, myWait, spots, nextStep,

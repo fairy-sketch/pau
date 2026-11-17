@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- the demo is plain browser JS; its test hook (window.PATH_DEMO) has no types. */
 import { expect, test, type Page } from "@playwright/test";
 
-import { at, atClub, cards, lastCard, open, say, tab, toast } from "../helpers/demo";
+import { asRole, at, atClub, cards, lastCard, open, say, tab, toast } from "../helpers/demo";
 
 /** Ramon's review of Log and Explore (17 Nov 2026): points 1, 3, 4 and 5 have their own tests here, 2, 6 and 7 are covered alongside. */
 const demo = <T>(page: Page, fn: (d: any) => T) =>
@@ -581,4 +581,42 @@ test("soft shadows are never cut off: rows that scroll sideways leave room for t
     );
     expect(tight, name).toEqual([]);
   }
+});
+
+test("your colour: six accents in the club sheet, applied everywhere, kept after a reload, readable on each (S-9)", async ({
+  page,
+}) => {
+  await open(page);
+  const acc = () =>
+    page
+      .locator("#view .btn.acc")
+      .first()
+      .evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(await acc()).toBe("rgb(142, 154, 128)");
+  await page.locator(".clubbtn").click();
+  const sheet = page.getByRole("dialog", { name: "Your clubs" });
+  await expect(sheet.getByRole("group", { name: "Your colour" }).getByRole("button")).toHaveCount(
+    6,
+  );
+  await sheet.getByRole("button", { name: "Rose" }).click();
+  await expect(sheet.getByRole("button", { name: "Rose" })).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Escape");
+  await page.reload();
+  expect(await acc()).toBe("rgb(201, 154, 160)");
+  // Black text must read on every colour: at least 4.5:1.
+  const ratios = await page.evaluate(() => {
+    const lum = (hex: string) => {
+      const c = [1, 3, 5]
+        .map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+        .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+      return 0.2126 * c[0]! + 0.7152 * c[1]! + 0.0722 * c[2]!;
+    };
+    return Object.values(window.PATH_DEMO.ACCENTS as Record<string, [string, string]>).map(
+      ([, hex]) => (lum(hex) + 0.05) / (lum("#111111") + 0.05),
+    );
+  });
+  expect(ratios.every((r) => r >= 4.5)).toBe(true);
+  // The coach and the admin see the same colour: it belongs to the person, not the club.
+  await asRole(page, "coach");
+  expect(await acc()).toBe("rgb(201, 154, 160)");
 });

@@ -284,10 +284,15 @@ svg text { font-family: var(--body); font-size: 11px; fill: var(--text-2); }
 /* The sage button floats (S-6): a wide soft shadow underneath, light from the top left, and a faint rim of light and shade
    on the button itself so it reads as a cushion, not a flat fill. Pressing it pushes it into the ground. No gradient. */
 .btn.acc:not(.demoted), .chatform button {
-  box-shadow: 10px 12px 24px rgba(72,82,60,.30), -8px -8px 18px rgba(255,255,255,.95), inset 1px 1.5px 1px rgba(255,255,255,.38), inset -2px -3px 6px rgba(40,48,30,.16);
+  box-shadow: 10px 12px 24px color-mix(in srgb, color-mix(in srgb, var(--accent) 55%, #000) 34%, transparent), -8px -8px 18px rgba(255,255,255,.95), inset 1px 1.5px 1px rgba(255,255,255,.38), inset -2px -3px 6px rgba(40,48,30,.16);
   transition: box-shadow .15s ease, transform .15s ease;
 }
 .btn.acc:not(.demoted):hover, .chatform button:hover { opacity: 1; transform: translateY(-1px); }
-.btn.acc:not(.demoted):active, .chatform button:active { transform: translateY(1px); box-shadow: 2px 3px 6px rgba(72,82,60,.22), -2px -2px 6px rgba(255,255,255,.9), inset 2px 3px 6px rgba(40,48,30,.22), inset -1px -1px 1px rgba(255,255,255,.25); }
+.btn.acc:not(.demoted):active, .chatform button:active { transform: translateY(1px); box-shadow: 2px 3px 6px color-mix(in srgb, color-mix(in srgb, var(--accent) 55%, #000) 26%, transparent), -2px -2px 6px rgba(255,255,255,.9), inset 2px 3px 6px rgba(40,48,30,.22), inset -1px -1px 1px rgba(255,255,255,.25); }
 .btn.acc:disabled { transform: none; }
 .chatform { padding-bottom: 28px; }
+/* Your colour: six swatches, raised like every other control; the chosen one carries a tick and sits in a pressed ring. */
+.swatches { display: flex; justify-content: space-between; margin: 0 -6px; }
+.swatch { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; }
+.swatch i { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: var(--text); box-shadow: 4px 5px 10px rgba(0,0,0,.14), -4px -4px 10px rgba(255,255,255,.95), inset 1px 1.5px 1px rgba(255,255,255,.38), inset -2px -3px 5px rgba(0,0,0,.10); }
+.swatch[aria-pressed="true"] { box-shadow: var(--press); }
