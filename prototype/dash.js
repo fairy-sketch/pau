@@ -212,12 +212,14 @@ function vPlanNew() {
   const back = `<button class="btn sm link ghost" data-a="plan-open" data-v="" aria-label="Back to plans">${I(P.back, 16)}Plans</button>`;
   if (dr) return `<section class="pad stack-l" id="plan-draft">${back}<div><div class="eyebrow">${dr.editId ? "Editing" : dr.source === "path" ? "Drafted by PATH" : "Structured from your words"}</div><h1 class="h1">${dr.sessions.length} sessions over ${Math.max(1, ...dr.sessions.map((s) => s.week))} ${Math.max(1, ...dr.sessions.map((s) => s.week)) === 1 ? "week" : "weeks"}</h1><p class="sub" style="margin-top:4px">${dr.editId ? "Change anything. Athletes see the new version once you save." : dr.source === "path" ? "A starting point, not a prescription. Change any line, add or remove sessions; you know your group." : "PATH put your words into weeks and sessions. Change any line before you save."}</p></div>
     <label class="f">Name<input id="ptitle" value="${esc(dr.title)}" autocomplete="off"></label>
-    ${dr.source === "path" && !dr.edited ? `<div class="filters" role="group" aria-label="Change the draft"><button class="chip" data-a="plan-refine" data-v="easier">Make it easier</button><button class="chip" data-a="plan-refine" data-v="harder">Make it harder</button><button class="chip" data-a="plan-refine" data-v="fun" aria-pressed="${dr.params.fun}">A playful session each week</button><button class="chip" data-a="plan-refine" data-v="longer">One more week</button></div>` : ""}
+    ${d.pnote ? `<p class="note" id="pnote">${esc(d.pnote)}</p>` : ""}
+    ${dr.ai ? `<form class="stack" data-f="predo" style="gap:8px"><label class="f">Tell PATH what to change<textarea id="pchange" class="inp" rows="2" style="min-height:72px" placeholder="More hills in week 3, and make Saturdays shorter"></textarea></label><button class="btn sm link" type="submit" ${d.pbusy ? "disabled" : ""}>${d.pbusy ? "Redrafting…" : "Redraft"}</button></form>` : ""}
+    ${dr.source === "path" && !dr.ai && !dr.edited ? `<div class="filters" role="group" aria-label="Change the draft"><button class="chip" data-a="plan-refine" data-v="easier">Make it easier</button><button class="chip" data-a="plan-refine" data-v="harder">Make it harder</button><button class="chip" data-a="plan-refine" data-v="fun" aria-pressed="${dr.params.fun}">A playful session each week</button><button class="chip" data-a="plan-refine" data-v="longer">One more week</button></div>` : ""}
     <div class="stack" id="draft-sessions">${editRows(dr)}</div>
     <div class="stack" style="gap:8px"><button class="btn acc full" data-a="plan-save">Save plan</button><button class="btn full ghost" data-a="plan-reset">Start over</button></div></section>`;
   return `<section class="pad stack-l" id="plan-new">${back}<div><div class="eyebrow">Add a plan</div><h1 class="h1">${mode === "path" ? "Tell PATH what you want to coach" : "Bring a plan you already have"}</h1></div>
     <div class="seg full" role="group" aria-label="How to add a plan"><button data-a="plan-mode" data-v="path" aria-pressed="${mode === "path"}">Build with PATH</button><button data-a="plan-mode" data-v="own" aria-pressed="${mode === "own"}">Upload or paste</button></div>
-    ${mode === "path" ? `<form class="stack" data-f="pgen"><label class="f">In your own words<textarea id="pprompt" class="inp big" rows="9" placeholder="Write it however you think of it.&#10;&#10;For example: six weeks for my Tuesday group towards a 5K, three sessions a week, one playful session, easy last week.&#10;&#10;Or type the sessions themselves, one per line. PATH puts it into weeks and sessions.">${esc(d.pwords || "")}</textarea></label><div class="filters" role="group" aria-label="Ideas"><button class="chip" type="button" data-a="plan-gen" data-v="4 weeks 10K build">4 weeks 10K build</button><button class="chip" type="button" data-a="plan-gen" data-v="6 weeks 5K with fun sessions">6 weeks 5K, playful</button><button class="chip" type="button" data-a="plan-gen" data-v="Race week taper">Race week taper</button><button class="chip" type="button" data-a="plan-gen" data-v="6 weeks strength for runners">Strength for runners</button></div><button class="btn acc full" type="submit">Draft it</button><p class="sub">PATH puts it into a plan you can still change, line by line. Nothing reaches an athlete from here.</p></form>`
+    ${mode === "path" ? `<form class="stack" data-f="pgen"><label class="f">In your own words<textarea id="pprompt" class="inp big" rows="9" placeholder="Write it however you think of it.&#10;&#10;For example: six weeks for my Tuesday group towards a 5K, three sessions a week, one playful session, easy last week.&#10;&#10;Or type the sessions themselves, one per line. PATH puts it into weeks and sessions.">${esc(d.pwords || "")}</textarea></label><div class="filters" role="group" aria-label="Ideas"><button class="chip" type="button" data-a="plan-gen" data-v="4 weeks 10K build">4 weeks 10K build</button><button class="chip" type="button" data-a="plan-gen" data-v="6 weeks 5K with fun sessions">6 weeks 5K, playful</button><button class="chip" type="button" data-a="plan-gen" data-v="Race week taper">Race week taper</button><button class="chip" type="button" data-a="plan-gen" data-v="6 weeks strength for runners">Strength for runners</button></div><button class="btn acc full" type="submit" ${d.pbusy ? "disabled" : ""}>${d.pbusy ? "Drafting…" : "Draft it"}</button><p class="sub">PATH puts it into a plan you can still change, line by line. Nothing reaches an athlete from here.</p></form>`
     : `<form class="stack" data-f="ppaste"><label class="btn full filebtn" for="pfile">Choose a file</label><input class="sr" type="file" id="pfile" accept=".txt,.csv,.md,text/plain" aria-label="Choose a plan file"><label class="f">Or paste it here<textarea id="ptext" class="inp" rows="7" placeholder="Week 1&#10;Mon: 5 × 1 km at 10K pace&#10;Thu: tempo 25 min&#10;Sat: long run 70 min">${esc(d.ptext || "")}</textarea></label>${d.pnote ? `<p class="note" id="pnote">${esc(d.pnote)}</p>` : ""}<button class="btn acc full" type="submit">Read my plan</button><p class="sub">One session per line. "Week 2" starts a new week. In this demo PATH reads text files; PDFs, photos and spreadsheets come with the real app.</p></form>`}</section>`;
 }
 function vPlanDetail(p) {
@@ -273,6 +275,29 @@ function myPlanNote(s) {
   const hit = p.sessions.find((x) => x.week === 1 && x.day === WD[s.start.getDay()]);
   return hit ? `<p class="note" id="plan-note" style="margin-top:-4px"><span class="strong" style="color:var(--text)">Your plan:</span> ${esc(hit.text)}</p>` : "";
 }
+/* The real language model (K-23): on the hosted demo, "Draft it" asks PATH's server function, which holds the key.
+   Anywhere else (opened as a file, in tests, in the Claude artifact) there is no server, and the written rules below draft instead. */
+const llmUrl = () => (window.PATH_LLM_URL !== undefined ? window.PATH_LLM_URL : /(^|\.)netlify\.app$|^localhost$|^127\.0\.0\.1$/.test(location.hostname) ? "/api/coach" : null);
+async function askModel(payload) {
+  const res = await fetch(llmUrl(), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(28000) });
+  if (!res.ok) throw new Error("model " + res.status);
+  const plan = await res.json(); if (!plan || !Array.isArray(plan.sessions) || !plan.sessions.length) throw new Error("format");
+  return plan;
+}
+/* Draft with the model if there is one; fall back to the rules, and say so, if it cannot be reached. */
+async function draftWithPath(words, change) {
+  const d = dash(), cur = d.pdraft; d.pwords = words;
+  if (!llmUrl()) { draftFromWords(words); return; }
+  d.pbusy = true; d.pnote = ""; render();
+  try {
+    const plan = await askModel(change ? { words, change, current: { title: cur.title, sessions: cur.sessions } } : { words });
+    d.pdraft = { source: "path", ai: true, edited: false, title: plan.title, sessions: plan.sessions, editId: cur && cur.editId };
+  } catch (e) {
+    if (change) d.pnote = "PATH could not redraft just now. Your draft is unchanged; try again in a moment.";
+    else { draftFromWords(words); d.pnote = "PATH's writer could not be reached, so this draft follows simple rules. Try again in a moment for a fuller one."; }
+  }
+  d.pbusy = false; lastKey = ""; render();
+}
 /* Free words in, structure out. If the coach wrote the sessions themselves (several lines, weekdays or "Week 2"), PATH keeps
    their words and only sorts them into weeks; if they described what they want, PATH drafts it. Either way it stays editable. */
 function draftFromWords(text) {
@@ -285,7 +310,7 @@ const newDraft = (prompt) => { const params = planParams(prompt), names = { "10k
 Object.assign(DASH_ACT, {
   "plan-open": (v) => { Object.assign(dash(), { planView: v || null, pdraft: null, pgroups: [], pnote: "" }); S.tab.coach = "plans"; lastKey = ""; },
   "plan-new": () => { Object.assign(dash(), { planView: "new", pdraft: null, pnote: "", ptext: "" }); lastKey = ""; },
-  "plan-mode": (v) => { dash().pmode = v; }, "plan-gen": (v) => { newDraft(v); lastKey = ""; },
+  "plan-mode": (v) => { dash().pmode = v; }, "plan-gen": (v) => { if (llmUrl()) { draftWithPath(v); return; } newDraft(v); lastKey = ""; },
   "plan-refine": (v) => { const dr = dash().pdraft, p = dr.params; if (v === "easier") p.level -= 1; if (v === "harder") p.level += 1; if (v === "fun") p.fun = !p.fun; if (v === "longer" && p.kind !== "taper") p.weeks = Math.min(12, p.weeks + 1); dr.title = (document.getElementById("ptitle") || {}).value || dr.title; dr.sessions = genPlan(p); },
   "plan-reset": () => { dash().pdraft = null; lastKey = ""; },
   "plan-save": () => {
@@ -305,8 +330,9 @@ Object.assign(DASH_ACT, {
   "plan-del": () => { const d = dash(); d.plans = plans().filter((p) => p.id !== d.planView); d.planView = null; UI.toast = "Plan deleted."; },
 });
 document.addEventListener("submit", (e) => {
-  const f = e.target.dataset.f; if (f !== "pgen" && f !== "ppaste") return; e.preventDefault(); const d = dash();
-  if (f === "pgen") { const v = document.getElementById("pprompt").value.trim(); if (!v) { document.getElementById("pprompt").focus(); return; } draftFromWords(v); }
+  const f = e.target.dataset.f; if (f !== "pgen" && f !== "ppaste" && f !== "predo") return; e.preventDefault(); const d = dash();
+  if (f === "predo") { const v = document.getElementById("pchange").value.trim(); if (!v || d.pbusy) return; draftWithPath(d.pwords || d.pdraft.title, v); return; }
+  if (f === "pgen") { const v = document.getElementById("pprompt").value.trim(); if (!v) { document.getElementById("pprompt").focus(); return; } if (d.pbusy) return; if (llmUrl()) { draftWithPath(v); return; } draftFromWords(v); }
   else { d.ptext = document.getElementById("ptext").value; const s = parsePlan(d.ptext); if (!s.length) { d.pnote = "PATH found no sessions. Put one session on each line."; } else { d.pnote = ""; d.pdraft = { source: "own", title: d.pfileName ? d.pfileName.replace(/\.[^.]+$/, "") : "My plan", sessions: s }; } }
   lastKey = ""; render();
 });

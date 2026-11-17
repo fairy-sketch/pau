@@ -497,3 +497,72 @@ test("the athlete's Path shows the plan they follow, and it mirrors what the coa
   await expect(plan.locator("[data-plan] .h2")).toHaveText("Race week taper");
   await expect(page.locator("#also-shared")).toHaveText("Also from your coach: Base block.");
 });
+
+test.describe("Build with PATH, with the real model behind it (K-23)", () => {
+  const cors = {
+    "access-control-allow-origin": "*",
+    "access-control-allow-headers": "content-type",
+  };
+  test("the draft comes from the server function, can be redrafted in words, and falls back to the rules if it fails", async ({
+    page,
+  }) => {
+    const asked: any[] = [];
+    let fail = false;
+    await page.addInitScript(() => {
+      (window as any).PATH_LLM_URL = "http://path.test/api/coach";
+    });
+    await page.route("http://path.test/api/coach", async (route) => {
+      if (route.request().method() === "OPTIONS")
+        return route.fulfill({ status: 204, headers: cors });
+      const body = route.request().postDataJSON();
+      asked.push(body);
+      if (fail)
+        return route.fulfill({
+          status: 502,
+          headers: cors,
+          contentType: "application/json",
+          body: '{"error":"model"}',
+        });
+      const sessions = body.change
+        ? [{ week: 1, day: "Tue", text: "Hill sprints, 8 × 30 s" }]
+        : [
+            { week: 1, day: "Tue", text: "Fartlek through the forest, by feel" },
+            { week: 1, day: "Sat", text: "Long run with coffee stop" },
+          ];
+      await route.fulfill({
+        status: 200,
+        headers: cors,
+        contentType: "application/json",
+        body: JSON.stringify({ title: "Forest block", sessions }),
+      });
+    });
+    await open(page);
+    await asRole(page, "coach");
+    await tab(page, "Plans");
+    await page.getByRole("button", { name: "Add a plan" }).click();
+    await page.locator("#pprompt").fill("Something wild for my Tuesday group, lots of forest");
+    await page.getByRole("button", { name: "Draft it" }).click();
+    await expect(page.locator("#ptitle")).toHaveValue("Forest block");
+    expect(await drafted(page)).toBe(
+      "Fartlek through the forest, by feel | Long run with coffee stop",
+    );
+    expect(asked[0]).toEqual({ words: "Something wild for my Tuesday group, lots of forest" });
+    // Redraft in words: the current draft and the wish go to the model.
+    await page.locator("#pchange").fill("make it hills only");
+    await page.getByRole("button", { name: "Redraft" }).click();
+    await expect(page.locator("#draft-sessions .stext")).toHaveCount(1);
+    expect(asked[1].change).toBe("make it hills only");
+    expect(asked[1].current.sessions).toHaveLength(2);
+    // The key never comes near the browser: the page sends words only.
+    expect(JSON.stringify(asked)).not.toMatch(/sk-|api[-_]?key/i);
+    // If the model cannot be reached, the coach still gets a draft, and is told which kind.
+    fail = true;
+    await page.getByRole("button", { name: "Start over" }).click();
+    await page.locator("#pprompt").fill("4 weeks towards a 10K");
+    await page.getByRole("button", { name: "Draft it" }).click();
+    await expect(page.locator("#pnote")).toContainText(
+      "could not be reached, so this draft follows simple rules",
+    );
+    await expect(page.locator("#ptitle")).toHaveValue("10K build, 4 weeks");
+  });
+});

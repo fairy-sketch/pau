@@ -1,0 +1,12 @@
+# Netlify serves the clickable demo (prototype/) and one server function for the AI drafts.
+# The Next.js app in this repo is not deployed from here yet.
+[build]
+  command = "echo 'PATH demo: static files, nothing to build'"
+  publish = "prototype"
+
+[build.environment]
+  # This repo also holds a Next.js app. The demo is plain files, so the Next.js runtime must stay out of the way.
+  NETLIFY_NEXT_PLUGIN_SKIP = "true"
+
+[functions]
+  directory = "netlify/functions"
