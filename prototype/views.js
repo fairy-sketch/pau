@@ -29,6 +29,7 @@ const P = {
   tag: '<path d="M4 6a2 2 0 0 1 2-2h4.8a2 2 0 0 1 1.4.6l7.2 7.2a2 2 0 0 1 0 2.8l-4.8 4.8a2 2 0 0 1-2.8 0L4.6 12.2A2 2 0 0 1 4 10.8z"/><circle fill="currentColor" stroke="none" cx="8.5" cy="8.5" r="1.3"/>',
   card: '<rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10.5h18M7 15h3"/>',
   x: '<path d="M7 7l10 10M17 7 7 17"/>',
+  compass: '<circle cx="12" cy="12" r="8.5"/><path d="M15.4 8.6l-2 4.800-4.800 2 2-4.800z"/>',
   up: '<path d="M12 19V5M6 11l6-6 6 6"/>',
   tick: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   back: '<path d="M14.5 5.5 8 12l6.5 6.5"/>',
@@ -98,6 +99,7 @@ function vPath() {
     <div class="card stack"><div><div class="eyebrow">Next step</div><p class="h2" style="font-size:22px;margin-top:6px">${esc(n.title)}</p><p class="sub" style="margin-top:4px">${n.meta}</p></div>
       <button class="btn acc full" data-a="${n.a}" data-v="${n.v || ""}">${n.cta}</button>
       <details><summary>Why this?</summary><p class="sub" style="margin-bottom:8px">${n.reason}</p><ul>${n.factors.map((f) => `<li>${esc(f)}</li>`).join("")}</ul></details></div>
+    ${S.tryPlans.length ? `<div class="stack" id="trying" style="gap:8px"><div class="eyebrow">You're trying</div><div class="card rows flat">${S.tryPlans.map(tryToday).map((t) => `<button class="row" data-a="prov-open" data-v="${t.o.id}"><span class="mid"><span class="strong">${esc(providerOf(t.o).plan.title)} <span class="sub" style="font-weight:400">· ${esc(t.o.club)}</span></span><span class="sub">Day ${t.n} of ${t.of}: ${esc(t.text)}</span></span><span class="end sub">${signedUp(t.o.id) ? "Booked" : "Book"}</span></button>`).join("")}</div></div>` : ""}
     <div class="stack"><div class="between"><span class="eyebrow">This week</span><span class="sub" style="font-size:12px">${S.entries.filter((e) => e.at >= wk).length} done</span></div><div class="week7">${week}</div><p class="sub" style="font-size:12px">${passLine(pass)}</p></div>
     <div class="stack"><div class="between"><span class="eyebrow">Weekly load</span><span class="sub" style="font-size:12px">${Math.round(st.ratio * 100)}% of your average</span></div>${lineChart(loadPts(st), st.wl.length - 1)}</div></section>`;
 }
@@ -120,8 +122,8 @@ function propCard(p) {
 }
 function vCoachChat() {
   const pass = passOf(S.org);
-  return `<div class="chatwrap"><div class="chatlog"><p class="sub" style="text-align:center;font-size:12px">Scripted demo coach at ${esc(ORGS[S.org].name)}. It only acts after you confirm.${pass ? `<br>${passLine(pass)}` : ""}</p>${S.chat.map((m) => `<div class="msg ${m.who}">${esc(m.text)}</div>${m.opts ? optBtns(m.opts.sid) : ""}${m.prop && S.props[m.prop] ? propCard(S.props[m.prop]) : ""}`).join("")}</div>
-  <div class="quick">${["Book my usual", "Book every Thursday this season", "What's on this week?", "Where am I on the waitlist?", "I need an easy week", "How am I doing?", "Cancel my next session", "Cancel everything this week", "My knee hurts"].map((q) => `<button data-a="ask" data-v="${esc(q)}">${esc(q)}</button>`).join("")}</div>
+  return `<div class="chatwrap"><div class="chatlog"><p class="sub" style="text-align:center;font-size:12px">Scripted demo coach at ${esc(ORGS[S.org].name)}. It only acts after you confirm.${pass ? `<br>${passLine(pass)}` : ""}</p>${S.chat.map((m) => `<div class="msg ${m.who}">${esc(m.text)}</div>${m.opts ? optBtns(m.opts.sid) : ""}${m.picks ? pickBtns(m.picks) : ""}${m.prop && S.props[m.prop] ? propCard(S.props[m.prop]) : ""}`).join("")}</div>
+  <div class="quick">${["Book my usual", "Suggest something new for me", "Book every Thursday this season", "What's on this week?", "Where am I on the waitlist?", "I need an easy week", "How am I doing?", "Cancel my next session", "Cancel everything this week", "My knee hurts"].map((q) => `<button data-a="ask" data-v="${esc(q)}">${esc(q)}</button>`).join("")}</div>
   <form class="chatform" data-f="chat"><input id="chat-input" aria-label="Message your coach" placeholder="Talk to your coach" autocomplete="off"><button type="submit" aria-label="Send message">${I(P.up, 20)}</button></form></div>`;
 }
 const AREAS = ["Foot or ankle", "Calf or shin", "Knee", "Thigh or hamstring", "Hip or groin", "Back", "Shoulder or arm", "Other", "Not sure"];
@@ -187,6 +189,7 @@ function vWeek() {
 }
 function vSheet() {
   if (!UI.sheet) return "";
+  if (UI.sheet.type === "offer") return vOfferSheet();
   if (UI.sheet.type === "pay") { const p = UI.sheet; return `<div class="sheetbg" data-a="close"><div class="sheet stack" role="dialog" aria-modal="true" aria-label="Checkout"><div><div class="eyebrow">Test checkout · no money moves</div><h2 class="h1">${esc(p.what)}</h2></div><p class="num">${chf(p.amount)}</p><p class="sub">${p.note ? esc(p.note) + " " : ""}This is the full price. No fees are added.${p.then ? " Your session is booked as soon as the payment goes through." : ""}</p><button class="btn acc full" data-a="pay-do" data-v="twint">Pay with TWINT</button><button class="btn full" data-a="pay-do" data-v="card">Pay with card</button><button class="btn ghost full" data-a="close-btn">Close</button></div></div>`; }
   const s = S.sessions[UI.sheet.sid], o = offOf(s), wd = s.start.getDay();
   if (UI.sheet.type === "series") {

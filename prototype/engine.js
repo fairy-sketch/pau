@@ -78,7 +78,7 @@ const NAMES = [];
 for (const last of ["Brunner", "Meier", "Rossi", "Frei", "Sutter", "Aziz"]) for (const first of ["Jana", "Luca", "Sofia", "Noah", "Elin", "Tariq", "Mara", "Ben"]) NAMES.push(`${first} ${last}`);
 
 /* ---------- state ---------- */
-const STORE_KEY = "path-demo-v3", WEEKS = 4, PER = 12, LOAD_LIMIT = 1.1, CARD_TTL_MIN = 15;
+const STORE_KEY = "path-demo-v4", WEEKS = 4, PER = 12, LOAD_LIMIT = 1.1, CARD_TTL_MIN = 15;
 let S;
 /* Things that belong to the open screen, not to the demo's data. Never saved. */
 const UI = { sheet: null, toast: "", lineFrom: null, justDone: null, resetArmed: false };
@@ -97,7 +97,7 @@ function ensureSessions() {
 function seed() {
   const T = today();
   S = {
-    v: 3, role: "athlete", org: "pau", tab: { athlete: "path", coach: "today", admin: "dash" }, banner: true, day: ymd(T), logTab: "log", rosterSid: null,
+    v: 4, role: "athlete", org: "pau", tab: { athlete: "path", coach: "today", admin: "dash" }, banner: true, day: ymd(T), logTab: "log", rosterSid: null,
     me: { name: "Mia Keller", sports: "Running · Strength" },
     goal: { title: "Sub‑40 10K", date: new Date(2027, 4, 9), why: "Because I want to race the Zurich 10K with my club." },
     stages: ["Foundation", "Build", "Sharpen", "Test", "Recover"], stage: 1, stageSessions: 5,
@@ -105,6 +105,8 @@ function seed() {
     /* What a club admin can change. PAU books the next person automatically; Studio Demo offers the spot with a 2 h hold. */
     settings: { pau: { waitlistMode: "auto", offerHoldMin: 120 }, studio: { waitlistMode: "offer", offerHoldMin: 120 } },
     filter: { cat: "all", mine: false },
+    /* Explore: open sessions from other clubs. `signups` is the member's own list. */
+    signups: [], tryPlans: [], exploreBase: ymd(T), explore: { view: "grid", kind: "all", open: null, group: "all", free: false, beginners: false, near: false, pin: null },
     passes: [
       { id: "p-pau", org: "pau", name: "Drop-in season pass", kind: "limit", max: 4, covers: ["track", "gym"], valid: "Valid until 31 Mar 2027" },
       { id: "p-studio", org: "studio", name: "10 classes", kind: "credits", valid: "No expiry in this demo" },
@@ -165,7 +167,7 @@ function load() {
   try {
     const raw = localStorage.getItem(STORE_KEY); if (!raw) return false;
     const data = JSON.parse(raw, (k, v) => (v && typeof v === "object" && typeof v.$d === "number" ? new Date(v.$d) : v));
-    if (!data || data.v !== 3 || !data.sessions) return false;
+    if (!data || data.v !== 4 || !data.sessions) return false;
     S = data; ensureSessions();
     if (S.day < ymd(today())) S.day = ymd(today());
     return true;

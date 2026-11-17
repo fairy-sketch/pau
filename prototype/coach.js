@@ -66,6 +66,8 @@ function runAct(a, key) {
     return { ...r, extra: seriesRows(se).map((x) => ({ ok: x.status !== "skipped", msg: `${fDay(x.date)}: ${x.status === "skipped" ? "skipped. " + x.text : x.text}` })) };
   }
   if (a.t === "series-pause") return pauseSeries(a.id, a.paused);
+  if (a.t === "signup") return signUp(a.id, key);
+  if (a.t === "tryplan") return tryPlan(a.id, key);
   if (a.t === "swap" || a.t === "ease") {
     if (S.idem[key]) return S.idem[key];
     const it = S.plan.items.find((i) => i.date === a.date); if (!it) return remember(key, err("NOT_FOUND", "That plan day no longer exists."));
@@ -76,7 +78,7 @@ function runAct(a, key) {
   }
   return err("UNKNOWN", "Unknown action.");
 }
-const FAIL = { book: "Couldn't book", cancel: "Couldn't cancel", swap: "Couldn't change the plan", ease: "Couldn't change the plan", accept: "Couldn't take the spot", series: "Couldn't start the series", "series-pause": "Couldn't change the series" };
+const FAIL = { book: "Couldn't book", cancel: "Couldn't cancel", swap: "Couldn't change the plan", ease: "Couldn't change the plan", accept: "Couldn't take the spot", series: "Couldn't start the series", "series-pause": "Couldn't change the series", signup: "Couldn't put your name down", tryplan: "Couldn't add the plan" };
 /* The only way the coach changes anything. A card can be decided once; each action carries the card's idempotency key. */
 function confirmProposal(id, yes) {
   sweepProposals();
@@ -218,7 +220,7 @@ function replySeries(text) {
 const AREA_WORDS = [["Foot or ankle", /foot|feet|ankle|achilles|heel/], ["Calf or shin", /calf|calves|shin/], ["Knee", /knee/], ["Thigh or hamstring", /thigh|hamstring|quad/], ["Hip or groin", /hip|groin|glute/], ["Back", /back|spine/], ["Shoulder or arm", /shoulder|arm|elbow|wrist/]];
 function coachReply(q) {
   const t = q.toLowerCase(), st = stats();
-  if (/pain|hurt|sore|injur|ache/.test(t)) {
+  if (/\bpain|hurt|\bsore\b|injur|\bach(e|es|ing)\b/.test(t)) {
     const alert = S.consent.pau["alerts.pain"], area = (AREA_WORDS.find(([, re]) => re.test(t)) || [])[0];
     if (alert) S.alerts.push({ id: S.seq++, kind: "Pain mentioned in coach chat", at: now(), status: "open" });
     S.form.pain = true; if (area) S.form.painWhere = area;
@@ -248,6 +250,7 @@ function coachReply(q) {
   }
   if (/cancel/.test(t)) return replyCancel(q);
   if (/\bevery\b|\bweekly\b|recurring|repeat|\bseries\b|all season|this season|\beach (mon|tue|wed|thu|fri|sat|sun)/.test(t)) return replySeries(q);
+  if (/explore|something (new|else|different)|suggest|recommend|new sport|other clubs?|what else|try out|train like|pro athlete|personal coach|physio|massage|recovery|nutrition/.test(t) || (namedOffer(q) && !parseOffering(q))) return replyExplore(q);
   if (/held|take (my|the) spot|accept/.test(t)) return replyOffer();
   if (/wait ?list/.test(t) && !/\bjoin\b|add me|put me|sign me/.test(t)) return replyWaitlist();
   if (/remember|know about me|memory/.test(t)) {
@@ -265,6 +268,6 @@ function coachReply(q) {
     return say(`Last 7 days: ${st.cur.count} session(s), load ${st.cur.load}. Your 4-week average is ${Math.round(st.avg)}, so you are at ${Math.round(st.ratio * 100)}%.\nLatest personal best: ${pb.metric} ${pb.value} ${pb.unit} on ${fDay(pb.at)}.\nStage: ${S.stages[S.stage]}, ${S.stageSessions} of ${PER} sessions done. ${st.ratio > LOAD_LIMIT ? "That is more than 10% above your average, so keep the next days easy." : "You are on track."}`);
   }
   if (/log/.test(t)) return say("Open the Log tab and tap how it felt. It takes under 30 seconds.");
-  say("In this demo I understand: \"book my usual\", \"book my usual Thursday\", \"book every Thursday 18:30 this season\", \"join the waitlist for gym on Friday\", \"where am I on the waitlist?\", \"what's on this week?\", \"cancel my next session\", \"cancel everything this week\", \"I need an easy week\", \"how am I doing?\", \"what do you remember?\" and anything about pain.");
+  say("In this demo I understand: \"book my usual\", \"book my usual Thursday\", \"book every Thursday 18:30 this season\", \"suggest something new for me\", \"join the waitlist for gym on Friday\", \"where am I on the waitlist?\", \"what's on this week?\", \"cancel my next session\", \"cancel everything this week\", \"I need an easy week\", \"how am I doing?\", \"what do you remember?\" and anything about pain.");
 }
 function ask(text) { S.chat.push({ who: "me", text }); coachReply(text); }

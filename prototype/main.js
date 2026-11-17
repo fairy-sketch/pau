@@ -5,13 +5,14 @@ const TABS = { athlete: [["path", "Path", "flag"], ["coach", "Coach", "chat"], [
 let lastKey = "", swipeClickGuard = -1e9;
 function render() {
   ensureSessions(); sweep(); sweepProposals(); sweepOffers(); runSeries();
-  const app = document.getElementById("app"), tab = S.tab[S.role], key = S.role + tab + S.org + (S.rosterSid || ""), old = document.getElementById("view"), top = old && key === lastKey ? old.scrollTop : 0;
-  const body = S.role === "athlete" ? { path: vPath, coach: vCoachChat, log: vLog, week: vWeek, me: vMe }[tab]() : S.role === "coach" ? vCoach() : vAdmin();
+  const app = document.getElementById("app"), tab = S.tab[S.role], key = S.role + tab + S.org + (S.rosterSid || "") + (tab === "explore" ? S.explore.open || "" : ""), old = document.getElementById("view"), top = old && key === lastKey ? old.scrollTop : 0;
+  const body = S.role === "athlete" ? { path: vPath, coach: vCoachChat, log: vLog, week: vWeek, me: vMe, explore: vExplore }[tab]() : S.role === "coach" ? vCoach() : vAdmin();
   const badge = S.role === "coach" ? S.alerts.filter((a) => a.status === "open" && (a.info || shares("alerts.pain"))).length : 0;
   app.className = S.role === "admin" ? "wide" : "";
   app.innerHTML = `<header class="top"><span class="name">PATH</span>
       <select id="role" aria-label="View as">${[["athlete", "Athlete"], ["coach", "Coach"], ["admin", "Admin"]].map(([v, l]) => `<option value="${v}" ${S.role === v ? "selected" : ""}>${l}</option>`).join("")}</select>
-      <select id="org" aria-label="Club">${Object.entries(ORGS).map(([v, o]) => `<option value="${v}" ${S.org === v ? "selected" : ""}>${o.name}</option>`).join("")}</select></header>
+      <select id="org" aria-label="Club">${Object.entries(ORGS).map(([v, o]) => `<option value="${v}" ${S.org === v ? "selected" : ""}>${o.name}</option>`).join("")}</select>
+      ${S.role === "athlete" ? `<button class="x explorebtn" data-a="tab" data-v="explore" aria-label="Explore: try something new" aria-pressed="${tab === "explore"}">${I(P.compass, 22)}</button>` : ""}</header>
     ${S.banner ? `<div class="banner"><span>Made-up data, saved on this device.</span><button class="resetbtn ${UI.resetArmed ? "armed" : ""}" data-a="reset">${UI.resetArmed ? "Tap again" : "Reset demo"}</button>${xBtn("hide-banner", "Hide this notice. Reset demo stays under Me.")}</div>` : ""}
     <main id="view" tabindex="0">${body}</main>
     ${UI.toast ? `<div class="toast" role="status"><span>${esc(UI.toast)}</span>${xBtn("hide-toast", "Dismiss message")}</div>` : ""}
@@ -22,7 +23,15 @@ function render() {
 }
 
 const ACT = {
-  tab: (v) => { S.tab[S.role] = v; S.rosterSid = null; }, day: (v) => { S.day = v; }, logtab: (v) => { S.logTab = v; },
+  tab: (v) => { S.tab[S.role] = v; S.rosterSid = null; if (v === "explore") S.explore.open = null; }, day: (v) => { S.day = v; }, logtab: (v) => { S.logTab = v; },
+  /* Explore */
+  "prov-open": (v) => { S.explore.open = v || null; S.tab.athlete = "explore"; UI.sheet = null; }, xkind: (v) => { S.explore.kind = S.explore.kind === v ? "all" : v; S.explore.pin = null; },
+  "plan-try": (v) => { UI.toast = tryPlan(v).msg + " Next: book a session with them."; }, "plan-drop": (v) => { UI.toast = dropPlan(v).msg; },
+  xview: (v) => { S.explore.view = v; }, xgroup: (v) => { S.explore.group = v; S.explore.pin = null; }, xflag: (v) => { S.explore[v] = !S.explore[v]; S.explore.pin = null; },
+  xclear: () => { Object.assign(S.explore, { kind: "all", group: "all", free: false, beginners: false, near: false, pin: null }); }, pin: (v) => { S.explore.pin = S.explore.pin === v ? null : v; },
+  "offer-open": (v) => { UI.sheet = { type: "offer", id: v }; },
+  "offer-signup": (v) => { const o = offerById(v); if (o.price) UI.sheet = { type: "pay", what: `${o.title}, ${o.club}`, amount: o.price, explore: v, then: true }; else { UI.toast = signUp(v).msg; UI.sheet = null; } },
+  "offer-drop": (v) => { UI.toast = dropSignup(v).msg; UI.sheet = null; },
   week: (v) => { shiftWeek(Number(v)); }, fcat: (v) => { S.filter.cat = v; }, fmine: () => { S.filter.mine = !S.filter.mine; }, fclear: () => { S.filter = { cat: "all", mine: false }; },
   /* Out of credits, in context: buying opens the test checkout and books the session when it goes through. */
   offer: (v) => {
@@ -52,6 +61,7 @@ const ACT = {
   "pay-do": (v) => {
     const p = UI.sheet; let after = "";
     if (p.inv) S.invoices.find((x) => x.id === p.inv).status = "paid";
+    else if (p.explore) after = " " + signUp(p.explore).msg;
     else if (p.buy) { purchase(p.buy, p.org); if (p.then) { const w = myWait(p.then); after = " " + (w && w.offer ? acceptOffer(p.then) : book(p.then, "app")).msg; } }
     else S.ledger.push({ pass: passOf(S.org).id, delta: p.credits, kind: "grant", reason: `Bought ${p.what}`, at: now() });
     UI.toast = `Test payment by ${v === "twint" ? "TWINT" : "card"} succeeded: ${chf(p.amount)}. No real money moved.${after}`; UI.sheet = null;
@@ -149,7 +159,7 @@ window.PATH_DEMO = {
   get state() { return S; }, ui: UI, ORGS, LOAD_LIMIT, CARD_TTL_MIN, STORE_KEY,
   render, seed, save, load, resetDemo, book, cancel, check, freeSpot, leaveWait, passState, passOf, stats, guard, guardDraft, currentDraft, RAW_DRAFT,
   ask, confirmProposal, toggleAct, runAct, planLocked, nextChangeable, applyDraft, shiftWeek, weekIndex,
-  offersFor, purchase, acceptOffer, declineOffer, sweepOffers, waitTotal, createSeries, previewSeries, pauseSeries, endSeries, runSeries, seriesRows, seriesSummary, findSeries, sweepProposals, parseWhen, parseOffering, rosterRows, rosterNames, addWalkin, markAttendance, memoryFor, upcomingBookings, sessList, myBooking, myWait, spots, nextStep,
+  OFFERS, openOffers, exploreList, tryPlan, dropPlan, tryToday, providerOf, signUp, dropSignup, signedUp, offerStart, offerKm, offersFor, purchase, acceptOffer, declineOffer, sweepOffers, waitTotal, createSeries, previewSeries, pauseSeries, endSeries, runSeries, seriesRows, seriesSummary, findSeries, sweepProposals, parseWhen, parseOffering, rosterRows, rosterNames, addWalkin, markAttendance, memoryFor, upcomingBookings, sessList, myBooking, myWait, spots, nextStep,
 };
 if (!load()) seed();
 render();

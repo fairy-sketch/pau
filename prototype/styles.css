@@ -32,7 +32,7 @@ h1, h2, h3, p, ul, ol { margin: 0; padding: 0; } ul, ol { list-style: none; }
 #app.wide { max-width: 960px; }
 .top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 24px 8px; }
 .top .name { font: 800 18px/1 var(--heading); letter-spacing: -.01em; margin-right: auto; }
-.top select { appearance: none; background: var(--surface); border: 1px solid var(--hairline); border-radius: 999px; height: 44px; padding: 0 12px; font-size: 13px; font-weight: 500; max-width: 31%; text-overflow: ellipsis; }
+.top select { appearance: none; background: var(--surface); border: 1px solid var(--hairline); border-radius: 999px; height: 44px; padding: 0 12px; font-size: 13px; font-weight: 500; max-width: 29%; text-overflow: ellipsis; }
 .banner { margin: 0 24px 8px; display: flex; align-items: center; gap: 8px; background: var(--soft); border-radius: var(--r-control); padding: 0 0 0 12px; font-size: 12px; color: var(--text-2); }
 .banner span { flex: 1; }
 .x { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 999px; color: var(--text-2); flex: none; }
@@ -210,3 +210,27 @@ svg text { font-family: var(--mono); font-size: 10px; fill: var(--text-2); }
 .filters::-webkit-scrollbar { display: none; }
 .filters .chip { flex: none; white-space: nowrap; }
 .opts { align-self: stretch; display: flex; flex-direction: column; gap: 8px; }
+
+/* ---- Explore ---- */
+.top .explorebtn { color: var(--text); background: var(--surface); border: 1px solid var(--hairline); }
+.top .explorebtn[aria-pressed="true"] { background: var(--text); border-color: var(--text); color: var(--surface); }
+.seg { display: inline-flex; background: var(--soft); border-radius: 999px; padding: 3px; }
+.seg button { min-height: 44px; min-width: 72px; padding: 0 16px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+/* The grid: three across, edge to edge, like a wall of flyers. The one screen where photos are the content. */
+.tiles3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; margin: 0 -24px; }
+.tile { position: relative; aspect-ratio: 3 / 4; overflow: hidden; background: var(--soft); }
+.tile .cap { position: absolute; inset: auto 0 0 0; display: flex; flex-direction: column; gap: 1px; padding: 28px 8px 8px; text-align: left; font-size: 11px; line-height: 1.25; color: #fff; background: linear-gradient(to top, rgba(28,25,22,.82), rgba(28,25,22,0)); }
+.tile .cap .strong { font-size: 12px; color: #fff; }
+.tile .in { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--text); }
+.tile:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
+.map { position: relative; aspect-ratio: 100 / 115; border-radius: var(--r-card); overflow: hidden; background: var(--soft); border: 1px solid var(--hairline); }
+.map svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.map .pin { position: absolute; width: 44px; height: 44px; transform: translate(-50%, -50%); display: grid; place-items: center; }
+.map .pin i { width: 20px; height: 20px; border-radius: 50%; background: var(--text); border: 2px solid var(--surface); display: grid; place-items: center; color: var(--surface); box-shadow: var(--shadow); }
+.map .pin[aria-pressed="true"] i { width: 26px; height: 26px; background: var(--accent); border-color: var(--text); color: var(--text); }
+.map .you { position: absolute; width: 14px; height: 14px; transform: translate(-50%, -50%); border-radius: 50%; background: var(--surface); border: 4px solid var(--accent); box-shadow: 0 0 0 6px rgba(142,154,128,.25); }
+.mapcard { display: flex; gap: 12px; align-items: center; text-align: left; width: 100%; padding: 10px; }
+.mapcard .thumb { width: 64px; height: 64px; border-radius: 10px; overflow: hidden; flex: none; }
+.offerpic { height: 150px; flex: none; margin: -4px 0 0; border-radius: var(--r-card); overflow: hidden; }
+.tile .who { position: absolute; top: 6px; left: 6px; font: 600 10px/1 var(--mono); letter-spacing: .04em; text-transform: uppercase; background: var(--surface); color: var(--text); border-radius: 999px; padding: 4px 7px; }
