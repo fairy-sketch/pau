@@ -31,7 +31,7 @@ test("the icon top right opens a photo grid of clubs, coaches and pros", async (
     .poll(() =>
       page
         .locator("#xgrid img")
-        .evaluateAll((els) => els.every((e) => (e as HTMLImageElement).complete)),
+        .evaluateAll((els) => els.every((e) => (e as HTMLImageElement).naturalWidth > 0)),
     )
     .toBe(true);
   const imgs = await page.locator("#xgrid img").evaluateAll((els) =>

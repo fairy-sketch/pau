@@ -170,7 +170,7 @@ function seed() {
   const T = today();
   S = {
     v: 5, role: "athlete", org: "pau", tab: { athlete: "path", coach: "today", admin: "dash" }, banner: true, day: ymd(T), logTab: "log", rosterSid: null,
-    me: { name: "Mia Keller", sports: "Running · Strength" },
+    me: { name: "Mia Keller", sports: "Running · Strength" }, onboarded: true, ob: null,
     goal: { title: "Sub‑40 10K", date: new Date(2027, 4, 9), why: "Because I want to race the Zurich 10K with my club." },
     stages: ["Foundation", "Build", "Sharpen", "Test", "Recover"], stage: 1, stageSessions: 5,
     sessions: {}, bookings: [], waitlist: [], ledger: [], notices: [], outbox: [], extra: { pau: [], studio: [] }, entries: [], pbs: [], chat: [], props: {}, audit: [], alerts: [], attendance: {}, walkins: {}, idem: {}, series: [],

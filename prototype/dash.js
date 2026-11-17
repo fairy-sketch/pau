@@ -43,7 +43,7 @@ function roster(org = S.org) {
 /* Mia, as her coach is allowed to see her. */
 function liveAthlete() {
   const st = stats(), op = shares("alerts.pain") ? openPain() : null, last = S.entries[0];
-  return { id: "mia", live: true, name: S.me.name, first: S.me.name.split(" ")[0], group: ORGS[S.org].me.myGroup, goal: S.goal.title, goalKind: "10K", stage: S.stage, inSt: S.stageSessions,
+  return { id: "mia", live: true, name: S.me.name, first: S.me.name.split(" ")[0], group: ORGS[S.org].me.myGroup, goal: S.goal.title, goalKind: /10\s?k/i.test(S.goal.title) ? "10K" : /5\s?k/i.test(S.goal.title) ? "5K" : /half/i.test(S.goal.title) ? "Half marathon" : "Own goal", stage: S.stage, inSt: S.stageSessions,
     away: last ? Math.max(0, Math.round((today() - new Date(last.at)) / 864e5)) : 30, back: false, load: st.ratio, pain: op ? { where: op.painWhere, level: op.painLevel } : null, ask: null, attend: attendance(S.org),
     shares: { path: shares("path.read"), log: shares("log.read"), pain: shares("alerts.pain") }, draft: shares("plan.write") && S.draftStatus === "pending_review" };
 }

@@ -334,3 +334,4 @@ textarea.inp.big { min-height: 248px; padding: 16px; }
 .sub.demo .tag, p .tag { margin-left: 4px; }
 .delta { font-size: 13px; line-height: 18px; }
 textarea.grow { display: block; width: 100%; min-height: 44px; padding: 10px 12px; line-height: 24px; resize: none; overflow: hidden; }
+[hidden] { display: none !important; } /* an element that is switched off stays off, whatever its class says */

@@ -128,7 +128,7 @@ function vPath() {
   const n = nextStep(), st = stats(), T = today(), wk = monday(T), pass = passOf("pau");
   const week = [...Array(7)].map((_, i) => { const d = addDays(wk, i), done = S.entries.some((e) => ymd(e.at) === ymd(d)), bk = S.bookings.some((b) => HELD.includes(b.status) && ymd(S.sessions[b.sid].start) === ymd(d)), isToday = ymd(d) === ymd(T); return `<div class="d"><span class="eyebrow ${isToday ? "today" : ""}">${WD[d.getDay()][0]}</span><span class="dot ${done ? "done" : bk ? "booked" : ""}" title="${done ? "Done" : bk ? "Booked" : "Open"}"></span></div>`; }).join("");
   return `<div class="hero">${photo(HERO_IMAGE)}</div><section class="pad stack-l" style="position:relative;margin-top:-24px">
-    <div class="stack" style="gap:24px"><div><div class="eyebrow">Your goal</div><h1 class="goal">${esc(S.goal.title)}</h1><p class="sub">By ${S.goal.date.getDate()} ${MOL[S.goal.date.getMonth()]} ${S.goal.date.getFullYear()}. ${esc(S.goal.why)}</p></div>
+    <div class="stack" style="gap:24px"><div><div class="eyebrow">Your goal</div><h1 class="goal">${esc(S.goal.title)}</h1><p class="sub">${goalDateText(S.goal)} ${esc(S.goal.why || "")}</p></div>
       ${pathLine()}</div>
     <div class="card stack"><div><div class="eyebrow">Next step</div><p class="h1">${esc(n.title)}</p><p class="sub" style="margin-top:4px">${n.meta}</p></div>
       <button class="btn acc full" data-a="${n.a}" data-v="${n.v || ""}">${n.cta}</button>
@@ -236,6 +236,7 @@ function vSheet() {
   if (!UI.sheet) return "";
   if (UI.sheet.type === "offer") return vOfferSheet();
   if (UI.sheet.type === "planday") return vPlanDaySheet();
+  if (UI.sheet.type === "goal") return vGoalSheet();
   if (UI.sheet.type === "asess") return vAdminSessionSheet();
   if (UI.sheet.type === "aadd") return vAdminAddSheet();
   if (UI.sheet.type === "amsg") return vAdminMessageSheet();
@@ -272,6 +273,7 @@ function vMe() {
   const scopes = { "profile.basic": ["Name and photo", "Always shared, so coaches can run a roster"], "path.read": ["Goal and stage"], "log.read": ["Training log and progress"], "log.comment": ["Coach comments on your log"], "plan.write": ["Coach reviews your plans"], "alerts.pain": ["Pain flags", "Health data. Off unless you turn it on"] };
   const mem = memoryFor(S.org), hidden = S.memory.length - mem.length;
   return `<section class="pad stack-l"><div><div class="eyebrow">Me</div><h1 class="h1">${esc(S.me.name)}</h1><p class="sub" style="margin-top:4px">${esc(S.me.sports)}</p></div>
+    ${vGoalCard()}
     <div class="stack"><div class="eyebrow">Your pass at ${club}</div><div class="card stack">${pass ? `<div class="between" style="align-items:center"><span><span class="strong" style="display:block">${pass.name}</span><span class="sub" id="pass-valid">${passValid(pass)}</span></span><span style="text-align:right${st.ended ? ";display:none" : ""}" data-pass="${pass.id}" data-text="${st.text}"><span class="num">${pass.kind === "limit" ? `${st.used}<span class="sub" style="font-weight:400"> / ${st.max}</span>` : pass.kind === "unlimited" ? "All" : st.left}</span><span class="sub" style="display:block">${pass.kind === "limit" ? "used in " + MOL[now().getMonth()] : pass.kind === "unlimited" ? "group sessions" : "credits left"}</span></span></div>${[ticketOf(S.org), packOf(S.org)].filter((p) => p && passState(p).left > 0).map((p) => `<p class="sub" id="${p.pack ? "pack" : "tickets"}">${p.name}: ${passState(p).text}.</p>`).join("")}` : ""}
       ${pass && passEnded(pass) && renewalOf(pass) ? `<button class="btn acc full" data-a="renew" data-v="${pass.id}">Renew for ${renewalOf(pass).season.name} · ${chf(renewalOf(pass).price)}</button>` : ""}
       ${prod ? `<button class="btn full" data-a="buy">Buy ${prod.name} · ${chf(prod.price)}</button>` : ""}
@@ -279,6 +281,7 @@ function vMe() {
     ${inv.length ? `<div class="stack" id="invoices"><div class="eyebrow">Invoices</div><div class="card rows">${inv.map((i) => `<div class="row"><span class="mid"><span class="strong">${chf(i.amount)}</span><span class="sub">${esc(i.what)} · due ${fDay(i.due)}</span></span>${i.status === "paid" ? pill("Paid") : `<button class="btn sm" data-a="pay-inv" data-v="${i.id}">Pay</button>`}</div>`).join("")}</div></div>` : ""}
     <div class="stack"><div><div class="eyebrow">Privacy</div><p class="sub" style="margin-top:4px">What ${club} can see. Changes apply at once.</p></div><div class="card rows">${Object.entries(scopes).map(([k, [label, sub]]) => sw(S.consent[S.org][k], "consent", S.org + "|" + k, label, sub || "", k === "profile.basic")).join("")}</div></div>
     <div class="stack" id="memory"><div><div class="eyebrow">Coach memory</div><p class="sub" style="margin-top:4px">What your coach uses at ${club}. It is yours, and yours to delete.</p></div>${mem.length ? `<div class="card rows">${mem.map((m) => `<div class="row" data-mem="${m.org || "general"}"><span class="mid"><span>${esc(m.text)}</span><span class="sub">${esc(m.why)}</span><span><span class="tag">${esc(memoryLabel(m))}</span></span></span>${xBtn("forget", "Delete this memory: " + m.text, m.id)}</div>`).join("")}</div>` : `<p class="sub">Your coach remembers nothing here.</p>`}${hidden ? `<p class="sub">${hidden} more ${hidden === 1 ? "item belongs" : "items belong"} to your other clubs. Switch club to see or delete ${hidden === 1 ? "it" : "them"}; nothing from there is used here.</p>` : ""}</div>
+    <button class="btn ghost full" data-a="ob-start" id="welcome-again">Go through the welcome again</button>
     <button class="btn ghost full ${UI.resetArmed ? "on" : ""}" data-a="reset">${UI.resetArmed ? "Tap again to erase and start over" : "Reset demo"}</button></section>`;
 }
 

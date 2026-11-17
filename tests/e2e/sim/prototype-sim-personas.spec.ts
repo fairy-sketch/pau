@@ -362,11 +362,175 @@ test.describe("Athlete Jonas: a regular's week at PAU (played on the demo athlet
 });
 
 test.describe("Athlete Lea: new to PATH", () => {
-  test.fixme("onboarding: joins a club, is asked for her sports and what she wants to share", () => {
-    // Not built: the demo starts with a finished member. There is no first-run flow.
+  test("onboarding: club, goal and what the coach may see; pain stays private unless she turns it on", async ({
+    page,
+  }) => {
+    await start(page);
+    await screen(page, "athlete", "me");
+    await page.getByRole("button", { name: "Go through the welcome again" }).click();
+    const ob = page.locator("#onboarding");
+    await expect(ob).toHaveAttribute("data-step", "1");
+    await expect(page.locator("nav.tabs")).toBeHidden(); // three questions, nothing else
+    // 1. The club.
+    await page.getByRole("radio", { name: /Studio Demo/ }).click();
+    await expect(page.getByRole("radio", { name: /Studio Demo/ })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    await page.getByRole("button", { name: "Next" }).click();
+    // 2. The goal: it is needed, a day in the past is refused, and what was typed stays.
+    await expect(ob).toHaveAttribute("data-step", "2");
+    await page.getByRole("button", { name: "Next" }).click();
+    await expect(page.locator("#ob-error")).toHaveText(
+      "Say in a few words what you are training for.",
+    );
+    await page.locator("#ob-title").fill("Hold a handstand for ten seconds");
+    await page.locator("#ob-date").fill("2026-11-01");
+    await page.getByRole("button", { name: "Next" }).click();
+    await expect(page.locator("#ob-error")).toContainText("Choose a day that is still to come");
+    await expect(page.locator("#ob-title")).toHaveValue("Hold a handstand for ten seconds");
+    await page.locator("#ob-date").fill("2027-03-01");
+    await page.locator("#ob-why").fill("Because I never could as a kid");
+    await page.getByRole("button", { name: "Next" }).click();
+    // 3. Sharing: pain is off, and says so. She shares her goal and log, not her plans.
+    await expect(ob).toHaveAttribute("data-step", "3");
+    await expect(page.getByRole("switch", { name: /Pain flags/ })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
+    await expect(page.locator("#ob-pain")).toHaveText(
+      "Pain flags stay with you. No club and no coach sees them unless you turn this on.",
+    );
+    await expect(page.getByRole("switch", { name: /Name and photo/ })).toBeDisabled();
+    await page.getByRole("switch", { name: /Coach reviews your plans/ }).click();
+    // Back keeps everything.
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await expect(page.locator("#ob-title")).toHaveValue("Hold a handstand for ten seconds");
+    await page.getByRole("button", { name: "Next" }).click();
+    await expect(page.getByRole("switch", { name: /Coach reviews your plans/ })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
+    await page.getByRole("button", { name: "Start", exact: true }).click();
+    await expect(page.locator(".toast")).toContainText(
+      "Welcome to Studio Demo. Your path starts here.",
+    );
+    await expect(page.locator("nav.tabs")).toBeVisible();
+    // Path has her goal; the studio's consent is what she chose; PAU's is untouched.
+    const path = await screen(page, "athlete", "path", "studio");
+    expect(path).toContain(
+      "YOUR GOAL Hold a handstand for ten seconds By 1 March 2027. Because I never could as a kid",
+    );
+    const c = await sim(page, (d) => [
+      d.state.consent.studio,
+      d.state.consent.pau["plan.write"],
+      d.state.org,
+    ]);
+    expect(c[0]).toEqual({
+      "profile.basic": true,
+      "path.read": true,
+      "log.read": true,
+      "log.comment": true,
+      "plan.write": false,
+      "alerts.pain": false,
+    });
+    expect(c.slice(1)).toEqual([true, "studio"]);
+    // Her coach at the studio now sees the goal and the log, and nothing of a pain flag she logs.
+    await sim(page, (d) => {
+      d.state.entries.unshift({
+        id: 9100,
+        at: new Date(),
+        title: "Yoga flow",
+        dur: 60,
+        rpe: 4,
+        pain: true,
+        painWhere: "Shoulder or arm",
+        painLevel: 5,
+        notes: "",
+        comments: [],
+      });
+    });
+    await sim(page, (d) => {
+      const S = d.state;
+      S.role = "coach";
+      S.org = "studio";
+      S.tab.coach = "athletes";
+      d.render();
+      S.dash.athlete = "mia";
+      d.render();
+    });
+    const detail = (await page.locator("#athlete-detail").innerText()).replace(/\s+/g, " ");
+    expect(detail).toContain("Hold a handstand for ten seconds");
+    expect(detail).toContain("Yoga flow");
+    expect(detail).not.toMatch(/shoulder|pain 5/i);
+    expect(await screen(page, "coach", "review", "studio")).toContain(
+      "has not allowed coaches at this club to review plans",
+    );
+    expect(await screen(page, "coach", "alerts", "studio")).not.toMatch(/Shoulder/);
   });
-  test.fixme("sets her own goal and date", () => {
-    // Not built: the goal ("Sub-40 10K") is fixed. There is nothing to edit under Path or Me.
+  test("leaving the welcome changes nothing, and the phone's Back goes one question back", async ({
+    page,
+  }) => {
+    await start(page);
+    const before = await sim(page, (d) =>
+      JSON.stringify([d.state.goal, d.state.consent, d.state.org]),
+    );
+    await screen(page, "athlete", "me");
+    await page.getByRole("button", { name: "Go through the welcome again" }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+    await page.locator("#ob-title").fill("Something else");
+    await page.goBack();
+    await expect(page.locator("#onboarding")).toHaveAttribute("data-step", "1");
+    await page.getByRole("button", { name: "Not now" }).click();
+    await expect(page.locator("#onboarding")).toHaveCount(0);
+    expect(
+      await sim(page, (d) => JSON.stringify([d.state.goal, d.state.consent, d.state.org])),
+    ).toBe(before);
+  });
+  test("she changes her goal from Me: Path follows, her progress stays, and her coach sees it only if she shares it", async ({
+    page,
+  }) => {
+    await start(page);
+    await screen(page, "athlete", "me");
+    await expect(page.locator("#goal-title")).toHaveText("Sub‑40 10K");
+    const stage = await sim(page, (d) => [
+      d.state.stage,
+      d.state.stageSessions,
+      d.state.entries.length,
+    ]);
+    await page.getByRole("button", { name: "Change goal" }).click();
+    const sheet = page.getByRole("dialog", { name: "Change your goal" });
+    await sheet.locator("#g-title").fill("");
+    await sheet.getByRole("button", { name: "Save goal" }).click();
+    await expect(page.locator("#goal-error")).toHaveText(
+      "Say in a few words what you are training for.",
+    );
+    await sheet.locator("#g-title").fill("Half marathon in <b>April</b>");
+    await sheet.locator("#g-date").fill("2027-04-18");
+    await sheet.locator("#g-why").fill("");
+    await sheet.getByRole("button", { name: "Save goal" }).click();
+    await expect(page.locator(".toast")).toContainText(
+      'Your goal is now "Half marathon in <b>April</b>".',
+    );
+    await expect(page.locator("#goal-date")).toHaveText("By 18 April 2027.");
+    expect(await page.locator("#view b").count()).toBe(0); // shown as text
+    expect(await screen(page, "athlete", "path")).toContain(
+      "YOUR GOAL Half marathon in <b>April</b> By 18 April 2027.",
+    );
+    expect(
+      await sim(page, (d) => [d.state.stage, d.state.stageSessions, d.state.entries.length]),
+    ).toEqual(stage);
+    // No date is fine too.
+    await screen(page, "athlete", "me");
+    await page.getByRole("button", { name: "Change goal" }).click();
+    await sheet.locator("#g-date").fill("");
+    await sheet.getByRole("button", { name: "Save goal" }).click();
+    await expect(page.locator("#goal-date")).toHaveText("No date set.");
+    // The coach at PAU sees it (she shares her goal there); at the studio she does not share it.
+    expect(await screen(page, "coach", "athletes", "pau")).toMatch(
+      /Mia Keller Half marathon in <b>April<\/b>/,
+    );
+    expect(await screen(page, "coach", "athletes", "studio")).toMatch(/Mia Keller Goal not shared/);
   });
 
   test("explores, puts her name down for a free taster at another club, and finds it in Week and in the chat", async ({
