@@ -70,7 +70,7 @@ test.describe("B1 guardrails", () => {
     await expect(page.locator("#guard")).toContainText("Knee, level 4");
 
     // Approving keeps the guarded version: the athlete never gets the race-pace session.
-    await page.getByRole("button", { name: "Approve" }).click();
+    await page.getByRole("button", { name: "Approve", exact: true }).click();
     const approved = await page.evaluate(() => window.PATH_DEMO.currentDraft());
     expect(approved.items.every((i: any) => i.intensity !== "high" && i.load <= 0)).toBe(true);
     expect(JSON.stringify(approved.items.map((i: any) => i.to))).not.toContain("10K pace");
@@ -180,7 +180,7 @@ test("B1 plan changes never touch a session that is in the past, has started or 
   const before = await upToToday();
   await asRole(page, "coach");
   await tab(page, "Review");
-  await page.getByRole("button", { name: "Approve" }).click();
+  await page.getByRole("button", { name: "Approve", exact: true }).click();
   await asRole(page, "athlete");
   await tab(page, "Path");
   // (Tuesday's yoga class ended two days ago and is not logged, so Path first asks how it went. Log it.)
@@ -397,7 +397,7 @@ test.describe("B4 roster", () => {
 
   test("a waitlist promotion puts the member on the roster, not before", async ({ page }) => {
     await open(page);
-    const FULL = "pau-gym-2026-11-20";
+    const FULL = "pau-track-2026-11-19";
     await page.evaluate((sid) => {
       const d = window.PATH_DEMO,
         s = d.state.sessions[sid];
@@ -406,13 +406,13 @@ test.describe("B4 roster", () => {
       d.render();
     }, FULL);
     await tab(page, "Week");
-    await page.getByRole("button", { name: "Fri 20 Nov", exact: true }).click();
+    await page.getByRole("button", { name: "Thu 19 Nov", exact: true }).click();
     await page.locator("#classcard").getByRole("button", { name: "Join waitlist" }).click();
     await expect(page.locator(".toast")).toContainText("#2 on the waitlist");
 
     // Waiting is not being on the roster.
     await openRoster(page, FULL);
-    expect(await headerEqualsRows(page)).toBe(15);
+    expect(await headerEqualsRows(page)).toBe(30);
     await expect(page.locator('#roster [data-row="Mia Keller"]')).toHaveCount(0);
     await expect(page.locator("#roster-wait li")).toHaveCount(3); // one ahead, Mia, one who joined behind her
     await expect(page.locator("#roster-wait")).toContainText("Mia Keller");
@@ -420,14 +420,14 @@ test.describe("B4 roster", () => {
     // Two members cancel: the first spot goes to #1, the second to Mia.
     await asRole(page, "admin");
     await tab(page, "Schedule");
-    const free = page.getByRole("button", { name: "Free a spot: Gym session, Fri 20 Nov" });
+    const free = page.getByRole("button", { name: "Free a spot: Track session, Thu 19 Nov" });
     await free.click();
     await expect(page.locator(".toast")).toContainText("moved up to #1");
     await free.click();
     await expect(page.locator(".toast")).toContainText("promoted from the waitlist and booked");
 
     await openRoster(page, FULL);
-    expect(await headerEqualsRows(page)).toBe(15);
+    expect(await headerEqualsRows(page)).toBe(30);
     await expect(page.locator('#roster [data-row="Mia Keller"]')).toHaveCount(1);
     await expect(page.locator("#roster-wait li")).toHaveCount(1); // the person behind her is still waiting
     await expect(page.locator("#roster-wait")).not.toContainText("Mia Keller");

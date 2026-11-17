@@ -27,8 +27,12 @@ test("Today opens with a briefing, today's session with a check-in, and at most 
   await expect(card).toContainText("18:30 · Track session");
   const rows = page.locator("#needs .row");
   expect(await rows.count()).toBeLessThanOrEqual(5);
-  await expect(rows.first()).toContainText("Mia Keller");
-  await expect(rows.first()).toContainText("Plan draft waiting for you");
+  // Who needs what today: the people coming to today's session first, each with what they need.
+  await expect(rows.first()).toContainText("Coming today.");
+  await expect(rows.first().locator("[data-what]")).not.toBeEmpty();
+  const mia = page.locator("#needs .row", { hasText: "Mia Keller" });
+  await expect(mia).toContainText("Plan draft waiting for you");
+  await expect(mia.locator("[data-what]")).toHaveText("Look at the plan change PATH drafted");
   // The check-in button opens the roster that was already there.
   await card.getByRole("button", { name: "Check in" }).click();
   await expect(page.getByRole("button", { name: "Mark all present" })).toBeVisible();
@@ -345,9 +349,11 @@ test.describe("Week: groups and one-to-one in one place (K-14 to K-18)", () => {
     await asRole(page, "coach");
     await tab(page, "Week");
     await expect(page.locator("#week-answer")).toHaveText(
-      "9 sessions: 6 groups, 3 one-to-one, 1 open slot",
+      "6 sessions: 3 groups, 3 one-to-one, 1 open slot",
     );
-    await expect(page.locator('#coach-week [data-kind="group"]')).toHaveCount(6);
+    await expect(page.locator('#coach-week [data-kind="group"]')).toHaveCount(3);
+    // Only the sessions this coach runs: a colleague's Gym session is not "yours".
+    await expect(page.locator("#coach-week")).not.toContainText("Gym session");
     await expect(page.locator('#coach-week [data-kind="one"]')).toHaveCount(3);
     await expect(page.locator('#coach-week [data-kind="open"]')).toHaveCount(1);
     // Each session says which plan it runs on.
@@ -384,6 +390,7 @@ test.describe("Week: groups and one-to-one in one place (K-14 to K-18)", () => {
     await page.getByRole("button", { name: "One-to-one", exact: true }).click();
     await expect(page.locator('#coach-week [data-kind="group"]')).toHaveCount(0);
     await page.locator('#coach-week [data-kind="one"]').first().click();
+    await page.getByRole("button", { name: "Open Jonas Meier's page" }).click();
     await expect(page.locator("#athlete-detail h1")).toHaveText("Jonas Meier");
     // Next week is there too.
     await page.getByRole("button", { name: "Back to the session" }).click();
@@ -443,7 +450,7 @@ test("the athlete's Path shows the plan they follow, and it mirrors what the coa
   await monday.click();
   const day = page.getByRole("dialog", { name: "Monday, week 1" });
   await expect(day.locator(".h1")).toHaveText("Track: 4 × 1 km at 10K pace, 2 min jog");
-  await expect(day).toContainText("Base block · from Coach Sara");
+  await expect(day).toContainText("From Coach Sara · Base block");
   await expect(day).toContainText("Track session, 18:30");
   await day.getByRole("button", { name: "Book this session" }).click();
   await expect(page.locator(".sheet")).toContainText("Track session");
@@ -455,11 +462,11 @@ test("the athlete's Path shows the plan they follow, and it mirrors what the coa
   await expect(monday).toContainText("Booked · 18:30");
   // A day with no club session is done on your own and logged.
   await plan.locator("#plan-days .row", { hasText: "Long run" }).click();
-  await expect(page.getByRole("dialog", { name: "Saturday, week 1" })).toContainText(
+  await expect(page.getByRole("dialog", { name: "Sunday, week 1" })).toContainText(
     "Do it on your own, then log it",
   );
   await page
-    .getByRole("dialog", { name: "Saturday, week 1" })
+    .getByRole("dialog", { name: "Sunday, week 1" })
     .getByRole("button", { name: "Close" })
     .click();
   // The other weeks are one step away, each day just as open.
@@ -496,6 +503,14 @@ test("the athlete's Path shows the plan they follow, and it mirrors what the coa
   await tab(page, "Path");
   await expect(plan.locator("[data-plan] .h2")).toHaveText("Race week taper");
   await expect(page.locator("#also-shared")).toHaveText("Also from your coach: Base block.");
+  // One plan: the newer plan's days replace the older plan's, and the days it leaves free are her own again.
+  await expect(plan.locator("#plan-days")).toContainText(
+    "Track: 4 × 400 m at race pace, long rests",
+  );
+  await expect(plan.locator("#plan-days")).not.toContainText("4 × 1 km at 10K pace");
+  await expect(plan.locator("#plan-days .row", { hasText: "Easy run 40 min" })).toContainText(
+    "Your own day",
+  );
 });
 
 test.describe("Build with PATH, with the real model behind it (K-23)", () => {

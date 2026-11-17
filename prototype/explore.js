@@ -113,6 +113,7 @@ const offerPrice = (o) => (o.price ? chf(o.price) : o.trial ? "Free trial" : "Fr
 const openOffers = () => OFFERS.filter((o) => offerStart(o) > now()).sort((a, b) => offerStart(a) - offerStart(b));
 const offerLine = (o) => `${o.title}, ${o.club}: ${fDay(offerStart(o))} ${fTime(offerStart(o))}, ${offerKm(o)} km away, ${offerPrice(o).toLowerCase()}`;
 
+const offerClash = (o) => clashAt(offerStart(o), new Date(offerStart(o).getTime() + o.dur * 60000), o.id);
 /* Putting your name down. The club learns your name and nothing else; your pass and your log stay where they are. */
 function signUp(id, key, opts = {}) {
   if (key && S.idem[key]) return S.idem[key];
@@ -124,13 +125,22 @@ function signUp(id, key, opts = {}) {
     S.signups.push({ id, at: now(), wait: true });
     return remember(key, { ok: true, msg: `You are on the waitlist for ${o.title} at ${o.club}. Nothing is charged; you are told when a spot opens.` });
   }
+  const clash = offerClash(o);
   S.signups.push({ id, at: now() });
-  return remember(key, { ok: true, msg: `You're in: ${o.title} at ${o.club}, ${fDay(offerStart(o))} ${fTime(offerStart(o))}. ${o.club} sees your name, nothing else.` });
+  return remember(key, { ok: true, msg: `You're in: ${o.title} at ${o.club}, ${fDay(offerStart(o))} ${fTime(offerStart(o))}. ${o.club} sees your name, nothing else.${clash ? ` Heads up: it overlaps with ${clash}.` : ""}` });
 }
 function dropSignup(id) { const o = offerById(id); S.signups = S.signups.filter((x) => x.id !== id); return { ok: true, msg: `Your name is off the list for ${o ? o.title : "that session"}.` }; }
 
 /* ---------- filters ---------- */
-const exploreMatch = (o) => { const f = S.explore; return (f.kind === "all" || kindOf(o) === f.kind) && (f.group === "all" || o.group === f.group) && (!f.free || !o.price) && (!f.beginners || o.beginners) && (!f.near || offerKm(o) <= 3); };
+/* Explore has two questions, in this order (X-15): who offers it (club, coach, pro, care, event), then which discipline.
+   The disciplines on offer depend on the "who": under Care they are physiotherapy, massage and so on; everywhere else the sport family. */
+const discOf = (o, kind = S.explore.kind) => (kind === "care" ? o.sport : o.group);
+const disciplines = (kind = S.explore.kind) => {
+  const pool = openOffers().filter((o) => (kind === "all" ? kindOf(o) !== "care" : kindOf(o) === kind));
+  const have = [...new Set(pool.map((o) => discOf(o, kind)))];
+  return [...GROUPS.filter((g) => have.includes(g)), ...have.filter((g) => !GROUPS.includes(g)).sort()];
+};
+const exploreMatch = (o) => { const f = S.explore; return (f.kind === "all" || kindOf(o) === f.kind) && (f.group === "all" || discOf(o) === f.group) && (!f.free || !o.price) && (!f.beginners || o.beginners); };
 const exploreList = () => openOffers().filter(exploreMatch);
 
 /* ---------- the coach can look here too ---------- */
@@ -191,21 +201,14 @@ function vExplore() {
   const openP = S.explore.open && offerById(S.explore.open); if (openP) return vProvider(openP);
   const f = S.explore, list = exploreList(), mine = S.signups.map((x) => offerById(x.id)).filter((o) => o && offerStart(o) > now()).sort((a, b) => offerStart(a) - offerStart(b));
   const chip = (a, v, label, on) => `<button class="chip" data-a="${a}" data-v="${v}" aria-pressed="${on}">${label}</button>`;
-  const tile = (o) => `<button class="tile" data-a="prov-open" data-v="${o.id}" data-kind="${kindOf(o)}"><span class="pic">${photo(o.img)}${signedUp(o.id) ? `<span class="in">${I(P.tick, 14)}</span>` : ""}</span><span class="cap"><span class="strong">${esc(kindOf(o) === "club" || kindOf(o) === "event" ? o.sport : o.club)}</span><span class="sub">${kindOf(o) === "club" ? "" : `<span class="who">${KIND_TAG[kindOf(o)]}</span> · `}${WD[offerStart(o).getDay()]} ${offerStart(o).getDate()} · ${o.price ? chf(o.price).replace(".00", "") : "Free"}</span></span><span class="sr">${esc(o.title)}, ${esc(o.club)}${signedUp(o.id) ? ", your name is down" : ""}</span></button>`;
-  const sel = list.find((o) => o.id === f.pin) || null;
-  const map = `<div class="map" id="map"><svg viewBox="0 0 100 115" preserveAspectRatio="none" aria-hidden="true"><path d="M50 60C58 62 62 70 70 82 76 92 84 104 92 115H62C60 100 54 84 47 70 45 65 46 60 50 60Z" fill="var(--track)"/><path d="M50 60C44 50 36 44 28 36 20 28 12 24 0 20" fill="none" stroke="var(--track)" stroke-width="2.4"/><path d="M48 61C45 72 40 86 37 115" fill="none" stroke="var(--track)" stroke-width="1.2"/><g fill="none" stroke="var(--hairline)" stroke-width=".6"><path d="M0 52H40L100 44M22 0 34 40 30 115M62 0 56 40 70 60 100 70M0 84 34 76 46 60M70 0 100 24"/></g></svg>
-      <span class="you" style="left:${ME_AT.x}%;top:${(ME_AT.y / 115) * 100}%" title="You are here"></span>
-      ${list.map((o) => `<button class="pin" style="left:${o.x}%;top:${(o.y / 115) * 100}%" data-a="pin" data-v="${o.id}" data-kind="${kindOf(o)}" aria-pressed="${f.pin === o.id}" aria-label="${esc(o.sport)} at ${esc(o.club)}, ${KIND[kindOf(o)]}, ${offerKm(o)} km away"><i style="background:${KIND_COLOR[kindOf(o)]}">${signedUp(o.id) ? I(P.tick, 12) : ""}</i></button>`).join("")}</div>
-    <ul class="legend" id="legend" aria-label="What the dot colours mean">${Object.keys(KIND_PLURAL).map((k) => `<li><i style="background:${KIND_COLOR[k]}"></i>${KIND_PLURAL[k]} <span class="sub">${list.filter((o) => kindOf(o) === k).length}</span></li>`).join("")}</ul>
-    ${sel ? `<button class="card mapcard" data-a="prov-open" data-v="${sel.id}"><span class="thumb">${photo(sel.img)}</span><span class="mid"><span class="eyebrow">${esc(sel.sport)} · ${offerKm(sel)} km</span><span class="strong" style="display:block">${esc(sel.title)}</span><span class="sub">${esc(sel.club)} · ${fDay(offerStart(sel))} ${fTime(offerStart(sel))} · ${offerPrice(sel)}</span></span></button>` : `<p class="sub" id="maphint">Tap a dot to see what is on there. ${list.length} ${list.length === 1 ? "session" : "sessions"} on the map.</p>`}
-    <p class="sub">A sketch map with made-up places. The app will use a real map and ask before it uses your location.</p>`;
+  const tile = (o) => `<button class="tile" data-a="prov-open" data-v="${o.id}" data-kind="${kindOf(o)}"><span class="pic">${photo(o.img, true)}${signedUp(o.id) ? `<span class="in">${I(P.tick, 14)}</span>` : ""}</span><span class="cap"><span class="strong">${esc(kindOf(o) === "club" || kindOf(o) === "event" ? o.sport : o.club)}</span><span class="sub">${kindOf(o) === "club" ? "" : `<span class="who">${KIND_TAG[kindOf(o)]}</span> · `}${WD[offerStart(o).getDay()]} ${offerStart(o).getDate()} · ${o.price ? chf(o.price).replace(".00", "") : "Free"}</span></span><span class="sr">${esc(o.title)}, ${esc(o.club)}${signedUp(o.id) ? ", your name is down" : ""}</span></button>`;
   return `<section class="pad stack-l" id="explore"><div><div class="eyebrow">Explore</div><h1 class="h1">Try something new</h1><p class="sub" style="margin-top:4px">Clubs, coaches, pros, physios and events around you. Look, try their plan, put your name down, like on the school sports list.</p></div>
     ${mine.length ? `<div class="stack" id="mylist" style="gap:8px"><div class="eyebrow">Your list · ${mine.length}</div><div class="card rows">${mine.map((o) => `<div class="row"><span class="lead time">${WD[offerStart(o).getDay()]} ${offerStart(o).getDate()}</span><button class="mid" style="text-align:left;min-height:44px" data-a="prov-open" data-v="${o.id}"><span class="strong" style="display:block">${esc(o.title)}</span><span class="sub">${fTime(offerStart(o))} · ${esc(o.club)}</span></button>${xBtn("offer-drop", "Take my name off: " + o.title, o.id)}</div>`).join("")}</div></div>` : ""}
-    <div class="stack"><div class="between" style="align-items:center"><div class="seg" role="group" aria-label="View">${["grid", "map"].map((v) => `<button data-a="xview" data-v="${v}" aria-pressed="${f.view === v}">${v === "grid" ? "Grid" : "Map"}</button>`).join("")}</div><span style="display:flex;align-items:center;gap:8px">${f.kind !== "all" || f.group !== "all" || f.free || f.beginners || f.near ? `<button class="btn sm" id="xreset" data-a="xclear">Reset filters</button>` : ""}<span class="sub" id="xcount">${list.length} of ${openOffers().length}</span></span></div>
-      <div class="filters" role="group" aria-label="Filter what you see">${chip("xgroup", "all", "All", f.group === "all")}${GROUPS.map((g) => chip("xgroup", g, g, f.group === g)).join("")}</div>
-      <div class="filters" role="group" aria-label="More filters">${chip("xkind", "club", "Clubs", f.kind === "club")}${chip("xkind", "coach", "Coaches", f.kind === "coach")}${chip("xkind", "pro", "Pros", f.kind === "pro")}${chip("xkind", "care", "Care", f.kind === "care")}${chip("xkind", "event", "Events", f.kind === "event")}${chip("xflag", "free", "Free", f.free)}${chip("xflag", "beginners", "Beginners welcome", f.beginners)}${chip("xflag", "near", "Within 3 km", f.near)}</div>
-      ${list.length ? "" : `<p class="sub" id="xnone">Nothing matches these filters.</p>`}</div>
-    ${f.view === "map" ? map : `<div class="tiles3" id="xgrid">${list.map(tile).join("")}</div>`}
+    <div class="stack"><div class="seg full" id="xkinds" role="group" aria-label="Who offers it">${[["all", "All"], ...Object.entries(KIND_PLURAL)].map(([k, l]) => `<button data-a="xkind" data-v="${k}" aria-pressed="${f.kind === k}">${l}</button>`).join("")}</div>
+      <div class="filters" id="xdisc" role="group" aria-label="Discipline">${chip("xgroup", "all", "All", f.group === "all")}${disciplines().map((g) => chip("xgroup", g, g, f.group === g)).join("")}</div>
+      <div class="between" style="align-items:center"><span class="sub" id="xcount">${list.length} of ${openOffers().length}</span><span class="only" role="group" aria-label="Only show">${[["free", "Free"], ["beginners", "Beginners welcome"]].map(([k, l]) => `<button class="btn sm ${f[k] ? "" : "ghost"}" data-a="xflag" data-v="${k}" aria-pressed="${!!f[k]}">${f[k] ? I(P.tick, 14) : ""}${l}</button>`).join("")}</span></div>
+      ${list.length ? "" : `<p class="sub" id="xnone">Nothing here yet. Try another discipline, or turn off "Free" and "Beginners welcome".</p>`}</div>
+    <div class="tiles3" id="xgrid">${list.map(tile).join("")}</div>
     <p class="note">Stuck for ideas? Ask your coach: "Suggest something new for me".</p></section>`;
 }
 function vOfferSheet() {
@@ -213,7 +216,7 @@ function vOfferSheet() {
   const full = left <= 0 && !inList;
   /* What happens if you book: spots, what it costs, what it does to your passes, and the waitlist if it is full. */
   const then = inList ? [onWait(o.id) ? "You are on the waitlist. You are told when a spot opens." : "Your name is down. It is in your Week and your coach knows about it.", "You can take your name off at any time."]
-    : [full ? "It is full. You can join the waitlist: you are told when a spot opens, and nothing is charged until then." : `You take 1 of the ${left} spots left; ${left - 1} remain.`, "It uses none of your passes or credits.", full ? "" : o.price ? `You pay ${chf(o.price)} once, in the test checkout. No real money moves.` : "Nothing is charged.", "It shows up in your Week, and your coach can see and cancel it for you."].filter(Boolean);
+    : [!full && offerClash(o) ? `It overlaps with ${esc(offerClash(o))}.` : "", full ? "It is full. You can join the waitlist: you are told when a spot opens, and nothing is charged until then." : `You take 1 of the ${left} spots left; ${left - 1} remain.`, "It uses none of your passes or credits.", full ? "" : o.price ? `You pay ${chf(o.price)} once, in the test checkout. No real money moves.` : "Nothing is charged.", "It shows up in your Week, and your coach can see and cancel it for you."].filter(Boolean);
   const action = inList ? `<button class="btn full" data-a="offer-drop" data-v="${o.id}">${onWait(o.id) ? "Leave the waitlist" : "Take my name off"}</button>`
     : full ? `<button class="btn acc full" data-a="offer-wait" data-v="${o.id}">Join waitlist</button>`
     : `<button class="btn acc full" data-a="offer-signup" data-v="${o.id}">${o.price ? `Put my name down · ${chf(o.price)}` : "Put my name down"}</button>`;

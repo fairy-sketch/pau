@@ -440,43 +440,15 @@ test.describe("5 confirm cards (B5)", () => {
   });
 });
 
-test("6 Explore: dots coloured by kind with a legend, Reset filters, and what booking does on the sheet", async ({
-  page,
-}) => {
+test("6 Explore: what booking does is spelled out on the sheet", async ({ page }) => {
   await open(page);
   await page
     .getByRole("navigation", { name: "Sections" })
     .getByRole("button", { name: "Explore" })
     .click();
+  // The map, its legend and "Reset filters" are gone (X-15): "All" in each row is the way back.
   await expect(page.getByRole("button", { name: "Reset filters" })).toHaveCount(0);
-  await page
-    .locator("#explore .filters")
-    .getByRole("button", { name: "Free", exact: true })
-    .click();
-  await page.getByRole("button", { name: "Map", exact: true }).click();
-  await expect(page.locator("#legend li")).toHaveText([
-    /Clubs \d+/,
-    /Coaches \d+/,
-    /Pros \d+/,
-    /Care \d+/,
-    /Events \d+/,
-  ]);
-  const colours = await page.locator("#map .pin").evaluateAll((els) => {
-    const by: Record<string, Set<string>> = {};
-    for (const e of els) {
-      const kind = (e as HTMLElement).dataset.kind ?? "";
-      (by[kind] ??= new Set()).add(
-        getComputedStyle(e.querySelector("i") as Element).backgroundColor,
-      );
-    }
-    return Object.fromEntries(Object.entries(by).map(([k, v]) => [k, [...v]]));
-  });
-  expect(Object.values(colours).every((v) => v.length === 1)).toBe(true); // one colour per kind
-  expect(new Set(Object.values(colours).map((v) => v[0])).size).toBe(Object.keys(colours).length); // and each kind its own
-  await page.getByRole("button", { name: "Reset filters" }).click();
-  await expect(page.locator("#map .pin")).toHaveCount(38);
-
-  await page.getByRole("button", { name: "Grid", exact: true }).click();
+  await expect(page.locator("#legend")).toHaveCount(0);
   await page.locator("#xgrid .tile").filter({ hasText: "Open doubles" }).click();
   await page.locator("#booknow").getByRole("button", { name: /^Book/ }).click();
   const c = page.locator("#consequence");

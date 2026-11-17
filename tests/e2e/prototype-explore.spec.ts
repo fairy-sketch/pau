@@ -12,7 +12,7 @@ const explore = (page: Page) =>
   page.getByRole("navigation", { name: "Sections" }).getByRole("button", { name: "Explore" });
 const tiles = (page: Page) => page.locator("#xgrid .tile");
 const chip = (page: Page, name: string) =>
-  page.locator("#explore .filters").getByRole("button", { name, exact: true });
+  page.locator("#explore .filters, #xkinds").getByRole("button", { name, exact: true });
 const demo = <T>(page: Page, fn: (d: any) => T) =>
   page.evaluate(`(${fn.toString()})(window.PATH_DEMO)`) as Promise<T>;
 
@@ -22,12 +22,16 @@ test("the icon top right opens a photo grid of clubs, coaches and pros", async (
   await expect(page.getByRole("heading", { name: "Try something new" })).toBeVisible();
   await expect(tiles(page)).toHaveCount(38);
   await expect(page.locator("#xcount")).toHaveText("38 of 38");
-  // Every tile shows one of the supplied photos, and it loads.
+  // Every tile shows one of the supplied photos, and it loads. (Tiles further down load as they come near; here all are asked for.)
+  await page.evaluate(() => {
+    document.querySelectorAll("#xgrid img").forEach((e) => e.removeAttribute("data-lazy"));
+    window.PATH_DEMO.loadPhotos();
+  });
   await expect
     .poll(() =>
       page
         .locator("#xgrid img")
-        .evaluateAll((els) => els.every((e) => (e as HTMLImageElement).complete)),
+        .evaluateAll((els) => els.every((e) => (e as HTMLImageElement).naturalWidth > 0)),
     )
     .toBe(true);
   const imgs = await page.locator("#xgrid img").evaluateAll((els) =>
@@ -174,46 +178,73 @@ test("a club session: put your name down, see it on your list, take it off again
   await expect(page.locator("#booknow")).toContainText("You are on the waitlist.");
 });
 
-test("filters apply to the grid and the map alike", async ({ page }) => {
+test("Explore navigation: who offers it first, then the discipline, and the two stay in step", async ({
+  page,
+}) => {
   await open(page);
   await explore(page).click();
+  const kinds = page.getByRole("group", { name: "Who offers it" }).getByRole("button");
+  const discs = page.getByRole("group", { name: "Discipline" }).getByRole("button");
+  await expect(kinds).toHaveText(["All", "Clubs", "Coaches", "Pros", "Care", "Events"]);
+  await expect(page.locator("#map")).toHaveCount(0); // no map any more
+  await expect(page.getByRole("button", { name: "Map", exact: true })).toHaveCount(0);
+  // All six fit side by side: none is cut off or scrolled away.
+  const row = (await page.locator("#xkinds").boundingBox())!;
+  for (const box of await kinds.evaluateAll((els) =>
+    els.map((e) => e.getBoundingClientRect().toJSON()),
+  )) {
+    expect(box.left).toBeGreaterThanOrEqual(row.x);
+    expect(box.right).toBeLessThanOrEqual(row.x + row.width + 0.5);
+    expect(box.width).toBeGreaterThanOrEqual(44);
+  }
+
+  // Discipline narrows what is shown; "Free" narrows it further.
   await chip(page, "Water").click();
   await expect(tiles(page)).toHaveCount(2);
-  await chip(page, "Free").click();
+  await page.getByRole("button", { name: "Free", exact: true }).click();
   await expect(tiles(page)).toHaveCount(1);
   await expect(tiles(page).first()).toContainText("Swimming");
   await expect(page.locator("#xcount")).toHaveText("1 of 38");
+  await page.getByRole("button", { name: "Free", exact: true }).click();
 
-  // Switch to the map: the same single session, as a dot.
-  await page.getByRole("button", { name: "Map", exact: true }).click();
-  await expect(page.locator("#map .pin")).toHaveCount(1);
-  await chip(page, "All").click();
-  await chip(page, "Free").click();
-  await expect(page.locator("#map .pin")).toHaveCount(38);
-  await chip(page, "Within 3 km").click();
-  const near = await page.locator("#map .pin").count();
-  expect(near).toBeGreaterThan(3);
-  expect(near).toBeLessThan(38);
-  expect(await demo(page, (d) => d.exploreList().every((o: any) => d.offerKm(o) <= 3))).toBe(true);
+  // The discipline row follows the "who": under Care it is treatments, not sports.
+  await kinds.filter({ hasText: "Care" }).click();
+  await expect(discs).toHaveText([
+    "All",
+    "Massage",
+    "Mental coaching",
+    "Physiotherapy",
+    "Recovery",
+    "Sports nutrition",
+  ]);
+  await expect(discs.first()).toHaveAttribute("aria-pressed", "true"); // "Water" no longer exists here, so it fell back to All
+  await expect(tiles(page)).toHaveCount(5);
+  await chip(page, "Physiotherapy").click();
+  await expect(tiles(page)).toHaveCount(1);
+  await expect(tiles(page).first().locator(".who")).toHaveText("Care");
 
-  // A dot opens a small card; the card opens the provider's page.
-  await expect(page.locator("#maphint")).toContainText(`${near} sessions on the map`);
-  await page.getByRole("button", { name: /^Mobility at Mobility Lab/ }).click();
-  await expect(page.locator(".mapcard")).toContainText("Mobility for runners");
-  await page.locator(".mapcard").click();
-  await expect(page.locator("#provider")).toContainText("Mobility Lab");
-  await page.getByRole("button", { name: "Back to Explore" }).click();
-
-  // View and filters survive a reload. Nothing matches: say so, and offer the way back.
+  // Every discipline that is offered has something behind it: no dead ends.
+  for (const kind of ["All", "Clubs", "Coaches", "Pros", "Events"]) {
+    await kinds.filter({ hasText: new RegExp(`^${kind}$`) }).click();
+    const names = await discs.allTextContents();
+    expect(names.length, kind).toBeGreaterThan(1);
+    const empty = await demo(page, (d) => {
+      const S = d.state,
+        keep = S.explore.group,
+        none: string[] = [];
+      for (const g of d.disciplines()) {
+        S.explore.group = g;
+        if (!d.exploreList().length) none.push(g);
+      }
+      S.explore.group = keep;
+      return none;
+    });
+    expect(empty, kind).toEqual([]);
+  }
+  // The choice survives a reload.
+  await kinds.filter({ hasText: "Pros" }).click();
   await page.reload();
-  await expect(page.locator("#map")).toBeVisible();
-  await expect(chip(page, "Within 3 km")).toHaveAttribute("aria-pressed", "true");
-  await chip(page, "Dance").click();
-  await chip(page, "Pros").click();
-  await expect(page.locator("#xnone")).toContainText("Nothing matches");
-  await page.getByRole("button", { name: "Reset filters" }).click();
-  await expect(page.getByRole("button", { name: "Reset filters" })).toHaveCount(0);
-  await expect(page.locator("#map .pin")).toHaveCount(38);
+  await expect(kinds.filter({ hasText: "Pros" })).toHaveAttribute("aria-pressed", "true");
 });
 
 test("the coach looks in Explore too: suggests, respects the guardrail, and acts only after a confirm", async ({
@@ -337,9 +368,11 @@ test("Explore passes axe (WCAG A and AA), has 44 px targets and names on every c
   await page.getByRole("dialog").getByRole("button", { name: "Put my name down" }).click();
   await page.getByRole("button", { name: "Back to Explore" }).click();
   await check("grid with my list");
-  await page.getByRole("button", { name: "Map", exact: true }).click();
-  await page.getByRole("button", { name: /^Yoga at Yoga am Fenster/ }).click();
-  await check("map with a card");
+  await page
+    .getByRole("group", { name: "Who offers it" })
+    .getByRole("button", { name: "Care" })
+    .click();
+  await check("grid, care");
   await tab(page, "Path");
   await check("path with a plan being tried");
   await tab(page, "Coach");
@@ -414,7 +447,10 @@ test("events are in Explore too: a race, a tournament, an open day, each with a 
   );
   await page.getByRole("button", { name: "Back to Explore" }).click();
   await expect(page.locator("#mylist")).toContainText("Limmat Night Run, 10K");
-  // On the map, events are dots like everything else.
-  await page.getByRole("button", { name: "Map", exact: true }).click();
-  await expect(page.locator("#map .pin")).toHaveCount(7);
+  // Events are one of the six kinds.
+  await page
+    .getByRole("group", { name: "Who offers it" })
+    .getByRole("button", { name: "Events" })
+    .click();
+  await expect(page.locator("#xgrid .tile")).toHaveCount(7);
 });

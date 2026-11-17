@@ -189,11 +189,13 @@ test.describe("Waitlist: offer with expiry", () => {
     await page.getByRole("dialog").getByRole("button", { name: "Join waitlist" }).click();
     await expect(toast(page)).toContainText("You are #2 on the waitlist");
   }
-  /** Two members cancel: the first spot goes to #1, the second is held for Mia. */
+  /** Two members cancel: the first spot is held for #1 (who takes it), the second is held for Mia. */
   async function offered(page: Page) {
     await waiting(page);
     await freeSpot(page, "Yoga flow, Thu 19 Nov");
-    await expect(toast(page)).toContainText("moved up to #1");
+    await expect(toast(page)).toContainText(
+      /It is held for \w+ \w+, next on the waitlist, until 14:00/,
+    );
     await page.getByRole("button", { name: "Free a spot: Yoga flow, Thu 19 Nov" }).click();
     await expect(toast(page)).toContainText(
       "It is held for Mia Keller until 14:00, then it goes to the next person",
@@ -237,7 +239,7 @@ test.describe("Waitlist: offer with expiry", () => {
     await page.clock.setFixedTime(minutesLater(121));
     await tab(page, "Coach");
     await expect(page.locator(".msg.coach").last()).toContainText(
-      "ran out at 14:00. It went to the next person on the waitlist",
+      "ran out at 14:00. It is held for the next person on the waitlist, until 16:01",
     );
     const after = await demo(page, (d) => {
       const s = d.state.sessions["studio-yoga-2026-11-19"];
@@ -250,16 +252,25 @@ test.describe("Waitlist: offer with expiry", () => {
         queue: s.waitOthers,
       };
     });
+    // The person behind her now has it held, for 2 h, like she had. Nobody can book past them.
     expect(after).toEqual({
       waiting: false,
       booked: false,
-      others: 20,
+      others: 19,
       cap: 20,
-      held: 0,
-      queue: 0,
+      held: 1,
+      queue: 1,
     });
     await tab(page, "Path");
     await expect(page.locator("#view")).not.toContainText("A spot is held for you");
+    await page.clock.setFixedTime(minutesLater(245));
+    await tab(page, "Path");
+    expect(
+      await demo(page, (d) => {
+        const s = d.state.sessions["studio-yoga-2026-11-19"];
+        return [s.others, s.held, s.waitOthers, d.spots(s)];
+      }),
+    ).toEqual([20, 0, 0, 0]);
   });
 
   test("take the spot from Path, or pass it on from the sheet", async ({ page }) => {
@@ -284,7 +295,7 @@ test.describe("Waitlist: offer with expiry", () => {
     });
   });
 
-  test("pass it on: it goes to the next person at once", async ({ page }) => {
+  test("pass it on: it is held for the next person at once", async ({ page }) => {
     await offered(page);
     await tab(page, "Week");
     await openSession(page, YOGA);
@@ -293,14 +304,14 @@ test.describe("Waitlist: offer with expiry", () => {
     );
     await page.getByRole("dialog").getByRole("button", { name: "Pass it on" }).click();
     await expect(toast(page)).toContainText(
-      "You passed on the spot. It went to the next person on the waitlist.",
+      /You passed on the spot\. It is held for the next person on the waitlist, until \d\d:\d\d/,
     );
     expect(
-      await demo(page, (d) => [
-        !!d.myWait("studio-yoga-2026-11-19"),
-        d.state.sessions["studio-yoga-2026-11-19"].others,
-      ]),
-    ).toEqual([false, 20]);
+      await demo(page, (d) => {
+        const s = d.state.sessions["studio-yoga-2026-11-19"];
+        return [!!d.myWait(s.id), s.others, s.held, d.spots(s)];
+      }),
+    ).toEqual([false, 19, 1, 0]);
   });
 
   test("the hold is a club setting: an admin switches PAU from automatic booking to offers", async ({
